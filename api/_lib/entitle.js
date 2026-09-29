@@ -187,6 +187,14 @@ export async function allowGuide(uid) {
   if (await dailyCount(uid, 'guide') >= cap) throw new HttpError(429, 'rate_limited', paid ? 'Your guide has talked a lot today. She will be back tomorrow.' : `Free accounts get ${cap} guide messages a day. Get a Home Pass to keep talking.`);
 }
 
+// ---- Mira's voice ----
+export async function allowVoice(uid) {
+  const sub = await getSub(uid), paid = subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;
+  const cap = paid ? PRICING.voice.paidPerDay : PRICING.voice.freePerDay;
+  if (await dailyCount(uid, 'voice') >= cap) throw new HttpError(429, 'rate_limited', 'Mira has talked a lot today; she will switch to the device voice.');
+  await db.insert('usage', { user_id: uid, kind: 'voice', model: 'elevenlabs' });
+}
+
 // ---- photo-real renders ----
 // Every render is a usage row (kind 'render'); a failed one is marked model='failed' and no longer counts.
 const RENDER_OK = { neq: 'failed' };

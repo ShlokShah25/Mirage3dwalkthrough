@@ -11,7 +11,7 @@ if (existsSync(join(root, '.env.local'))) for (const line of readFileSync(join(r
   const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
 const PORT = Number(process.env.PORT || 3000);
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.glb': 'model/gltf-binary', '.txt': 'text/plain; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.glb': 'model/gltf-binary', '.mp4': 'video/mp4', '.mp3': 'audio/mpeg', '.txt': 'text/plain; charset=utf-8' };
 
 async function api(req, res, name) {
   const file = join(root, 'api', name + '.js');
@@ -36,8 +36,16 @@ http.createServer(async (req, res) => {
     let p = join(root, 'public', decodeURIComponent(url.pathname));
     if (!p.startsWith(join(root, 'public'))) { res.writeHead(403).end(); return; }
     try { if ((await stat(p)).isDirectory()) p = join(p, 'index.html'); } catch { if (existsSync(p + '.html')) p += '.html'; }
-    const data = await readFile(p);
-    res.writeHead(200, { 'content-type': TYPES[extname(p)] || 'application/octet-stream', ...(extname(p) === '.glb' ? { 'cache-control': 'public, max-age=604800' } : {}) }).end(data);
+    const data = await readFile(p), ext = extname(p), type = TYPES[ext] || 'application/octet-stream';
+    const cache = ['.glb', '.mp4', '.mp3'].includes(ext) ? { 'cache-control': 'public, max-age=604800' } : {};
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (range && ['.mp4', '.mp3'].includes(ext)) {   // video needs byte ranges (Safari won't play without them)
+      let a = range[1] ? +range[1] : data.length - +range[2], b = range[1] && range[2] ? +range[2] : data.length - 1;
+      if (!range[1]) b = data.length - 1; a = Math.max(0, a); b = Math.min(b, data.length - 1);
+      if (a > b) { res.writeHead(416, { 'content-range': `bytes */${data.length}` }).end(); return; }
+      res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${b}/${data.length}`, 'content-length': b - a + 1, ...cache }).end(data.subarray(a, b + 1)); return;
+    }
+    res.writeHead(200, { 'content-type': type, ...(['.mp4', '.mp3'].includes(ext) ? { 'accept-ranges': 'bytes' } : {}), ...cache }).end(data);
   } catch (e) {
     if (e.code === 'ENOENT') { res.writeHead(404).end('not found'); return; }
     console.error(e); res.writeHead(500).end('error');

@@ -160,6 +160,10 @@ assert.equal(r.status, 200); assert.ok(r.body.image.startsWith('data:image/jpeg'
 const fc = calls.filter(c => c.fal).at(-1); assert.equal(fc.auth, 'Key fal_test'); assert.equal(fc.ratio, '16:9'); assert.ok(fc.hasImage); assert.match(fc.prompt, /Keep EXACTLY the same camera angle/); ok('free render works, sends Key auth, the view and a 16:9 frame');
 r = await call(F, '/api/render', { homeId: 'sample-home', image: VIEW, style: 'FAILME' }); assert.equal(r.status, 502); assert.equal(r.body.error.code, 'render_failed');
 r = await call(F, '/api/render', { homeId: 'sample-home', image: VIEW }); assert.equal(r.status, 200); ok('a failed render is not counted');
+// Mira's premium voice
+r = await call(F, '/api/voice', { text: 'Welcome home.' }); assert.equal(r.status, 200); assert.equal(r.body.url, 'https://fal.test/mira.mp3');
+assert.match(calls.filter(c => c.fal).at(-1).fal, /elevenlabs/); ok('Mira speaks in the premium voice through fal');
+r = await call(F, '/api/voice', { text: 'x'.repeat(500) }); assert.equal(r.status, 413); ok('overlong voice lines are refused');
 r = await call(F, '/api/render', { homeId: 'sample-home', image: VIEW }); assert.equal(r.status, 402); assert.equal(r.body.error.code, 'render_limit'); ok('free renders are capped at 2 a day');
 r = await call(A, '/api/render', { homeId: 'h1', image: VIEW, room: 'Bedroom 2' }); assert.equal(r.status, 200); assert.equal(r.body.tier, 'pass'); ok('Home Pass homes render on their own allowance');
 r = await call(F, '/api/render', { homeId: 'h1', image: VIEW }); assert.equal(r.status, 403); ok("you can't render someone else's home");

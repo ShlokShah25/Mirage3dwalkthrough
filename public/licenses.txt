@@ -1,7 +1,7 @@
 Third-party assets used by Mirage
 =================================
 
-Presenter character ("Mira") — Microsoft Rocketbox avatar library, Female_Adult_09
+Presenter character ("Mira") — Microsoft Rocketbox avatar library, Female_Adult_15
 https://github.com/microsoft/Microsoft-Rocketbox
 Converted to glTF and reduced (textures resized, facial blendshapes trimmed) for web use.
 

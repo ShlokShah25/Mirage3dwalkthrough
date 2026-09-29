@@ -63,6 +63,7 @@ export function startFakes() {
   const fal = http.createServer(async (req, res) => {
     const b = await readJson(req); calls.push({ fal: req.url, auth: req.headers.authorization, prompt: b.prompt, ratio: b.aspect_ratio, hasImage: String(b.image_url || '').startsWith('data:image/') });
     if (/FAILME/.test(b.prompt || '')) return res.writeHead(500, { 'content-type': 'application/json' }).end('{"detail":"boom"}');
+    if (/elevenlabs/.test(req.url)) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ audio: { url: 'https://fal.test/mira.mp3' } }));
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ images: [{ url: String(b.image_url), width: 1344, height: 768 }], has_nsfw_concepts: [false] }));
   }).listen(4003);
   return { close: () => { claude.close(); rzp.close(); fal.close(); }, subs };

@@ -24,3 +24,18 @@ export async function falImage(input, { timeoutMs = 120000 } = {}) {
     throw e;
   } finally { clearTimeout(t); }
 }
+
+// Mira's voice: ElevenLabs through fal. Returns a URL to an mp3 of the line.
+export async function falSpeech(text, { voice = env('MIRA_VOICE', 'Charlotte'), timeoutMs = 30000 } = {}) {
+  const key = env('FAL_KEY'); if (!key) throw new HttpError(503, 'voice_off', 'The premium voice is not switched on.');
+  const url = env('FAL_URL', 'https://fal.run').replace(/\/$/, '') + '/' + env('FAL_TTS_MODEL', 'fal-ai/elevenlabs/tts/multilingual-v2');
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { method: 'POST', signal: ac.signal, headers: { authorization: 'Key ' + key, 'content-type': 'application/json' }, body: JSON.stringify({ text, voice, stability: .45, similarity_boost: .8, style: .3, speed: 1 }) });
+    const j = await r.json().catch(() => ({}));
+    const out = j.audio?.url || j.audio_url?.url || j.audio_url;
+    if (!r.ok || !out) { console.error('fal tts', r.status, JSON.stringify(j).slice(0, 300)); throw new HttpError(502, 'voice_failed', 'Voice unavailable right now.'); }
+    return out;
+  } catch (e) { if (e?.name === 'AbortError') throw new HttpError(504, 'voice_failed', 'Voice took too long.'); throw e; }
+  finally { clearTimeout(t); }
+}

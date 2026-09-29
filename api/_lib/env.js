@@ -14,6 +14,7 @@ export const PRICING = {
   budgets: { designCalls: 32, editFollowups: 4, generationMinutes: 45 },
   // Photo-real renders (fal.ai, about ₹3–4 each). Free: a few a day to feel the wow. Paid: per home or per rolling 30 days.
   guide: { freePerDay: 40, paidPerDay: 400 },
+  voice: { freePerDay: 60, paidPerDay: 600, maxChars: 420 },   // Mira's premium voice: one line of speech per call
   renders: { freePerDay: 2, pass: 25, pro: 150, max: 500, perDayCap: 80 },
   graceDays: 3,               // keep Pro working this long after a failed renewal
   // Launch offer on the Home Pass: price steps up as homes are sold. Set LAUNCH_OFFER=off to end it.

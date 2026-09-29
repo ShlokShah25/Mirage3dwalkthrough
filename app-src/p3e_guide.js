@@ -77,6 +77,26 @@ function gSpeak(text) {
   const words = text.split(/\s+/).length, est = 900 + words * 360;
   const say = PRES.say = { text, t0: performance.now() + 150, ci: 0, cps: text.length / Math.max(1, (est - 900) / 1000) };   // her lips follow the words
   const clear = () => { if (PRES.say === say) PRES.say = null; };
+  if (GUIDE.speak && SITE?.token && !GUIDE.voiceOff) {   // Mira's own voice (premium), falling back to the device voice
+    return premiumSpeak(text, say).then(ok => { if (ok) { clear(); return; } return deviceSpeak(text, say, est, clear); });
+  }
+  return deviceSpeak(text, say, est, clear);
+}
+const VOICE_CACHE = new Map();
+async function premiumSpeak(text, say) {
+  try {
+    let url = VOICE_CACHE.get(text);
+    if (!url) { url = (await SITE.api('/api/voice', { text })).url; VOICE_CACHE.set(text, url); if (VOICE_CACHE.size > 80) VOICE_CACHE.delete(VOICE_CACHE.keys().next().value); }
+    hush(); PRES.say = say; const a = new Audio(url); GUIDE.audio = a; a.preload = "auto";
+    await new Promise((res, rej) => { a.oncanplay = res; a.onerror = rej; setTimeout(rej, 8000); });
+    await a.play();
+    return await new Promise(res => {
+      const tick = () => { if (GUIDE.audio !== a) return res(true); if (a.duration) { say.ci = Math.floor(a.currentTime / a.duration * text.length); say.t0 = performance.now(); } if (!a.ended && !a.paused) requestAnimationFrame(tick); };
+      a.onended = () => res(true); a.onpause = () => res(true); tick();
+    });
+  } catch (e) { if (e?.status === 429) GUIDE.voiceOff = true; return false; }
+}
+function deviceSpeak(text, say, est, clear) {
   if (!GUIDE.speak || !('speechSynthesis' in window)) return new Promise(r => setTimeout(() => { clear(); r(); }, est));
   return new Promise(res => {
     speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); GUIDE.voice ||= pickVoice(); if (GUIDE.voice) u.voice = GUIDE.voice;
@@ -86,7 +106,7 @@ function gSpeak(text) {
     u.onend = fin; u.onerror = fin; setTimeout(fin, est + 4000); speechSynthesis.speak(u);
   });
 }
-function hush() { try { window.speechSynthesis?.cancel(); } catch { } if (typeof PRES !== 'undefined') PRES.say = null; }
+function hush() { try { window.speechSynthesis?.cancel(); } catch { } try { GUIDE.audio?.pause(); } catch { } GUIDE.audio = null; if (typeof PRES !== 'undefined') PRES.say = null; }
 let capT = null;
 function gCaption(text) { const el = $('guideCap'); el.textContent = text; el.hidden = !text; clearTimeout(capT); if (text) capT = setTimeout(() => { el.hidden = true; }, 1500 + text.split(/\s+/).length * 420); }
 

@@ -202,7 +202,7 @@ async function loadMiraModel() {
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
         m.envMapIntensity = .55; if (m.map) m.map.anisotropy = 8;
         if (/opacity/i.test(m.name)) { m.transparent = false; m.alphaTest = .42; m.depthWrite = true; m.side = THREE.DoubleSide; }   // lashes, brows, flyaway hair
-        else if (/head/i.test(m.name)) { m.roughness = .52; } else m.roughness = .8;
+        else if (/head/i.test(m.name)) { m.roughness = .46; m.envMapIntensity = .7; if (m.normalMap) m.normalScale.set(.55, .55); } else m.roughness = .8;
       } } });
     if (!sk) throw new Error('no skinned mesh');
     root.updateMatrixWorld(true);
@@ -229,6 +229,9 @@ async function loadMiraModel() {
     PRES.rig = rig; PRES.sk = sk; PRES.model = holder; PRES.hipsRest = rig.hips?.b.position.clone();
     PRES.morph = sk.morphTargetInfluences ? sk : null;
     PRES.fig.traverse(o => { if (o.isMesh) o.visible = false; });   // hide the drawn stand-in
+    // a soft, warm key light that travels with her so her face never goes flat or dark
+    const key = new THREE.SpotLight('#ffe7d2', 2.2, 11, .42, .8, 1.6); key.position.set(.6, 6.6, 3.4); key.castShadow = false;
+    const aim = new THREE.Object3D(); aim.position.set(0, 5.1, 0); key.target = aim; PRES.fig.add(key, aim); PRES.keyLight = key;
     PRES.fig.add(holder);
   } catch (e) { console.warn('Mira model unavailable; using the drawn presenter.', e); }
   finally { PRES.modelLoading = false; }
@@ -268,7 +271,7 @@ function driveFace(dt) {
   // blinks every few seconds
   PRES.nextBlink ||= now + 2000; if (now > PRES.nextBlink) { PRES.blinkT = now; PRES.nextBlink = now + 2200 + Math.random() * 3500; }
   const bt = (now - (PRES.blinkT || 0)) / 1000, blink = bt < .16 ? Math.sin(bt / .16 * Math.PI) : 0;
-  want[BLINK_L] = want[BLINK_R] = blink;
+  want[BLINK_L] = want[BLINK_R] = .13 + blink * .87;   // lids rest slightly lowered: a softer, less startled look
   const smile = S ? .3 : .45; want[SMILE_L] = want[SMILE_R] = smile; want[BROW_UP] = S ? .15 + Math.max(0, Math.sin(now / 900)) * .2 : 0;
   const k = Math.min(1, dt * 22);
   for (let i = 0; i < inf.length; i++) inf[i] += (want[i] - inf[i]) * (i === BLINK_L || i === BLINK_R ? 1 : k);
@@ -408,7 +411,9 @@ async function startPresent() {
     if (!sp && first) { const s = presentSpot(first, null); await gFade(1, 250); player.x = s.vp.x; player.z = s.vp.z; player.yaw = s.vp.yaw; sp = [s.x, s.z]; }
     ensurePresenter(); placePresenter(sp[0], sp[1], Math.atan2(player.x - sp[0], player.z - sp[1])); await gFade(0, 350);
     flyTo(player.x, player.z, yawTo(player.x, player.z, sp[0], sp[1]), .08, 1.2);
-    if (script.intro) { PRES.waving = true; setTimeout(() => PRES.waving = false, 1800); gSay(script.intro); PRES.talking = true; await gSpeak(script.intro); PRES.talking = false; }
+    PRES.waving = true; setTimeout(() => PRES.waving = false, 1800); PRES.talking = true;
+    if (script.intro) { gSay(script.intro); await gSpeak(script.intro); }
+    PRES.talking = false;
     for (const s of script.stops) {
       if (!PRES.on) break;
       while (PRES.paused && PRES.on) await new Promise(r => setTimeout(r, 250));
@@ -418,7 +423,7 @@ async function startPresent() {
       await presentRoom(r, it, s.say);
       while (PRES.paused && PRES.on) await new Promise(r => setTimeout(r, 250));
     }
-    if (PRES.on && script.outro) { gSay(script.outro); PRES.talking = true; await gSpeak(script.outro); PRES.talking = false; }
+    if (PRES.on) { PRES.talking = true; if (script.outro) { gSay(script.outro); await gSpeak(script.outro); } PRES.talking = false; }
   } finally { if (PRES.on) endPresent(true); }
 }
 function endPresent(keepHer = false) {
@@ -439,4 +444,5 @@ addEventListener('keydown', e => {   // Esc closes the Ask panel first, then end
 }, true);
 // fetch her quietly once the home is up, so she's ready the moment someone presses Present
 setTimeout(() => { try { (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => fetch(MIRA_URL).catch(() => { })); } catch { } }, 6000);
+
 window.__present = { cols: () => ({ wallCols, itemCols, groups: [...itemGroups.entries()].map(([k, g]) => [k, g.userData.cols]) }), sightOk, gOk, gCell, walkableAt, losOk, roomDimsP: r => roomDims(r), PRES, presentRoom, focalItem, presentCam, startPresent, endPresent, findPath, navGrid, presentSpot, ensure: ensurePresenter, place: placePresenter };

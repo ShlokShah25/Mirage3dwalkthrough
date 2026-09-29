@@ -70,6 +70,7 @@ Start with **Test mode** keys, then switch to Live once your KYC is approved.
 1. Sign up at fal.ai → Dashboard → Keys → create a key. Put it in `FAL_KEY`.
 2. Add credit and set a spend limit. Each render is one FLUX.1 Kontext [pro] image.
 3. Without `FAL_KEY` the "Make it real" button stays hidden and `/api/render` answers 503.
+4. The same key gives Mira her own voice (ElevenLabs via fal, `/api/voice`) for signed-in users; without it she uses the device voice. `MIRA_VOICE` picks the voice (default Charlotte).
 
 ### 4. Vercel (hosting)
 1. Push this folder to a GitHub repo and import it at vercel.com/new. Framework preset: **Other**. No build command.
