@@ -245,21 +245,6 @@
   #presentBar .gav{width:22px;height:22px}
   .presbtn{font-weight:600}
   @media (max-width:760px){body.presenting #guideCap{font-size:15.5px;top:auto}#presentBar{font-size:12px}#presentBar .pb-who span{display:none}}
-  /* Mira on a video call */
-  #miraCam{position:absolute;right:16px;top:84px;width:150px;aspect-ratio:3/4;border-radius:18px;overflow:hidden;z-index:8;background:#0d0e10;border:1px solid rgba(255,255,255,.16);box-shadow:0 14px 40px rgba(0,0,0,.5)}
-  #miraCam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  #miraCam .mc-talk{opacity:0;transition:opacity .22s ease}#miraCam.talking .mc-talk{opacity:1}
-  #miraCam .mc-tag{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:12px;font-weight:600;color:#fff}
-  #miraCam .mc-live{width:7px;height:7px;border-radius:50%;background:#5bf0d1;box-shadow:0 0 8px #5bf0d1}
-  #miraCam .mc-wave{position:absolute;right:9px;bottom:11px;display:flex;gap:2px;align-items:flex-end;height:14px;opacity:0;transition:opacity .2s}
-  #miraCam .mc-wave i{width:3px;height:4px;border-radius:2px;background:#fff;animation:mcw .9s ease-in-out infinite}
-  #miraCam .mc-wave i:nth-child(2){animation-delay:.15s}#miraCam .mc-wave i:nth-child(3){animation-delay:.3s}#miraCam .mc-wave i:nth-child(4){animation-delay:.45s}
-  #miraCam.speaking .mc-wave,#miraCam.talking .mc-wave{opacity:1}
-  @keyframes mcw{0%,100%{height:4px}50%{height:14px}}
-  #miraCam .mc-x{position:absolute;right:6px;top:6px;width:22px;height:22px;padding:0;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:11px;opacity:0;transition:opacity .2s;cursor:pointer}
-  #miraCam:hover .mc-x{opacity:1}
-  body.presenting #miraCam{top:calc(6.5vh + 64px)}
-  @media (max-width:760px){#miraCam{width:104px;top:auto;bottom:150px;right:10px;border-radius:14px}body.presenting #miraCam{top:calc(6.5vh + 58px);bottom:auto}}
   #guideFade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:4}
   #guideCap{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(760px,calc(100% - 40px));z-index:7;padding:12px 18px;border-radius:14px;background:rgba(10,11,12,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:17px;line-height:1.45;text-align:center;color:var(--ink);text-wrap:balance;pointer-events:none}
   #guidePanel{position:absolute;right:14px;bottom:14px;width:370px;max-height:min(560px,calc(100% - 120px));display:flex;flex-direction:column;z-index:8;border-radius:18px;overflow:hidden}
@@ -3738,11 +3723,9 @@ function gSpeak(text) {
   const say = PRES.say = { text, t0: performance.now() + 150, ci: 0, cps: text.length / Math.max(1, (est - 900) / 1000) };   // her lips follow the words
   const clear = () => { if (PRES.say === say) PRES.say = null; };
   if (GUIDE.speak && SITE?.token && !GUIDE.voiceOff) {   // Mira's own voice (premium), falling back to the device voice
-    camSpeaking(true);
-    return premiumSpeak(text, say).then(ok => { camSpeaking(false); if (ok) { clear(); return; } return deviceSpeak(text, say, est, clear); });
+    return premiumSpeak(text, say).then(ok => { if (ok) { clear(); return; } return deviceSpeak(text, say, est, clear); });
   }
-  camSpeaking(true);
-  return deviceSpeak(text, say, est, clear).then(() => camSpeaking(false));
+  return deviceSpeak(text, say, est, clear);
 }
 const VOICE_CACHE = new Map();
 async function premiumSpeak(text, say) {
@@ -3904,7 +3887,7 @@ async function runAction(a) {
   else if (a.do === 'tour') { if (PRES.on) { PRES.paused = GUIDE.paused = false; $('presentPause').textContent = 'Pause'; } else startPresent(); }
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
-  else if (a.do === 'edit' && a.request) { camSay('onit'); const ok = await guideEdit(String(a.request).slice(0, 600)); if (ok) await camSay('done'); }
+  else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
 }
 function guideEdit(request) {
   return new Promise(res => {
@@ -3924,7 +3907,6 @@ function gNote(text, cls = 'guide') {
 function setTourUI(on) { $('guideTourBar').hidden = !on; $('guideTour').hidden = on; if (!on) $('guideStep').textContent = ''; $('guidePause').textContent = 'Pause'; }
 function openGuide(v = !GUIDE.open) {
   GUIDE.open = v; $('guidePanel').hidden = !v; document.body.classList.toggle('guide-open', v); $('btnGuide').setAttribute('aria-pressed', v);
-  camShow(v || PRES.on); if (v && !$('guideLog').children.length && !PRES.on) camSay('ask');
   if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, answer questions, and change anything you ask for. Try “show me the kitchen” or “make the bedroom darker”.`);
   if (v) setTimeout(() => $('guideIn').focus(), 50); else hush();
 }
@@ -4147,7 +4129,7 @@ async function loadMiraModel() {
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
         m.envMapIntensity = .55; if (m.map) m.map.anisotropy = 8;
         if (/opacity/i.test(m.name)) { m.transparent = false; m.alphaTest = .42; m.depthWrite = true; m.side = THREE.DoubleSide; }   // lashes, brows, flyaway hair
-        else if (/head/i.test(m.name)) { m.roughness = .52; } else m.roughness = .8;
+        else if (/head/i.test(m.name)) { m.roughness = .46; m.envMapIntensity = .7; if (m.normalMap) m.normalScale.set(.55, .55); } else m.roughness = .8;
       } } });
     if (!sk) throw new Error('no skinned mesh');
     root.updateMatrixWorld(true);
@@ -4174,6 +4156,9 @@ async function loadMiraModel() {
     PRES.rig = rig; PRES.sk = sk; PRES.model = holder; PRES.hipsRest = rig.hips?.b.position.clone();
     PRES.morph = sk.morphTargetInfluences ? sk : null;
     PRES.fig.traverse(o => { if (o.isMesh) o.visible = false; });   // hide the drawn stand-in
+    // a soft, warm key light that travels with her so her face never goes flat or dark
+    const key = new THREE.SpotLight('#ffe7d2', 2.2, 11, .42, .8, 1.6); key.position.set(.6, 6.6, 3.4); key.castShadow = false;
+    const aim = new THREE.Object3D(); aim.position.set(0, 5.1, 0); key.target = aim; PRES.fig.add(key, aim); PRES.keyLight = key;
     PRES.fig.add(holder);
   } catch (e) { console.warn('Mira model unavailable; using the drawn presenter.', e); }
   finally { PRES.modelLoading = false; }
@@ -4213,7 +4198,7 @@ function driveFace(dt) {
   // blinks every few seconds
   PRES.nextBlink ||= now + 2000; if (now > PRES.nextBlink) { PRES.blinkT = now; PRES.nextBlink = now + 2200 + Math.random() * 3500; }
   const bt = (now - (PRES.blinkT || 0)) / 1000, blink = bt < .16 ? Math.sin(bt / .16 * Math.PI) : 0;
-  want[BLINK_L] = want[BLINK_R] = blink;
+  want[BLINK_L] = want[BLINK_R] = .13 + blink * .87;   // lids rest slightly lowered: a softer, less startled look
   const smile = S ? .3 : .45; want[SMILE_L] = want[SMILE_R] = smile; want[BROW_UP] = S ? .15 + Math.max(0, Math.sin(now / 900)) * .2 : 0;
   const k = Math.min(1, dt * 22);
   for (let i = 0; i < inf.length; i++) inf[i] += (want[i] - inf[i]) * (i === BLINK_L || i === BLINK_R ? 1 : k);
@@ -4353,8 +4338,8 @@ async function startPresent() {
     if (!sp && first) { const s = presentSpot(first, null); await gFade(1, 250); player.x = s.vp.x; player.z = s.vp.z; player.yaw = s.vp.yaw; sp = [s.x, s.z]; }
     ensurePresenter(); placePresenter(sp[0], sp[1], Math.atan2(player.x - sp[0], player.z - sp[1])); await gFade(0, 350);
     flyTo(player.x, player.z, yawTo(player.x, player.z, sp[0], sp[1]), .08, 1.2);
-    PRES.waving = true; setTimeout(() => PRES.waving = false, 1800); camShow(true); PRES.talking = true;
-    if (CAM.shown && !CAM.broken) await camSay('hello'); else if (script.intro) { gSay(script.intro); await gSpeak(script.intro); }
+    PRES.waving = true; setTimeout(() => PRES.waving = false, 1800); PRES.talking = true;
+    if (script.intro) { gSay(script.intro); await gSpeak(script.intro); }
     PRES.talking = false;
     for (const s of script.stops) {
       if (!PRES.on) break;
@@ -4365,16 +4350,16 @@ async function startPresent() {
       await presentRoom(r, it, s.say);
       while (PRES.paused && PRES.on) await new Promise(r => setTimeout(r, 250));
     }
-    if (PRES.on) { PRES.talking = true; if (CAM.shown && !CAM.broken) await camSay('outro'); else if (script.outro) { gSay(script.outro); await gSpeak(script.outro); } PRES.talking = false; }
+    if (PRES.on) { PRES.talking = true; if (script.outro) { gSay(script.outro); await gSpeak(script.outro); } PRES.talking = false; }
   } finally { if (PRES.on) endPresent(true); }
 }
 function endPresent(keepHer = false) {
   PRES.on = false; PRES.path = null; PRES.done?.(false); PRES.done = null; PRES.turnTo?.res?.(); PRES.turnTo = null; PRES.follow = false; PRES.talking = false; PRES.gestOn = false; PRES.paused = false;
-  GUIDE.touring = false; GUIDE.flight = null; hush(); document.body.classList.remove('presenting', 'present-ask'); if (!GUIDE.open) camShow(false); $('presentBar').hidden = true; $('guideCap').hidden = true; dispatchEvent(new Event('resize'));
+  GUIDE.touring = false; GUIDE.flight = null; hush(); document.body.classList.remove('presenting', 'present-ask'); $('presentBar').hidden = true; $('guideCap').hidden = true; dispatchEvent(new Event('resize'));
   if (!keepHer && PRES.fig) PRES.fig.visible = false;
 }
 // a chat "go" while presenting: she walks you there instead of cutting
-async function presentGo(r) { camSay('follow', { caption: false }); const it = focalItem(r); await presentRoom(r, it, ''); }
+async function presentGo(r) { const it = focalItem(r); await presentRoom(r, it, ''); }
 
 $('btnPresent').onclick = () => PRES.on ? endPresent() : startPresent();
 $('presentEnd').onclick = () => endPresent();
@@ -4387,42 +4372,6 @@ addEventListener('keydown', e => {   // Esc closes the Ask panel first, then end
 // fetch her quietly once the home is up, so she's ready the moment someone presses Present
 setTimeout(() => { try { (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => fetch(MIRA_URL).catch(() => { })); } catch { } }, 6000);
 
-/* ---------- Mira on a video call: a photoreal concierge window ----------
-   Pre-made clips of the real-looking Mira (same voice as her live lines) for her set pieces;
-   while she speaks live lines a soft 'listening/speaking' loop plays with a voice meter. */
-const CAM_LINES = { hello: "Hi, I'm Mira. Welcome to your new home. Let me show you around.", ask: "Ask me anything. Sizes, finishes, or anything you'd like changed.", follow: "Follow me, it's just this way.",
-  onit: "Of course. Give me a second.", done: "Done. Have a look.", outro: "That's the whole home. Whenever you want something changed, just ask." };
-const CAM = { el: null, idle: null, talk: null, busy: null, shown: false };
-const camBase = () => (window.MIRAGE_ASSETS || '') + 'mira/';
-function camEnsure() {
-  if (CAM.el) return CAM.el;
-  const el = document.createElement('div'); el.id = 'miraCam'; el.hidden = true;
-  el.innerHTML = `<video class="mc-idle" muted loop playsinline preload="none"></video><video class="mc-talk" playsinline preload="none"></video><div class="mc-tag"><span class="mc-live"></span>Mira</div><div class="mc-wave"><i></i><i></i><i></i><i></i></div><button class="mc-x" type="button" aria-label="Hide Mira's video">✕</button>`;
-  ($('view3d') || document.body).appendChild(el); CAM.el = el; CAM.idle = el.querySelector('.mc-idle'); CAM.talk = el.querySelector('.mc-talk');
-  el.querySelector('.mc-x').onclick = () => { CAM.hiddenByUser = true; camShow(false); };
-  CAM.idle.onerror = () => { CAM.broken = true; el.hidden = true; };
-  return el;
-}
-function camShow(on) {
-  if (on && (CAM.hiddenByUser || CAM.broken)) return; const el = camEnsure(); CAM.shown = on; el.hidden = !on;
-  if (on) { if (!CAM.idle.src) CAM.idle.src = camBase() + 'idle.mp4'; CAM.idle.play().catch(() => { }); } else { CAM.idle.pause(); CAM.talk.pause(); el.classList.remove('talking', 'speaking'); }
-}
-function camSpeaking(on) { if (CAM.el) CAM.el.classList.toggle('speaking', !!on && CAM.shown); }
-// play one of her set-piece clips; resolves when she has finished (or straight away if the window can't show)
-function camSay(name, { caption = true, lips = true } = {}) {
-  const txt = CAM_LINES[name]; if (!txt) return Promise.resolve();
-  if (!CAM.shown && !(PRES.on || GUIDE.open)) return Promise.resolve();
-  camShow(true); if (!CAM.shown || CAM.broken) return GUIDE.speak ? gSpeak(txt) : Promise.resolve();
-  hush(); const v = CAM.talk; v.muted = !GUIDE.speak; v.src = camBase() + name + '.mp4';
-  if (caption) { gCaption(txt); gSay(txt); }
-  return new Promise(res => {
-    const done = () => { CAM.el.classList.remove('talking'); if (PRES.say?.text === txt) PRES.say = null; res(); };
-    v.onended = done; v.onerror = () => { done(); };
-    v.play().then(() => { CAM.el.classList.add('talking'); if (lips) PRES.say = { text: txt, t0: performance.now(), ci: 0, cps: txt.length / Math.max(1, v.duration || txt.length / 14) }; })
-      .catch(() => { done(); });
-    setTimeout(done, 12000);
-  });
-}
 window.__present = { cols: () => ({ wallCols, itemCols, groups: [...itemGroups.entries()].map(([k, g]) => [k, g.userData.cols]) }), sightOk, gOk, gCell, walkableAt, losOk, roomDimsP: r => roomDims(r), PRES, presentRoom, focalItem, presentCam, startPresent, endPresent, findPath, navGrid, presentSpot, ensure: ensurePresenter, place: placePresenter };
 
 
