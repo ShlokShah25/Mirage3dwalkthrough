@@ -1,0 +1,290 @@
+
+/* ================= step 1: read the plan (free) ================= */
+async function ensureImages() {
+  const sample = await getSample(); if (!sample) { flash('Claude is not available in this view.', true); return null; }
+  const caps = await sample.limits().catch(() => null);
+  if (!caps?.images) { modal(`<div class="eyebrow">Can't read images here</div><h2>Open in a browser to continue</h2><p class="lead">This Claude app doesn't let pages send images to Claude yet, so the plan and photos can't be read. Nothing was charged.</p><p class="lead">Open this page at claude.ai in Chrome, Safari or Edge on a computer. Projects are saved per browser, so on another device add the plan and photos again.</p><div class="mact"><button class="primary" data-close>Got it</button></div>`); return null; }
+  return { sample, max: Math.max(1, caps.images.maxCount || 1) };
+}
+$('btnGen').onclick = () => {
+  if (running) { ctl?.abort(); return; }
+  if (!project.plan?.image) { flash('Add a floor plan image first.', true); $('planDrop').focus?.(); return; }
+  if (!layout.walls.length) readPlan(); else requestGenerate();
+};
+$('btnReread').onclick = () => {
+  const m = modal(`<div class="eyebrow">Read the plan again</div><h2>Start the layout over?</h2><p class="lead">Claude traces the plan again. The current walls, rooms and furniture are replaced. Your photos stay. It's free.</p><div class="mact"><button data-close>Cancel</button><button class="primary" id="goRe">Read it again</button></div>`);
+  m.el.querySelector('#goRe').onclick = () => { m.close(); readPlan(); };
+};
+async function readPlan() {
+  if (running) return; const ok = await ensureImages(); if (!ok) return;
+  running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
+  if (innerWidth < 860) document.body.classList.remove('side-hidden');
+  project.brief = $('brief').value; const ceiling = clamp(parseFloat($('ceilH').value) || 10, 7, 20), view = $('seaSide').value;
+  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'shell', label: 'Building walls, doors and windows' }]);
+  let done = false;
+  try {
+    const tp = ticker('plan', 'Tracing walls and rooms');
+    if (SITE) SITE.ctx = { kind: 'plan_read', homeId: project.id };
+    const tr = await ok.sample.json(PLAN_PROMPT(project.plan.w, project.plan.h, project.brief), { images: dataURLtoBlob(project.plan.image), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop);
+    project.trace = tr; stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms`);
+    stepSet('shell', 'active');
+    const res = traceToLayout(tr, project.plan.w, project.plan.h, { ceiling, view, style: project.style, name: project.name });
+    if (!res.layout.walls.length) { stepSet('shell', 'error', 'No walls could be traced.'); res.warns.forEach(w => flash(w, true)); flash('The plan could not be traced. Try a cleaner image with walls, doors and windows only.', true); return; }
+    project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0;
+    const keep = new Set(res.layout.rooms.map(r => r.name));
+    for (const k of Object.keys(project.roomInspo || {})) if (!keep.has(k)) { delete project.roomInspo[k]; delete project.roomStyles?.[k]; }
+    project.layout = layout = res.layout; project.status = 'traced'; for (const k in MC) delete MC[k];
+    $('empty3d').hidden = true; $('pbar').hidden = false; buildAll(); placeSpawn(); setMode('walk'); showView('3d'); pv.fitted = false;
+    stepSet('shell', 'done', `${res.method} ${layout.walls.length} walls, ${layout.rooms.length} rooms.`);
+    res.warns.forEach(w => flash(w, true)); done = true; saveSoon();
+  } catch (e) { if (e?.code === 'cancelled') flash('Stopped.', true); else flash(errText(e), true); }
+  finally { running = false; renderUploads(); if (done) (SITE ? SITE.afterPlanRead?.() : askRoomInspo()); }
+}
+function askRoomInspo() {
+  const n = inspRooms().length;
+  const m = modal(`<div class="eyebrow">Plan read · ${n} rooms found</div><h2>Want any room to look different?</h2>
+    <p class="lead">Add photos for rooms that should have their own look, such as a cosy master bedroom, a kids' room or a kitchen with a particular stone. Everything else follows the style you picked. You can change this later on the left.</p>
+    <div class="rooms-insp" id="modalRooms"></div>
+    <div class="mact" style="margin-top:16px"><button data-close>Skip for now</button><button class="primary" data-close>Done</button></div>`, { wide: true });
+  $('modalRooms').innerHTML = roomRows('modal'); bindThumbs($('modalRooms'));
+  flash('Your plan is ready in 3D. If a wall looks wrong, fix it in Fix the layout, then press Design my home.');
+}
+
+/* ================= step 2: generate (charged on success) ================= */
+async function requestGenerate() {
+  if (running) { ctl?.abort(); return; }
+  const needImg = project.inspo.length || Object.values(project.roomInspo || {}).some(x => x.length);
+  const ok = needImg ? await ensureImages() : await getSample().then(sm => sm ? { sample: sm, max: 4 } : (flash('Claude is not available in this view.', true), null)); if (!ok) return;
+  if (SITE) { if (!(await SITE.canDesign?.(project))) return; }
+  else if (wallet.credits < BILLING.perWalkthrough) { openWallet('empty'); return; }
+  const regen = project.status === 'generated', roomsWith = Object.entries(project.roomInspo || {}).filter(([k, v]) => v.length);
+  const m = modal(`<div class="eyebrow">${regen ? 'Redesign' : 'Design'} my home</div><h2>${esc(project.name || 'My new home')}</h2>
+    <p class="lead">Every one of the ${inspRooms().length} rooms gets designed and furnished. It usually takes 2 to 5 minutes, and you can watch it happen.${regen ? ' This replaces the current furniture and your changes.' : ''}</p>
+    <dl class="sumlist"><dt>Rooms</dt><dd>${inspRooms().length}</dd><dt>Style</dt><dd>${project.inspo.length ? project.inspo.length + ' photo' + (project.inspo.length > 1 ? 's' : '') + ' of yours' : esc(presetById(project.presetId)?.name || 'Warm Minimal')}</dd><dt>Rooms with their own look</dt><dd>${roomsWith.length ? roomsWith.map(([k, v]) => `${esc(k)} (${v.length})`).join(', ') : 'None'}</dd><dt>Special requests</dt><dd>${project.brief ? esc(project.brief.slice(0, 140)) + (project.brief.length > 140 ? '…' : '') : 'None'}</dd></dl>
+    <div class="costline"><div><div class="eyebrow">Cost</div><div style="margin-top:4px;color:var(--muted);font-size:12.5px">${SITE ? 'Only counted when it finishes. Stop or fail and nothing is used.' : 'Charged only when it finishes. Stop or fail and you pay nothing.'}</div></div><b>${SITE ? esc(SITE.costLabel?.(project) || '') : creditsWord(BILLING.perWalkthrough)}</b></div>
+    <div class="mact"><span style="flex:1;align-self:center;color:var(--faint);font-size:12.5px">${SITE ? esc(SITE.balanceText?.(project) || '') : 'Balance after: ' + creditsWord(wallet.credits - BILLING.perWalkthrough)}</span><button data-close>Cancel</button><button class="primary" id="goGen">${regen ? 'Redesign' : 'Design my home'}</button></div>`);
+  m.el.querySelector('#goGen').onclick = () => { m.close(); runGenerate(ok); };
+}
+async function runGenerate(ok) {
+  const { sample, max } = ok;
+  let genId = null;
+  if (SITE) { try { genId = await SITE.startGen(project); } catch (e) { flash(errText(e), true); SITE.onError?.(e); return; } SITE.ctx = { kind: 'design', genId }; }
+  running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
+  if (innerWidth < 860) document.body.classList.remove('side-hidden');
+  project.brief = $('brief').value;
+  const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
+  const preset = presetById(project.presetId) || PRESETS[0];
+  const steps = [{ id: 'style', label: project.inspo.length ? `Reading your ${project.inspo.length} photo${project.inspo.length > 1 ? 's' : ''}` : `Using the ${preset.name} style`, state: 'active' }];
+  if (roomsWith.length) steps.push({ id: 'rstyle', label: `Reading photos for ${roomsWith.length} room${roomsWith.length > 1 ? 's' : ''}`, state: 'active' });
+  steps.push({ id: 'furn', label: 'Designing and furnishing rooms' }); stepUI(steps);
+  let placed = 0;
+  try {
+    const ts = ticker('style', 'Reading materials and colours');
+    const homeP = project.inspo.length ? collages(project.inspo, max).then(imgs => sample.json(STYLE_PROMPT(project.brief), { images: imgs, modelTier: 'default', signal, onText: ts.onText })) : Promise.resolve(null);
+    const roomJobs = roomsWith.map(r => async () => {
+      const imgs = await collages(project.roomInspo[r.name], max);
+      const raw = await sample.json(STYLE_PROMPT(project.brief, r), { images: imgs, modelTier: 'default', signal });
+      const st = normalizeStyle(raw); project.roomStyles[r.name] = { summary: st.summary, features: st.features, tokens: st.tokens, floor: st.floors[roomCat(r.type)] };
+    });
+    let rdone = 0, rfail = 0; const pool = async () => { while (roomJobs.length) { const j = roomJobs.shift(); try { await j(); } catch (e) { if (e?.code === 'cancelled') throw e; rfail++; } rdone++; stepSet('rstyle', null, `${rdone} of ${roomsWith.length} rooms`); } };
+    const [hr, rr] = await Promise.allSettled([homeP.finally(ts.stop), Promise.all([pool(), pool()])]);
+    const base = structuredClone(preset.style);
+    if (hr.status === 'rejected') { if (hr.reason?.code === 'cancelled') throw hr.reason; stepSet('style', 'error', errText(hr.reason) + ` Using the ${preset.name} style instead.`); project.style = normalizeStyle(base); project.customStyle = false; }
+    else if (hr.value) { const v = hr.value || {}; project.style = normalizeStyle({ ...base, ...v, tokens: { ...base.tokens, ...(v.tokens || {}) }, floors: { ...base.floors, ...(v.floors || {}) } }); project.customStyle = true; stepSet('style', 'done', project.style.summary); }
+    else { project.style = normalizeStyle(base); project.customStyle = false; stepSet('style', 'done', preset.style.summary); }
+    layout.settings.timeOfDay = project.style.time;
+    if (rr.status === 'rejected' && rr.reason?.code === 'cancelled') throw rr.reason;
+    if (roomsWith.length) stepSet('rstyle', rfail === roomsWith.length ? 'error' : 'done', `${roomsWith.length - rfail} of ${roomsWith.length} rooms have their own style${rfail ? `; ${rfail} could not be read and use the home style` : ''}`);
+    for (const k in MC) delete MC[k];
+    applyStyleToRooms(layout, project.style); removeItemsWhere(() => true); select(null); project.edits = []; undoStack = [];
+    buildAll(); renderStyle(); saveSoon();
+    const r = await furnishRooms(inspRooms().filter(r => r.type !== 'other'), signal); placed = r.placed;
+  } catch (e) {
+    if (e?.code === 'cancelled') flash('Stopped. Nothing was charged; what was already built is kept.', true);
+    else if (e?.code) flash(errText(e) + ' Nothing was charged.', true);
+    else { console.error(e); flash('Something went wrong while building: ' + (e?.message || e) + '. Nothing was charged.', true); }
+  } finally {
+    running = false;
+    if (placed > 0) { if (!SITE) charge(`Home design · ${project.name || 'My new home'}`); project.status = 'generated'; project.generatedAt = Date.now(); captureCover(); flash(SITE ? 'Your home is ready. Walk in and look around.' : `Your home is ready. ${creditsWord(BILLING.perWalkthrough)} used, ${creditsWord(wallet.credits)} left.`); renderSugg(); setTimeout(maybeCoach, 400); }
+    if (SITE && genId) SITE.finishGen?.(genId);
+    renderPresets();
+    renderUploads(); renderPhist(); saveSoon();
+  }
+}
+async function furnishRooms(rooms, signal, stepId = 'furn', extra = '') {
+  const sample = await getSample(); if (!sample) return { placed: 0 };
+  const chunks = []; let cur = [], area = 0;
+  for (const r of [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))) { const a = polyArea(r.polygon); if (cur.length && (cur.length >= 3 || area + a > 650)) { chunks.push(cur); cur = []; area = 0; } cur.push(r); area += a; }
+  if (cur.length) chunks.push(cur);
+  let done = 0, placed = 0, failed = 0; stepSet(stepId, 'active', `0 of ${rooms.length} rooms`);
+  const t0 = performance.now(), iv = setInterval(() => stepSet(stepId, null, `${done} of ${rooms.length} rooms · ${placed} pieces · ${Math.round((performance.now() - t0) / 1000)}s`), 1000);
+  const worker = async () => {
+    while (chunks.length) {
+      const ch = chunks.shift(); if (signal?.aborted) return;
+      try {
+        const res = await sample.json(furnishPrompt(ch, extra), { modelTier: 'default', signal });
+        const items = settleItems(Array.isArray(res) ? res : res?.items, ch);
+        layout.furniture.push(...items); addItemsLive(items); placed += items.length; updateMeta(); saveSoon();
+      } catch (e) { if (e?.code === 'cancelled') throw e; failed += ch.length; flash(`${ch.map(r => r.name).join(', ')}: ${errText(e)}`, true); }
+      done += ch.length;
+    }
+  };
+  try { await Promise.all([worker(), worker()]); }
+  finally { clearInterval(iv); stepSet(stepId, failed === rooms.length ? 'error' : 'done', `${placed} pieces in ${rooms.length - failed} of ${rooms.length} rooms · ${Math.round((performance.now() - t0) / 1000)}s`); }
+  return { placed, failed };
+}
+async function refurnishRoom(r, extra = '', bill = true) {
+  if (running) return;
+  if (!SITE && bill && wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return; }
+  if (SITE) { if (bill && !(await SITE.canEdit?.(project))) return; SITE.ctx = bill ? { kind: 'refurnish', homeId: project.id } : { kind: 'edit_followup', editId: SITE.lastEditId }; }
+  running = true; ctl = new AbortController();
+  stepUI([{ id: 'refurn', label: 'Refurnishing ' + r.name, state: 'active' }]);
+  try { removeItemsWhere(it => it.room === r.name); select(null); const { placed } = await furnishRooms([r], ctl.signal, 'refurn', extra); if (bill && placed > 0 && SITE) flash(`${r.name} redone.`); if (bill && placed > 0 && !SITE) { charge(`Redo ${r.name}`, BILLING.perChange); flash(`${r.name} redone. ${cfmt(BILLING.perChange)} credits used, ${creditsWord(wallet.credits)} left.`); } }
+  catch (e) { if (e?.code !== 'cancelled') flash(errText(e), true); }
+  finally { running = false; saveSoon(); }
+}
+
+/* ================= prompt editing ================= */
+const pbar = $('pbar'), pinput = $('pinput'), pstatus = $('pstatus'), phist = $('phist');
+const SUGG_BASE = ['Make the master bedroom moodier with dark walnut', 'Add a reading chair and floor lamp by the living room window', 'Change all bedroom floors to light oak', 'Swap the sofa fabric to a deep olive', 'Switch to night and add more warm lamps', 'Turn one bedroom into a home office'];
+function renderSugg() {
+  const rooms = layout.rooms.filter(r => r.kind === 'room').map(r => r.name);
+  const list = rooms.length ? SUGG_BASE.map(s => s.replace('one bedroom', rooms.find(n => /bed/i.test(n) && !/master/i.test(n)) || 'one bedroom')) : SUGG_BASE;
+  $('sugg').innerHTML = list.map(s => `<button type="button">${esc(s)}</button>`).join('');
+  $('sugg').querySelectorAll('button').forEach(b => b.onclick = () => { pinput.value = b.textContent; pinput.focus(); });
+}
+function renderPhist() {
+  const e = (project?.edits || []).slice(0, 8);
+  phist.innerHTML = e.map((x, i) => `<div><span>${esc(x.text)}<small>${esc(x.summary || '')} · ${ago(x.t)}</small></span>${i === 0 && undoStack.length ? '<button type="button" id="undoLast">Undo</button>' : ''}</div>`).join('');
+  $('undoLast')?.addEventListener('click', undoEdit);
+}
+pinput.addEventListener('focus', () => pbar.classList.add('open'));
+document.addEventListener('pointerdown', e => { if (!pbar.contains(e.target)) pbar.classList.remove('open'); });
+pinput.addEventListener('keydown', e => { if (e.key === 'Escape') { pbar.classList.remove('open'); pinput.blur(); } e.stopPropagation(); });
+function dirName(yaw) { const fx = -Math.sin(yaw), fz = -Math.cos(yaw); return Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 'right (+x)' : 'left (-x)') : (fz > 0 ? 'down the plan (+z)' : 'up the plan (-z, north)'); }
+function editPrompt(text) {
+  const low = text.toLowerCase(), here = roomAt(player.x, player.z), selRoom = selected && layout.rooms.find(r => r.name === selected.room);
+  let focus = layout.rooms.filter(r => r.kind !== 'ledge' && low.includes(r.name.toLowerCase()));
+  if (!focus.length) { const types = [['bedroom', /bedroom|bed room/], ['bath', /bath|toilet|washroom/], ['kitchen', /kitchen/], ['living', /living|lounge/], ['terrace', /terrace|balcon/]]; for (const [t, re] of types) if (re.test(low)) focus.push(...layout.rooms.filter(r => r.type === t || (t === 'bedroom' && r.type === 'master') || (t === 'terrace' && r.kind === 'outdoor'))); }
+  if (!focus.length) focus = [selRoom || here].filter(Boolean);
+  focus = [...new Set(focus)].slice(0, 4);
+  const extrasOf = it => Object.entries(it).filter(([k]) => !['id', 'type', 'name', 'room', 'x', 'z', 'rot', 'w', 'd', 'h', 'y', 'finish', 'accent'].includes(k)).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
+  let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
+  if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
+  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}`; }).join('\n');
+  const detail = focus.map(r => `ROOM "${r.name}" polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}\n${roomFaces(r).join('\n')}`).join('\n\n');
+  const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
+  return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
+
+HOMEOWNER'S REQUEST: "${text.slice(0, 800)}"
+WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. Words like "this", "here" or "that" refer to these.
+STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
+CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.
+
+ROOMS (name | type | area | bounds | floor):
+${rooms}
+
+${detail}
+
+FURNITURE (id | type | name | room | x,z rot | w×d×h y | finish | accent | extras):
+${furn.join('\n')}
+
+CATALOG for new items (type: default w×d×h — notes):
+${cat}
+
+Reply with only JSON: {"summary":"one short sentence saying what you changed","ops":[ ... ]}. Operations:
+{"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, or a type's extra fields }}
+{"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}}
+{"op":"remove","id":"<id>"}
+{"op":"style","token":"wood-light|wood-dark|stone|marble|stone-dark|fabric-main|fabric-second|fabric-accent|metal","value":"#hex"} (for stone, marble, stone-dark the value may be {"look":"travertine|marble|limestone|concrete|terrazzo","color":"#hex"}; for metal "brass|black|chrome"). This changes the material everywhere it is used.
+{"op":"floor","rooms":["<room>"],"finish":"stone-large|wood|tile-2ft|tile-1ft|terrazzo|stone","color":"#hex"}
+{"op":"paint","walls":"#hex","ceiling":"#hex"}
+{"op":"time","value":"golden|day|night"}
+{"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
+Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
+RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. If the request cannot be done, return an empty ops list and explain why in summary.`;
+}
+function applyOps(res) {
+  const ops = Array.isArray(res?.ops) ? res.ops.slice(0, 120) : [];
+  let n = 0, shell = false, mats = false; const added = [], refurn = [];
+  const roomByName = nm => layout.rooms.find(r => r.name.toLowerCase() === String(nm || '').toLowerCase());
+  for (const op of ops) {
+    if (!op || typeof op !== 'object') continue;
+    if (op.op === 'update') {
+      const it = layout.furniture.find(x => x.id === op.id); if (!it) continue; const set = op.set || {};
+      for (const [k, v] of Object.entries(set)) { if (['id', 'type'].includes(k)) continue; if (['x', 'z', 'rot', 'w', 'd', 'h', 'y'].includes(k)) { const x = +v; if (isFinite(x) && (!['w', 'd', 'h'].includes(k) || x > 0)) it[k] = x; } else it[k] = v; }
+      if (('x' in set || 'z' in set || 'rot' in set) && BACKED.has(it.type)) snapBack(it);
+      const r = roomAt(it.x, it.z); if (r) it.room = r.name; rebuildItem(it); n++;
+    } else if (op.op === 'remove') { const before = layout.furniture.length; removeItemsWhere(x => x.id === op.id); if (layout.furniture.length < before) n++; }
+    else if (op.op === 'add') { if (op.item || op.type) added.push(op.item || op); }
+    else if (op.op === 'style' && TOKEN_NAMES.includes(op.token)) {
+      const cur = project.style.tokens[op.token], v = op.value;
+      if (op.token === 'metal') { if (['brass', 'black', 'chrome'].includes(v)) project.style.tokens.metal = v; }
+      else if (typeof cur === 'object') { if (typeof v === 'object') { if (['travertine', 'marble', 'limestone', 'concrete', 'terrazzo'].includes(v.look)) cur.look = v.look; cur.color = hexOk(v.color, cur.color); } else cur.color = hexOk(v, cur.color); }
+      else project.style.tokens[op.token] = hexOk(v, cur);
+      mats = true; n++;
+    } else if (op.op === 'floor') {
+      const names = Array.isArray(op.rooms) ? op.rooms : [op.room];
+      for (const nm of names) { const r = roomByName(nm); if (!r) continue; if (['stone-large', 'wood', 'tile-2ft', 'tile-1ft', 'terrazzo', 'stone', 'plain'].includes(op.finish)) r.finish = op.finish; r.floor = hexOk(op.color, r.floor); shell = true; n++; }
+    } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
+    else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
+    else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
+  }
+  if (added.length) { const items = settleItems(added, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; }
+  if (mats) for (const k in MC) delete MC[k];
+  if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
+  saveSoon();
+  return { n, refurn };
+}
+function undoEdit() {
+  const snap = undoStack.pop(); if (!snap) return;
+  project.layout = layout = snap.layout; project.style = snap.style; project.edits.shift();
+  for (const k in MC) delete MC[k]; select(null); buildAll(); saveSoon(); renderPhist(); pstatus.textContent = ''; flash('Undone.');
+}
+let editing = false, editCtl = null;
+$('pform').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (editing) { editCtl?.abort(); return; }
+  const text = pinput.value.trim(); if (!text) return;
+  if (running) { flash('Wait for the current generation to finish, or stop it first.', true); return; }
+  if (SITE) { if (!(await SITE.canEdit?.(project))) return; SITE.ctx = { kind: 'edit', homeId: project.id }; }
+  else if (wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return; }
+  const sample = await getSample(); if (!sample) { flash('Prompt edits need Claude, which is not available in this view.', true); return; }
+  editing = true; editCtl = new AbortController(); $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
+  const t0 = performance.now(); const iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
+  const snap = { layout: structuredClone(layout), style: structuredClone(project.style) };
+  try {
+    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal });
+    clearInterval(iv);
+    const { n, refurn } = applyOps(res);
+    const summary = String(res?.summary || '').slice(0, 220) || (n ? 'Done.' : 'No changes were made.');
+    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text, summary }); project.edits = project.edits.slice(0, 50); }
+    pstatus.innerHTML = `<span>${esc(summary)}</span>${n || refurn.length ? '<button type="button" id="undoNow">Undo</button>' : ''}`;
+    $('undoNow')?.addEventListener('click', undoEdit);
+    pinput.value = ''; renderPhist(); saveSoon();
+    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); pstatus.innerHTML = `<span>${esc(summary)}</span><button type="button" id="undoNow">Undo</button>`; $('undoNow')?.addEventListener('click', undoEdit); }
+  } catch (err) { clearInterval(iv); pstatus.textContent = err?.code === 'cancelled' ? 'Stopped. Nothing was changed.' : errText(err); }
+  finally { clearInterval(iv); editing = false; pinput.disabled = false; renderCredits(); }
+});
+
+/* ================= website: free one-room preview ================= */
+async function teaserRoom() {
+  if (running || !SITE) return;
+  const rooms = inspRooms().filter(r => r.type !== 'other');
+  const room = rooms.find(r => /living/i.test(r.type + ' ' + r.name)) || [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
+  if (!room) { flash('No rooms were found to preview.', true); return; }
+  running = true; ctl = new AbortController(); renderGenState();
+  if (innerWidth < 860) document.body.classList.remove('side-hidden');
+  stepUI([{ id: 'teaser', label: `Designing ${room.name} as your free preview`, state: 'active' }]);
+  let placed = 0;
+  try {
+    const preset = presetById(project.presetId) || PRESETS[0];
+    if (!project.customStyle) project.style = normalizeStyle(structuredClone(preset.style));
+    layout.settings.timeOfDay = project.style.time;
+    applyStyleToRooms(layout, project.style); removeItemsWhere(() => true); select(null); for (const k in MC) delete MC[k]; buildAll(); renderStyle();
+    SITE.ctx = { kind: 'teaser', homeId: project.id };
+    placed = (await furnishRooms([room], ctl.signal, 'teaser')).placed;
+    if (placed) { project.teaserRoom = room.name; const [x, z] = centroid(room.polygon); player.x = x; player.z = z; player.y = floorY(room); setMode('walk'); showView('3d'); }
+  } catch (e) { if (e?.code !== 'cancelled') flash(errText(e), true); }
+  finally { running = false; renderGenState(); saveSoon(); if (placed) setTimeout(() => SITE.afterTeaser?.(room), 900); }
+}

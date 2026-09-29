@@ -1,0 +1,12 @@
+{
+  "name": "mirage",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/dev.mjs",
+    "test": "node scripts/test-api.mjs"
+  }
+}
