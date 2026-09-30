@@ -33,7 +33,7 @@ Object.assign(CAT, {
       const g = G(), w = it.w, H = Math.min(it.h, ctx.H), back = -it.d / 2, m = mat(it.finish), n = Math.max(2, Math.round(w / 2));
       for (let i = 0; i < n; i++) { const pw = w / n; bx(g, pw - .025, H, .14, m, -w / 2 + pw * (i + .5), 0, back + .07); }
       bx(g, w, H, .02, mat('#1d1510'), 0, 0, back + .01);
-      const L = it.leds | 0; for (let i = 1; i <= L; i++) { const x = -w / 2 + w * i / (L + 1); ledV(g, x, .1, back + .14, H - .2); }
+      const L = it.leds | 0; for (let i = 1; i <= L; i++) { const x = L === 2 ? (i === 1 ? -1 : 1) * (w / 2 - Math.max(1, w * .18)) : -w / 2 + w * i / (L + 1); ledV(g, x, .1, back + .14, H - .2); }   // a pair frames the wall rather than crossing a TV or bed
       bx(g, w, .06, .06, mat('led-soft'), 0, .12, back + .17);
       return g;
     } },

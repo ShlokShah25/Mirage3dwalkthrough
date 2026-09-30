@@ -93,15 +93,16 @@ let composer = null, gtao = null, bloom = null, quality = TOUCH ? 'fast' : 'high
 let grade = null;
 // cinematic finish: gentle S-curve, warm highlights, soft vignette and fine grain (applied in display space)
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, vig: { value: .32 }, warm: { value: .035 }, contrast: { value: .16 }, grain: { value: .018 }, time: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, vig: { value: .32 }, warm: { value: .035 }, contrast: { value: .16 }, grain: { value: .008 }, sat: { value: 1.12 }, time: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float vig,warm,contrast,grain,time; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float vig,warm,contrast,grain,sat,time; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){ vec4 c=texture2D(tDiffuse,vUv); vec3 x=c.rgb;
       x=mix(x, x*x*(3.-2.*x), contrast);
+      x=mix(vec3(dot(x,vec3(.299,.587,.114))), x, sat);
       float l=dot(x,vec3(.299,.587,.114)); x+=vec3(warm,warm*.45,-warm*.6)*smoothstep(.45,1.,l);
       float d=distance(vUv,vec2(.5)); x*=mix(1.,1.-vig,smoothstep(.32,.9,d));
-      x+=(h(vUv*vec2(1733.,977.)+fract(time))-.5)*grain;
+      x+=(h(vUv*vec2(1733.,977.))-.5)*grain;   // still grain: animated noise read as shimmering
       gl_FragColor=vec4(clamp(x,0.,1.),c.a); }`
 };
 function setupPost() {
@@ -124,7 +125,7 @@ function setupPost() {
     gtao.overrideVisibility = () => { scene.traverse(o => { cache.set(o, o.visible); if (o.isPoints || o.isLine || o.isSprite || o === sky || o === sea || o.parent === city || o === city || (o.material && (o.material.transparent || Array.isArray(o.material)))) o.visible = false; }); };
     composer.addPass(gtao);
   }
-  bloom = new UnrealBloomPass(new THREE.Vector2(w, h), .3, .35, 1.05);
+  bloom = new UnrealBloomPass(new THREE.Vector2(w, h), .2, .3, 1.3);
   composer.addPass(bloom); composer.addPass(new OutputPass());
   grade = new ShaderPass(GradeShader); composer.addPass(grade);
   composer.setSize(w, h);
@@ -259,7 +260,7 @@ function floorTex(kind) {
 
 /* ================= materials & style tokens ================= */
 const MC = {}, EMIS = [];
-const std = o => new THREE.MeshStandardMaterial({ envMapIntensity: .55, ...o });
+const std = o => new THREE.MeshStandardMaterial({ envMapIntensity: .4, ...o });
 const phys = o => new THREE.MeshPhysicalMaterial({ envMapIntensity: .45, ...o });
 function emis(color, e, ei) { const m = std({ color, emissive: e, emissiveIntensity: ei, roughness: .6 }); m.userData.baseEI = ei; EMIS.push(m); return m; }
 const TOKEN_NAMES = ['wood-light', 'wood-dark', 'stone', 'marble', 'stone-dark', 'fabric-main', 'fabric-second', 'fabric-accent', 'metal'];
@@ -286,7 +287,7 @@ function mat(spec0) {
   let m; const [kind, a, b] = spec.split(':');
   if (kind === 'wood') { const t = woodTex(a); m = std({ map: t, normalMap: nmap(t === TX['wood-' + a] ? 'wood-' + a : '', 1.2), normalScale: new THREE.Vector2(.35, .35), roughness: .58 }); }
   else if (kind === 'fabric') { const t = fabricTex(a); m = phys({ map: t, normalMap: nmap('fab-' + a, 2.5), normalScale: new THREE.Vector2(.6, .6), roughness: .95, sheen: 1, sheenRoughness: .75, sheenColor: new THREE.Color(a).lerp(new THREE.Color('#ffffff'), .35) }); }
-  else if (kind === 'stone') { stoneTex(a, b); m = std({ map: TX['stone-' + a + b], normalMap: nmap('stone-' + a + b, 1.4), normalScale: new THREE.Vector2(.25, .25), roughness: a === 'marble' ? .2 : a === 'concrete' ? .9 : .6 }); }
+  else if (kind === 'stone') { stoneTex(a, b); m = std({ map: TX['stone-' + a + b], normalMap: nmap('stone-' + a + b, 1.4), normalScale: new THREE.Vector2(.25, .25), roughness: a === 'marble' ? .36 : a === 'concrete' ? .9 : .65 }); }
   else if (kind === 'clay') m = std({ map: fabricTex(a), roughness: .9 });
   else if (kind === 'velvet') { const t = fabricTex(a); m = phys({ map: t, normalMap: nmap('fab-' + a, 1.5), normalScale: new THREE.Vector2(.3, .3), roughness: .7, sheen: 1, sheenRoughness: .35, sheenColor: new THREE.Color(a).lerp(new THREE.Color('#ffffff'), .55) }); }
   else switch (spec) {
@@ -306,10 +307,10 @@ function mat(spec0) {
     case 'leaf-dark': m = std({ color: '#53633f', roughness: .75 }); break;
     case 'bark': m = std({ color: '#6d5a45', roughness: .9 }); break;
     case 'soil': m = std({ color: '#3b2f25', roughness: 1 }); break;
-    case 'lamp': m = emis('#f6e7cf', '#ffc98a', .9); break;
-    case 'lamp-white': m = emis('#f8f2e8', '#ffd9a8', .8); break;
-    case 'led': m = emis('#ffd9a0', '#ffc57a', 1.8); break;
-    case 'led-soft': m = emis('#f3dcc0', '#ffcf94', .7); break;
+    case 'lamp': m = emis('#f8efe3', '#ffdcb4', .9); break;
+    case 'lamp-white': m = emis('#faf5ee', '#ffe7cc', .8); break;
+    case 'led': m = emis('#fff1e0', '#ffe2bf', 1.5); break;
+    case 'led-soft': m = emis('#f5e8d8', '#ffe1bd', .7); break;
     case 'wine-glow': m = emis('#3b2416', '#ffb466', .9); break;
     default: m = spec.startsWith('#') ? phys({ color: spec, map: fabricTex('#ffffff'), roughness: .85, sheen: .5, sheenRoughness: .8, sheenColor: new THREE.Color(spec) }) : std({ color: '#cccccc' });
   }
@@ -319,7 +320,7 @@ function tintMat(key, map, color, rough = .9) { const k = key + color; return MC
 function floorMat(finish, color) {
   const k = 'floor:' + finish + color; if (MC[k]) return MC[k];
   const map = finish && finish !== 'plain' ? floorTex(finish) : null;
-  return (MC[k] = std({ color, map, normalMap: map ? nmap('floor-' + finish, finish === 'wood' ? 2.2 : 3) : null, normalScale: new THREE.Vector2(.5, .5), roughness: finish === 'wood' ? .5 : finish === 'stone' ? .8 : finish === 'stone-large' ? .16 : .32, envMapIntensity: finish === 'stone-large' ? 1 : .7 }));
+  return (MC[k] = std({ color, map, normalMap: map ? nmap('floor-' + finish, finish === 'wood' ? 2.2 : 3) : null, normalScale: new THREE.Vector2(.5, .5), roughness: finish === 'wood' ? .62 : finish === 'stone' ? .82 : finish === 'stone-large' ? .42 : .48, envMapIntensity: finish === 'stone-large' ? .45 : .35 }));
 }
 function paintMat(seed) { return MC['paint' + seed] ||= std({ map: paintTex(seed), roughness: .9 }); }
 

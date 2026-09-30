@@ -62,10 +62,12 @@ Object.assign(CAT, {
       const g = G(), w = it.w, d = it.d, H = Math.min(it.h, ctx.H), back = -d / 2;
       if (it.fluted) { bx(g, w, H, .08, mat('wood-dark'), 0, 0, back + .04); flutes(g, w, H, mat(it.accent || 'wood-light'), back + .1, 0, .18); }
       else { bx(g, w, H, .12, mat(it.finish), 0, 0, back + .06); for (let i = 1; i < 4; i++) bx(g, w, .012, .01, mat('#bfb2a0'), 0, H * i / 4, back + .125); }
-      bx(g, .05, H - .8, .05, mat('led'), -w / 2 + .9, .4, back + .16); bx(g, .05, H - .8, .05, mat('led'), w / 2 - .9, .4, back + .16);
+      // the screen fits the wall, and the light channels sit clear of it (or are left out on a narrow wall)
+      const tvW = Math.min(4.9, w - 1.6), tvH = tvW * 2.8 / 4.9, lx = Math.max(w / 2 - .9, tvW / 2 + .45);
+      if (lx < w / 2 - .12) for (const s of [-1, 1]) bx(g, .05, H - .8, .05, mat('led'), s * lx, .4, back + .16);
       const cw = w * .72; bx(g, cw, .8, .78, mat(it.fluted ? 'stone' : it.accent), 0, .55, back + .12 + .39);
       bx(g, cw - .2, .025, .05, mat('led'), 0, .5, back + .6);
-      bx(g, 4.9, 2.8, .1, mat('black-metal'), 0, 3.3, back + .22); bx(g, 4.82, 2.72, .012, mat('screen'), 0, 3.34, back + .275);
+      bx(g, tvW, tvH, .1, mat('black-metal'), 0, 3.3, back + .22); bx(g, tvW - .08, tvH - .08, .012, mat('screen'), 0, 3.34, back + .275);
       const ty = 1.35; books(g, -cw / 2 + .8, ty, back + .5); vaseBranch(g, cw / 2 - .7, ty, back + .5, .8); sculpture(g, cw / 2 - 1.6, ty, back + .5, .8);
       return g;
     } },

@@ -312,7 +312,7 @@ if (SITE) (() => {
       } catch (e) { console.error('auth init', e); }
     }
     renderCredits();
-    if (S.cfg?.prices?.rendersOn && $('btnReal')) $('btnReal').hidden = false;
+    // the one-tap AI render is retired: the 3D itself is the product's look
     // Deep links from the landing page: /app#start opens a new home, /app#sample opens the sample home.
     const hash = location.hash.slice(1);
     if (hash === 'start' || hash === 'sample') { history.replaceState(null, '', location.pathname); setTimeout(() => $(hash === 'start' ? 'btnNewProj' : 'btnSampleHome')?.click(), 300); }

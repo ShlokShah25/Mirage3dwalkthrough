@@ -260,7 +260,7 @@ function buildShell() {
       const top = new THREE.Mesh(geo, M.ceil); top.position.y = H + slab + i * .0015; top.castShadow = true; top.receiveShadow = true; house.add(top); ceilings.push(top);
       const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]), spanX = Math.max(...xs) - Math.min(...xs), spanZ = Math.max(...zs) - Math.min(...zs);
       const spots = spanX > 18 ? [[cx - spanX / 4, cz], [cx + spanX / 4, cz]] : spanZ > 18 ? [[cx, cz - spanZ / 4], [cx, cz + spanZ / 4]] : [[cx, cz]];
-      for (const [lx, lz] of spots) if (pip([lx, lz], r.polygon)) { const lamp = new THREE.PointLight('#ffd2a0', 14, 0, 1.6); lamp.position.set(lx, H - .6, lz); house.add(lamp); lamps.push(lamp); }
+      for (const [lx, lz] of spots) if (pip([lx, lz], r.polygon)) { const lamp = new THREE.PointLight('#ffe0c2', 14, 0, 1.6); lamp.position.set(lx, H - .6, lz); house.add(lamp); lamps.push(lamp); }
       const dg = new THREE.Group(), dl = mat('led'), inset = insetPoly(r.polygon, 1.4).pts; let n = 0;
       for (let x = Math.min(...xs) + 2; x < Math.max(...xs) - 1.5 && n < 14; x += 4.5) for (let z = Math.min(...zs) + 2; z < Math.max(...zs) - 1.5 && n < 14; z += 4.5) if (pip([x, z], inset)) { add(dg, new THREE.CircleGeometry(.2, 16), dl, x, H - .005, z, 0, Math.PI / 2); add(dg, new THREE.TorusGeometry(.24, .025, 6, 20), M.frame, x, H - .01, z, 0, Math.PI / 2); n++; }
       if (dg.children.length) { mergeGroup(dg); house.add(dg); ceilings.push(dg); }
@@ -275,7 +275,7 @@ function buildShell() {
         });
         if (cg.children.length) { mergeGroup(cg); house.add(cg); ceilings.push(cg); }
         // light spill from the cove: onto the ceiling tray and washing down the wall
-        const gg = new THREE.Group(), gc = glowMat('grad', '#ffc27a', .55), gw = glowMat('grad', '#ffb866', .42);
+        const gg = new THREE.Group(), gc = glowMat('grad', '#ffdcb0', .5), gw = glowMat('grad', '#ffd6a8', .36);
         lines.forEach((ln, k) => {
           const p0 = pts[k], p1 = pts[(k + 1) % pts.length], L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); if (L < .6 || L > 200) return;
           const mx = (p0[0] + p1[0]) / 2, mz = (p0[1] + p1[1]) / 2, [nx, nz] = ln.n, ang = Math.atan2(-(p1[1] - p0[1]), p1[0] - p0[0]);
@@ -289,7 +289,7 @@ function buildShell() {
       }
       // wall-washer downlights: a scallop of light on each solid wall run
       if (r.type !== 'passage' || true) {
-        const { lines: wl } = insetPoly(r.polygon, 0), sg = new THREE.Group(), sm = glowMat('scallop', '#ffcf94', .62), ring = mat('led');
+        const { lines: wl } = insetPoly(r.polygon, 0), sg = new THREE.Group(), sm = glowMat('scallop', '#ffe0bb', .55), ring = mat('led');
         wl.forEach(ln => {
           const L = Math.hypot(ln.b[0] - ln.a[0], ln.b[1] - ln.a[1]); if (L < 4) return; const n = Math.max(1, Math.floor(L / 4.2)), step = L / n;
           for (let i = 0; i < n; i++) {
@@ -317,16 +317,16 @@ function buildAll() { buildShell(); buildAllItems(); applyTime(); applyCut(); se
 
 /* ================= time of day ================= */
 const TIMES = {
-  golden: { label: 'Golden hour', top: '#3f5f8c', mid: '#f0b98a', bot: '#243f55', fog: '#e6b48b', sea: '#2e5670', sun: '#ffb069', sunI: 3.4, sunPos: [-110, 26, -150], hs: '#ffd9b8', hg: '#8f7a66', hi: .3, amb: .08, lamp: 14, emis: 1, exp: .95, bloom: .3, ground: '#8a7563', win: '#ffd2a8', winI: 2.2 },
-  night: { label: 'Night', top: '#050a14', mid: '#16223a', bot: '#04080f', fog: '#131b2b', sea: '#0b1622', sun: '#9fb4d9', sunI: .22, sunPos: [80, 120, -60], hs: '#34445f', hg: '#15120f', hi: .15, amb: .04, lamp: 28, emis: 1.3, exp: 1.05, bloom: .45, ground: '#1c1915', win: '#8aa0c8', winI: .15 },
-  day: { label: 'Daytime', top: '#6fa3c7', mid: '#dce8ec', bot: '#2f5e73', fog: '#dce8ec', sea: '#3f7890', sun: '#fff3df', sunI: 2.8, sunPos: [-60, 110, -90], hs: '#eef4f7', hg: '#d6cfc4', hi: .38, amb: .12, lamp: 6, emis: .45, exp: 1.0, bloom: .15, ground: '#b8ab99', win: '#eaf2ff', winI: 3.2 },
+  golden: { label: 'Golden hour', top: '#3f5f8c', mid: '#f0b98a', bot: '#243f55', fog: '#e6b48b', sea: '#2e5670', sun: '#ffb069', sunI: 3.4, sunPos: [-110, 26, -150], hs: '#ffd9b8', hg: '#8f7a66', hi: .3, amb: .08, lamp: 14, emis: 1, exp: .95, bloom: .12, ground: '#8a7563', win: '#ffd2a8', winI: 2.2 },
+  night: { label: 'Night', top: '#050a14', mid: '#16223a', bot: '#04080f', fog: '#131b2b', sea: '#0b1622', sun: '#9fb4d9', sunI: .22, sunPos: [80, 120, -60], hs: '#34445f', hg: '#15120f', hi: .15, amb: .04, lamp: 28, emis: 1.3, exp: 1.05, bloom: .2, ground: '#1c1915', win: '#8aa0c8', winI: .15 },
+  day: { label: 'Daytime', top: '#6fa3c7', mid: '#dce8ec', bot: '#2f5e73', fog: '#dce8ec', sea: '#3f7890', sun: '#fff3df', sunI: 2.8, sunPos: [-60, 110, -90], hs: '#eef4f7', hg: '#d6cfc4', hi: .38, amb: .12, lamp: 6, emis: .45, exp: 1.0, bloom: .05, ground: '#b8ab99', win: '#eaf2ff', winI: 3.2 },
 };
-TIMES.dusk = { label: 'Dusk', top: '#2b3a63', mid: '#f2b48e', bot: '#1b2436', fog: '#b99aa0', sea: '#243a52', sun: '#ff9a62', sunI: 1.1, sunPos: [-140, 8, -150], hs: '#c9a6a0', hg: '#4a3a30', hi: .1, amb: .025, lamp: 12, emis: 1.35, exp: .9, bloom: .55, ground: '#4d3f35', win: '#f0b89a', winI: 1.1, city: .9 };
+TIMES.dusk = { label: 'Dusk', top: '#2b3a63', mid: '#f2b48e', bot: '#1b2436', fog: '#b99aa0', sea: '#243a52', sun: '#ff9a62', sunI: 1.1, sunPos: [-140, 8, -150], hs: '#c9a6a0', hg: '#4a3a30', hi: .1, amb: .025, lamp: 12, emis: 1.35, exp: .92, bloom: .2, ground: '#4d3f35', win: '#f0b89a', winI: 1.1, city: .9 };
 TIMES.golden.city = .25; TIMES.night.city = 1.3; TIMES.day.city = 0;
 const TIME_ORDER = ['dusk', 'golden', 'night', 'day'];
 function applyTime() {
   const t = TIMES[layout.settings.timeOfDay] || TIMES.golden;
-  if (grade) { const du = t === TIMES.dusk || t === TIMES.night; grade.uniforms.warm.value = du ? .06 : .035; grade.uniforms.contrast.value = du ? .22 : .16; grade.uniforms.vig.value = du ? .4 : .32; }
+  if (grade) { const du = t === TIMES.dusk || t === TIMES.night; grade.uniforms.warm.value = du ? .03 : .01; grade.uniforms.contrast.value = du ? .2 : .17; grade.uniforms.vig.value = du ? .26 : .2; grade.uniforms.sat.value = du ? .96 : 1.02; }
   skyU.top.value.set(t.top); skyU.mid.value.set(t.mid); skyU.bot.value.set(t.bot); skyU.sunCol.value.set(t.sun).multiplyScalar(t === TIMES.night ? .15 : 1);
   scene.fog.color.set(t.fog); seaMat.color.set(t.sea);
   sea.visible = (layout.settings.view || 'sea') === 'sea'; city.visible = layout.settings.view === 'city';

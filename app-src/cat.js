@@ -54,7 +54,7 @@ const CAT = {
       return g;
     } },
   'tv': { label: 'TV', cat: 'Living', d: { w: 5.4, d: .15, h: 3.1, y: 3.4 }, nc: true,
-    build(it) { const g = G(); bx(g, it.w, it.h, .12, mat('black-metal'), 0, 0, 0); bx(g, it.w - .08, it.h - .08, .01, mat('screen'), 0, .04, .065); return g; } },
+    build(it) { const g = G(); bx(g, it.w, it.h, .12, mat('black-metal'), 0, 0, .16); bx(g, it.w - .08, it.h - .08, .01, mat('screen'), 0, .04, .225); return g; } },   // stands proud of any wall panelling
   'panel-slats': { label: 'Fluted wood wall', cat: 'Walls', d: { w: 8, d: .22, h: 9.6, finish: 'wood-light' },
     build(it) {
       const g = G(), w = it.w, h = it.h, d = it.d; bx(g, w, h, .06, mat('wood-dark'), 0, 0, -d / 2 + .03);
