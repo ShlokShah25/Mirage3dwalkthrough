@@ -310,6 +310,7 @@ function mat(spec0) {
     case 'lamp': m = emis('#f8efe3', '#ffdcb4', .9); break;
     case 'lamp-white': m = emis('#faf5ee', '#ffe7cc', .8); break;
     case 'led': m = emis('#fff1e0', '#ffe2bf', 1.5); break;
+    case 'downlight': m = emis('#f7efe4', '#ffe6cc', .75); break;   // recessed ceiling spots: lit, not glaring
     case 'led-soft': m = emis('#f5e8d8', '#ffe1bd', .7); break;
     case 'wine-glow': m = emis('#3b2416', '#ffb466', .9); break;
     default: m = spec.startsWith('#') ? phys({ color: spec, map: fabricTex('#ffffff'), roughness: .85, sheen: .5, sheenRoughness: .8, sheenColor: new THREE.Color(spec) }) : std({ color: '#cccccc' });

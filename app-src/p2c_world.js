@@ -260,8 +260,8 @@ function buildShell() {
       const top = new THREE.Mesh(geo, M.ceil); top.position.y = H + slab + i * .0015; top.castShadow = true; top.receiveShadow = true; house.add(top); ceilings.push(top);
       const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]), spanX = Math.max(...xs) - Math.min(...xs), spanZ = Math.max(...zs) - Math.min(...zs);
       const spots = spanX > 18 ? [[cx - spanX / 4, cz], [cx + spanX / 4, cz]] : spanZ > 18 ? [[cx, cz - spanZ / 4], [cx, cz + spanZ / 4]] : [[cx, cz]];
-      for (const [lx, lz] of spots) if (pip([lx, lz], r.polygon)) { const lamp = new THREE.PointLight('#ffe0c2', 14, 0, 1.6); lamp.position.set(lx, H - .6, lz); house.add(lamp); lamps.push(lamp); }
-      const dg = new THREE.Group(), dl = mat('led'), inset = insetPoly(r.polygon, 1.4).pts; let n = 0;
+      for (const [lx, lz] of spots) if (pip([lx, lz], r.polygon)) { const lamp = new THREE.PointLight('#ffe0c2', 14, 0, 1.6); lamp.position.set(lx, H - 2.6, lz); /* hung low enough not to burn a hot spot into the ceiling */ house.add(lamp); lamps.push(lamp); }
+      const dg = new THREE.Group(), dl = mat('downlight'), inset = insetPoly(r.polygon, 1.4).pts; let n = 0;
       for (let x = Math.min(...xs) + 2; x < Math.max(...xs) - 1.5 && n < 14; x += 4.5) for (let z = Math.min(...zs) + 2; z < Math.max(...zs) - 1.5 && n < 14; z += 4.5) if (pip([x, z], inset)) { add(dg, new THREE.CircleGeometry(.2, 16), dl, x, H - .005, z, 0, Math.PI / 2); add(dg, new THREE.TorusGeometry(.24, .025, 6, 20), M.frame, x, H - .01, z, 0, Math.PI / 2); n++; }
       if (dg.children.length) { mergeGroup(dg); house.add(dg); ceilings.push(dg); }
       if (r.cove) {
