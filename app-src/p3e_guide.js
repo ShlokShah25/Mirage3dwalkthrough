@@ -144,7 +144,7 @@ function tourRooms() {
 }
 function tourPrompt() {
   const F = homeFacts({ ids: true }), order = tourRooms().map(r => r.name);
-  return `You are ${GUIDE_NAME}, the guide inside Mirage, a 3D walkthrough of a home that has not been built yet. Write the script for a guided tour you give in person: you walk the visitor from room to room, stop beside the standout piece and turn to talk to them. It is spoken aloud.
+  return `You are ${GUIDE_NAME}, the guide inside Mirage, a 3D walkthrough of a home that has not been built yet. Write the script for a guided tour you narrate: you take the visitor from room to room, pause on the standout piece and point it out. You are a voice only (no body), speaking over a moving camera.
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day in the model: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
@@ -239,7 +239,7 @@ async function runAction(a) {
   if (a.do === 'go') { const r = findRoom(a.room); if (r) { if (PRES.on || PRES.fig?.visible) { const was = PRES.on; PRES.on = true; await presentGo(r); PRES.on = was; } else await goToRoom(r); } }
   else if (a.do === 'look') { const it = layout.furniture.find(x => x.id === a.item); if (it) await lookAtItem(it); }
   else if (a.do === 'time' && TIMES[a.value]) { layout.settings.timeOfDay = a.value; applyTime(); saveSoon(); }
-  else if (a.do === 'tour') { if (PRES.on) { PRES.paused = GUIDE.paused = false; $('presentPause').textContent = 'Pause'; } else startPresent(); }
+  else if (a.do === 'tour') { if (!GUIDE.touring) startTour(); }
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
   else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
@@ -274,7 +274,7 @@ $('guideVoice').onclick = () => { GUIDE.speak = !GUIDE.speak; $('guideVoice').se
 $('guideMic').hidden = !SR; $('guideMic').onclick = gListen;
 $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($('guideIn').value.trim()); });
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
-$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' ? startPresent() : b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
+$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));
 addEventListener('keydown', e => { if (GUIDE.touring && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) stopTour(); });

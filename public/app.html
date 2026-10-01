@@ -518,7 +518,7 @@
             <div class="grp gpanel"><button id="btnWalk" aria-pressed="true">Walk</button><button id="btnOver" aria-pressed="false">Overview</button><button id="btnCut" aria-pressed="false" hidden>Cut walls</button></div>
             <div class="grp gpanel"><button id="btnTime" title="Time of day (T)">Golden hour</button><button id="btnPhoto" title="Render a photoreal still (P)">Photo</button><button id="btnReal" class="real" title="Turn this view into a real photograph" hidden>✦ Make it real</button></div>
             <div class="grp gpanel"><button id="btnAdd">Add</button><button id="btnEdit">Settings</button></div>
-            <div class="grp gpanel"><button id="btnPresent" class="presbtn" title="Mira walks you through the home">▶ Present</button><button id="btnGuide" class="guidebtn" aria-pressed="false" title="Talk to your guide"><span class="gdot" aria-hidden="true"></span>Guide</button></div>
+            <div class="grp gpanel"><button id="btnPresent" class="presbtn" title="Mira narrates a tour of the home">▶ Present</button><button id="btnGuide" class="guidebtn" aria-pressed="false" title="Talk to your guide"><span class="gdot" aria-hidden="true"></span>Guide</button></div>
           </div>
         </div>
         <div class="map gpanel" id="mapPanel"><div class="cap"><span class="eyebrow">Plan · tap to jump</span></div><canvas id="minimap" width="240" height="140" aria-label="Floor plan minimap"></canvas></div>
@@ -536,7 +536,7 @@
           <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Your guide · walks, answers, changes</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Close">✕</button></header>
           <div id="guideTourBar" hidden><span class="live"></span><span>Touring · <b id="guideStep"></b></span><button id="guidePause">Pause</button><button id="guideStop">End tour</button></div>
           <div id="guideLog" role="log"></div>
-          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="fly">Quick fly-through</button><button type="button">Show me the kitchen</button><button type="button">Which is the biggest bedroom?</button><button type="button">Make it night</button></div>
+          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button">Show me the kitchen</button><button type="button">Which is the biggest bedroom?</button><button type="button">Make it night</button></div>
           <form id="guideForm"><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira anything, or say what to change" aria-label="Message your guide"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>
@@ -3856,7 +3856,7 @@ function tourRooms() {
 }
 function tourPrompt() {
   const F = homeFacts({ ids: true }), order = tourRooms().map(r => r.name);
-  return `You are ${GUIDE_NAME}, the guide inside Mirage, a 3D walkthrough of a home that has not been built yet. Write the script for a guided tour you give in person: you walk the visitor from room to room, stop beside the standout piece and turn to talk to them. It is spoken aloud.
+  return `You are ${GUIDE_NAME}, the guide inside Mirage, a 3D walkthrough of a home that has not been built yet. Write the script for a guided tour you narrate: you take the visitor from room to room, pause on the standout piece and point it out. You are a voice only (no body), speaking over a moving camera.
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day in the model: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
@@ -3951,7 +3951,7 @@ async function runAction(a) {
   if (a.do === 'go') { const r = findRoom(a.room); if (r) { if (PRES.on || PRES.fig?.visible) { const was = PRES.on; PRES.on = true; await presentGo(r); PRES.on = was; } else await goToRoom(r); } }
   else if (a.do === 'look') { const it = layout.furniture.find(x => x.id === a.item); if (it) await lookAtItem(it); }
   else if (a.do === 'time' && TIMES[a.value]) { layout.settings.timeOfDay = a.value; applyTime(); saveSoon(); }
-  else if (a.do === 'tour') { if (PRES.on) { PRES.paused = GUIDE.paused = false; $('presentPause').textContent = 'Pause'; } else startPresent(); }
+  else if (a.do === 'tour') { if (!GUIDE.touring) startTour(); }
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
   else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
@@ -3986,7 +3986,7 @@ $('guideVoice').onclick = () => { GUIDE.speak = !GUIDE.speak; $('guideVoice').se
 $('guideMic').hidden = !SR; $('guideMic').onclick = gListen;
 $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($('guideIn').value.trim()); });
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
-$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' ? startPresent() : b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
+$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));
 addEventListener('keydown', e => { if (GUIDE.touring && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) stopTour(); });
@@ -4428,7 +4428,8 @@ function endPresent(keepHer = false) {
 // a chat "go" while presenting: she walks you there instead of cutting
 async function presentGo(r) { const it = focalItem(r); await presentRoom(r, it, ''); }
 
-$('btnPresent').onclick = () => PRES.on ? endPresent() : startPresent();
+// Mira is voice-only: Present runs her narrated camera tour; the drawn/3D figure is retired.
+$('btnPresent').onclick = () => GUIDE.touring ? stopTour() : startTour();
 $('presentEnd').onclick = () => endPresent();
 $('presentPause').onclick = () => { PRES.paused = GUIDE.paused = !PRES.paused; $('presentPause').textContent = PRES.paused ? 'Resume' : 'Pause'; if (PRES.paused) window.speechSynthesis?.pause(); else window.speechSynthesis?.resume(); };
 $('presentAsk').onclick = () => { document.body.classList.toggle('present-ask'); openGuide(document.body.classList.contains('present-ask')); };
@@ -4437,7 +4438,7 @@ addEventListener('keydown', e => {   // Esc closes the Ask panel first, then end
   if (document.body.classList.contains('present-ask')) { document.body.classList.remove('present-ask'); openGuide(false); $('guideIn').blur(); } else endPresent();
 }, true);
 // fetch her quietly once the home is up, so she's ready the moment someone presses Present
-setTimeout(() => { try { (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => fetch(MIRA_URL).catch(() => { })); } catch { } }, 6000);
+
 
 window.__present = { cols: () => ({ wallCols, itemCols, groups: [...itemGroups.entries()].map(([k, g]) => [k, g.userData.cols]) }), sightOk, gOk, gCell, walkableAt, losOk, roomDimsP: r => roomDims(r), PRES, presentRoom, focalItem, presentCam, startPresent, endPresent, findPath, navGrid, presentSpot, ensure: ensurePresenter, place: placePresenter };
 

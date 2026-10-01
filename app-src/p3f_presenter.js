@@ -434,7 +434,8 @@ function endPresent(keepHer = false) {
 // a chat "go" while presenting: she walks you there instead of cutting
 async function presentGo(r) { const it = focalItem(r); await presentRoom(r, it, ''); }
 
-$('btnPresent').onclick = () => PRES.on ? endPresent() : startPresent();
+// Mira is voice-only: Present runs her narrated camera tour; the drawn/3D figure is retired.
+$('btnPresent').onclick = () => GUIDE.touring ? stopTour() : startTour();
 $('presentEnd').onclick = () => endPresent();
 $('presentPause').onclick = () => { PRES.paused = GUIDE.paused = !PRES.paused; $('presentPause').textContent = PRES.paused ? 'Resume' : 'Pause'; if (PRES.paused) window.speechSynthesis?.pause(); else window.speechSynthesis?.resume(); };
 $('presentAsk').onclick = () => { document.body.classList.toggle('present-ask'); openGuide(document.body.classList.contains('present-ask')); };
@@ -443,6 +444,6 @@ addEventListener('keydown', e => {   // Esc closes the Ask panel first, then end
   if (document.body.classList.contains('present-ask')) { document.body.classList.remove('present-ask'); openGuide(false); $('guideIn').blur(); } else endPresent();
 }, true);
 // fetch her quietly once the home is up, so she's ready the moment someone presses Present
-setTimeout(() => { try { (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => fetch(MIRA_URL).catch(() => { })); } catch { } }, 6000);
+
 
 window.__present = { cols: () => ({ wallCols, itemCols, groups: [...itemGroups.entries()].map(([k, g]) => [k, g.userData.cols]) }), sightOk, gOk, gCell, walkableAt, losOk, roomDimsP: r => roomDims(r), PRES, presentRoom, focalItem, presentCam, startPresent, endPresent, findPath, navGrid, presentSpot, ensure: ensurePresenter, place: placePresenter };
