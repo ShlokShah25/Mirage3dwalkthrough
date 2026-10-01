@@ -32,6 +32,7 @@ function supabaseDb() {
     async upsert(table, row, onConflict) {
       return (await (await call('POST', `${table}${onConflict ? '?on_conflict=' + onConflict : ''}`, { headers: { prefer: 'resolution=merge-duplicates,return=representation' }, data: row })).json())[0];
     },
+    async del(table, filters) { if (!filters || !Object.keys(filters).length) throw new Error('refusing to delete without a filter'); await call('DELETE', `${table}?${qs(filters)}`); },
     async update(table, filters, patch) { return (await call('PATCH', `${table}?${qs(filters)}`, { headers: { prefer: 'return=representation' }, data: patch })).json(); },
     async count(table, filters) {
       const r = await call('GET', `${table}?select=id&${qs(filters)}`, { headers: { prefer: 'count=exact', range: '0-0' } });
@@ -53,7 +54,7 @@ function memoryDb() {
     return row[k] === v;
   });
   const clone = x => x && JSON.parse(JSON.stringify(x));
-  const PK = { profiles: 'id', homes: 'id', subscriptions: 'user_id', orders: 'id' };
+  const PK = { profiles: 'id', homes: 'id', subscriptions: 'user_id', orders: 'id', home_data: 'home_id' };
   return {
     async select(table, filters, { order, limit } = {}) {
       let rows = tab(table).filter(r => match(r, filters));
@@ -71,6 +72,7 @@ function memoryDb() {
       const pk = onConflict || PK[table] || 'id'; const ex = tab(table).find(x => x[pk] === row[pk]);
       if (ex) { Object.assign(ex, row); return clone(ex); } return this.insert(table, row);
     },
+    async del(table, filters) { const t = tab(table); for (let i = t.length - 1; i >= 0; i--) if (match(t[i], filters)) t.splice(i, 1); },
     async update(table, filters, patch) { const rows = tab(table).filter(r => match(r, filters)); rows.forEach(r => Object.assign(r, patch)); return clone(rows); },
     async count(table, filters) { return tab(table).filter(r => match(r, filters)).length; },
   };

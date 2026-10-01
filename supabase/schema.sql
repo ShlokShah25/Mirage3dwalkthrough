@@ -101,6 +101,46 @@ create table if not exists public.usage (
 );
 create index if not exists usage_user_kind_time on public.usage(user_id, kind, created_at);
 
+-- Collaborators: people a home is shared with, by email. Roles: viewer < commenter < editor (the owner is homes.user_id).
+alter table public.homes add column if not exists owner_email text;
+create table if not exists public.home_members (
+  id uuid primary key default gen_random_uuid(),
+  home_id text not null references public.homes(id) on delete cascade,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,                  -- lower-cased; matched to the account when they sign in
+  user_id uuid references auth.users(id) on delete set null,
+  role text not null check (role in ('viewer', 'commenter', 'editor')),
+  invited_by uuid,
+  created_at timestamptz not null default now(),
+  unique (home_id, email)
+);
+create index if not exists home_members_email on public.home_members(email);
+create index if not exists home_members_owner on public.home_members(owner_id);
+
+-- The shared copy of a home's design (homes otherwise live in the owner's browser). version guards against overwrites.
+create table if not exists public.home_data (
+  home_id text primary key references public.homes(id) on delete cascade,
+  name text,
+  data jsonb not null,
+  version integer not null default 1,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+
+-- Comments pinned to a spot in the 3D home.
+create table if not exists public.home_comments (
+  id uuid primary key default gen_random_uuid(),
+  home_id text not null references public.homes(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  author_email text,
+  room text,
+  x real, y real, z real,
+  text text not null,
+  resolved boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists home_comments_home on public.home_comments(home_id, created_at);
+
 -- Row-level security: read own rows only; no client writes.
 alter table public.profiles enable row level security;
 alter table public.homes enable row level security;
@@ -110,6 +150,9 @@ alter table public.orders enable row level security;
 alter table public.generations enable row level security;
 alter table public.edits enable row level security;
 alter table public.usage enable row level security;
+alter table public.home_members enable row level security;
+alter table public.home_data enable row level security;
+alter table public.home_comments enable row level security;
 
 do $$ begin
   create policy "own profile" on public.profiles for select using (auth.uid() = id);

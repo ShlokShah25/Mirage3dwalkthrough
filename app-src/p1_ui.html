@@ -421,6 +421,72 @@
     .modal h2{font-size:28px}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+  /* the brief questionnaire */
+  .profsum{display:flex;align-items:center;gap:8px;justify-content:space-between;font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px;margin-bottom:9px}
+  .profsum button{padding:5px 10px;font-size:12px;flex:none}
+  .linkish{background:none;border:0;padding:0 0 0 6px;color:var(--gold);font-size:12.5px;text-decoration:underline;cursor:pointer}
+  .qgrid{display:grid;gap:10px;margin-top:6px}
+  .qgrid.two{grid-template-columns:1fr 1fr}.qgrid.three{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:600px){.qgrid.two,.qgrid.three{grid-template-columns:1fr}}
+  .qcard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px;border-radius:14px;min-height:92px;transition:transform .15s,border-color .15s}
+  .qcard b{font-size:16px;font-weight:600}.qcard span{font-size:12.5px;line-height:1.45;color:var(--muted);font-weight:400}
+  .qcard[aria-pressed="true"] span{color:var(--gold-ink);opacity:.8}
+  .qcard:hover{transform:translateY(-1px)}
+  .qcompass{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:6px;position:relative;width:max-content}
+  .qcompass button{font-size:18px;padding:0;border-radius:10px}
+  .qcompass img{grid-column:2;grid-row:2;width:44px;height:44px;object-fit:contain;border-radius:8px;background:#fff;opacity:.9}
+  .qcompass [data-n="0"]{grid-column:2;grid-row:1}.qcompass [data-n="45"]{grid-column:3;grid-row:1}.qcompass [data-n="90"]{grid-column:3;grid-row:2}.qcompass [data-n="135"]{grid-column:3;grid-row:3}
+  .qcompass [data-n="180"]{grid-column:2;grid-row:3}.qcompass [data-n="225"]{grid-column:1;grid-row:3}.qcompass [data-n="270"]{grid-column:1;grid-row:2}.qcompass [data-n="315"]{grid-column:1;grid-row:1}
+  .qcompass.small{grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,36px)}.qcompass.small img{width:36px;height:36px}
+  .qlist{display:grid;gap:2px;margin-top:4px}
+  .qstep{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line)}
+  .qstep>div{display:flex;align-items:center;gap:8px}
+  .qstep [data-k]{width:34px;height:34px;padding:0;border-radius:99px;font-size:16px}
+  .qstep output{min-width:28px;text-align:center;font-family:var(--mono);font-size:15px}
+  .qtog{min-width:64px}
+  .qdots{display:flex;gap:6px;justify-content:center;margin:18px 0 4px}
+  .qdots i{width:6px;height:6px;border-radius:99px;background:var(--line2)}.qdots i.on{background:var(--gold);width:18px}
+  /* Mira's cards and options */
+  .gmsg.card{max-width:96%;align-self:stretch;background:var(--surface2);border:1px solid var(--line);padding:12px}
+  .vhead{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+  .vhead small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .vring{--p:0;width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--gold) calc(var(--p)*1%),var(--line2) 0)}
+  .vring b{width:38px;height:38px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-family:var(--mono);font-size:14px}
+  .vlist{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:12.5px}
+  .vlist li{display:flex;gap:8px;line-height:1.4}.vlist li span{color:var(--muted)}.vlist li b{color:var(--ink);font-weight:600}
+  .vlist li em{display:block;font-style:normal;color:var(--faint);margin-top:2px}
+  .vlist i{flex:none;width:18px;height:18px;border-radius:99px;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700}
+  .vlist .ok i{background:rgba(91,240,209,.16);color:var(--gold)}.vlist .warn i{background:rgba(240,190,90,.18);color:#f0be5a}.vlist .fail i{background:rgba(240,100,90,.18);color:#f0645a}
+  .vlist .more{color:var(--faint);padding-left:26px}
+  .vact{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.vact button{font-size:12px;padding:6px 11px}
+  .gopts{display:flex;flex-direction:column;gap:6px;align-self:flex-start;max-width:92%}
+  .gopts button{text-align:left;font-size:12.5px;padding:8px 12px;border-radius:12px;font-weight:500}
+  .gopts button.chosen{border-color:var(--gold);color:var(--gold)}
+  /* collaborators */
+  body[data-role="viewer"] #side .step,body[data-role="commenter"] #side .step,body[data-role="editor"] #side .step{display:none}
+  body[data-role] #side #sharedNote{display:block}
+  body[data-role="viewer"] #pbar,body[data-role="commenter"] #pbar,body[data-role="viewer"] #btnAdd,body[data-role="commenter"] #btnAdd,body[data-role="viewer"] #btnEdit,body[data-role="commenter"] #btnEdit,body[data-role="viewer"] #drawer,body[data-role="commenter"] #drawer{display:none!important}
+  body[data-role="viewer"] #tabPlan,body[data-role="commenter"] #tabPlan,body[data-role="editor"] #tabPlan,body[data-role="viewer"] #tabStyle,body[data-role="commenter"] #tabStyle{display:none}
+  body[data-role="owner"] #sharedNote{display:none}
+  .shrow{display:flex;gap:8px;flex-wrap:wrap}.shrow input{flex:1;min-width:200px;padding:11px 12px;font-size:14px}
+  .shlist{margin:16px 0 4px;border:1px solid var(--line);border-radius:14px;padding:4px 14px}
+  .shm{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}.shm:last-child{border-bottom:0}
+  .shm>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.shm small{color:var(--faint);margin-left:6px}.shm .r{color:var(--muted);font-size:12.5px}
+  .shm select{font-size:12.5px;padding:5px 8px}
+  #pins{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+  .pin{position:absolute;left:0;top:0;pointer-events:auto;width:26px;height:26px;padding:0;border-radius:50% 50% 50% 4px;background:var(--gold);color:var(--gold-ink);font-weight:700;font-size:12px;border:2px solid #0A0B0C;box-shadow:0 6px 18px rgba(0,0,0,.45);transform-origin:0 100%}
+  #pinOverlay{position:absolute;inset:0;z-index:6;cursor:crosshair;background:rgba(91,240,209,.04)}
+  #pinOverlay .gpanel{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:99px;font-size:13px;cursor:default;white-space:nowrap}
+  #pinOverlay .gpanel button{padding:4px 10px;font-size:12px;margin-left:6px}
+  .cbubble{position:absolute;z-index:7;width:260px;padding:12px;border-radius:14px;font-size:13px}
+  .cbubble .who{display:flex;justify-content:space-between;gap:8px}.cbubble .who small{color:var(--faint)}
+  .cbubble p{margin:6px 0 0;line-height:1.45}.cbubble textarea{width:100%;margin-top:8px;font-size:13px}
+  .cbubble .mact button{padding:6px 11px;font-size:12px}
+  .clist{display:grid;gap:8px;margin:6px 0 4px;max-height:52vh;overflow:auto}
+  .crow{display:flex;gap:10px;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
+  .crow p{margin:4px 0 0;line-height:1.45}.crow small{color:var(--faint)}.crow.done{opacity:.55}
+  .crow .ca{display:flex;flex-direction:column;gap:6px}.crow .ca button{font-size:12px;padding:5px 10px;white-space:nowrap}
+  #cCount:empty{display:none}#cCount{background:var(--gold);color:var(--gold-ink);border-radius:99px;padding:0 6px;margin-left:4px;font-size:11px}
 </style>
 
 <div class="app">
@@ -477,6 +543,7 @@
       </div>
       <div class="step" id="step3">
         <h3><span class="t"><i>03</i>Anything special?</span><small>optional</small></h3>
+        <div class="profsum" id="profileSum"></div>
         <div class="chips pick" id="ideaChips"></div>
         <div class="field"><label for="brief" class="sr">Notes for the design</label><textarea id="brief" placeholder="e.g. a study corner in the second bedroom, a pooja unit in the living room, lots of plants on the balcony"></textarea></div>
         <div class="row2" style="margin-top:9px">
@@ -526,7 +593,7 @@
           <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Your guide · walks, answers, changes</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Close">✕</button></header>
           <div id="guideTourBar" hidden><span class="live"></span><span>Touring · <b id="guideStep"></b></span><button id="guidePause">Pause</button><button id="guideStop">End tour</button></div>
           <div id="guideLog" role="log"></div>
-          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button">Show me the kitchen</button><button type="button">Which is the biggest bedroom?</button><button type="button">Make it night</button></div>
+          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="vastu">Is my home Vastu compliant?</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button">Show me the kitchen</button><button type="button">Make it night</button></div>
           <form id="guideForm"><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira anything, or say what to change" aria-label="Message your guide"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>

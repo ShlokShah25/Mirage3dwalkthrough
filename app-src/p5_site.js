@@ -70,6 +70,7 @@ if (SITE) (() => {
     if (!S.token) return null;
     try { S.me = await S.api('/api/me'); } catch (e) { if (e.status !== 401) console.warn(e); return null; }
     renderCredits(); if (project && $('genLabel')) renderGenState();
+    if (activeView === 'home' && S.me.shared?.length) renderHome();
     if (project && S.token && project.id !== 'sample-home' && !S.me.homes[project.id] && project.plan?.image) S.api('/api/homes', { id: project.id, name: project.name }).catch(() => { });
     return S.me;
   };
@@ -299,6 +300,214 @@ if (SITE) (() => {
   if ($('btnReal')) $('btnReal').onclick = renderReal;
   S.renderReal = renderReal;
 
+  /* ---------- collaborators: share, sync, roles, pinned comments ---------- */
+  const ROLE_TXT = { viewer: 'Can view', commenter: 'Can comment', editor: 'Can edit' };
+  const RANKS = { viewer: 1, commenter: 2, editor: 3, owner: 4 };
+  const myEmail = () => S.me?.user?.email || '';
+  const short = e => String(e || 'someone').split('@')[0];
+  S.role = 'owner';
+  const roleOf = p => p?.shared?.role || 'owner';
+  const can = min => RANKS[S.role] >= RANKS[min];
+  const collab = () => project && project.id !== 'sample-home' && S.token && (project.shared || (home()?.members || 0) > 0);
+  const sync = { version: 0, sig: '', t: null, pushing: false, poll: null, comments: [], showResolved: false };
+
+  // homes shared with me, on the home screen
+  S.decorateHome = (grid, list) => {
+    const shared = (S.me?.shared || []).filter(h => !list.some(p => p.id === h.id));
+    for (const h of shared) {
+      const el = document.createElement('div'); el.className = 'card'; el.tabIndex = 0; el.setAttribute('role', 'button');
+      el.innerHTML = `<span class="cover"></span><span class="chip gen">Shared · ${esc(h.role)}</span><div class="meta"><h3>${esc(h.name)}</h3><p>${esc(h.owner ? 'From ' + h.owner : 'Shared with you')}${h.ready ? '' : ' · waiting for the owner to sync'}</p></div>`;
+      el.onclick = () => openShared(h.id); el.onkeydown = e => { if (e.key === 'Enter') openShared(h.id); };
+      grid.appendChild(el);
+    }
+  };
+  const pack = p => { const d = { ...p }; delete d.shared; d.inspo = []; d.roomInspo = {}; return structuredClone(d); };
+  async function openShared(id) {
+    try {
+      const r = await S.api('/api/homedata?home=' + encodeURIComponent(id));
+      if (!r.data) { flash('The owner has not synced this home yet. Ask them to open it in Mirage once.', true); return; }
+      const p = { ...r.data, id, shared: { role: r.role, version: r.version, by: r.updated_by } };
+      p.inspo ||= []; p.roomInspo ||= {}; await store.put(p); openProject(p);
+    } catch (e) { flash(e.message, true); }
+  }
+  S.openShared = openShared;
+
+  S.onProjectLoaded = p => {
+    S.role = roleOf(p); document.body.dataset.role = S.role;
+    clearInterval(sync.poll); sync.version = p.shared?.version || 0; sync.sig = ''; sync.comments = []; renderPins(); renderCollabUI();
+    if (!S.token || p.id === 'sample-home') return;
+    if (p.shared) startPolling();
+    else if (home()?.members) firstSync();
+  };
+  async function firstSync() {
+    try {
+      const r = await S.api('/api/homedata?home=' + encodeURIComponent(project.id));
+      sync.version = r.version || 0;
+      if (r.data && r.updated_by && r.updated_by !== myEmail()) applyRemote(r);
+      else pushSoon(0);
+    } catch (e) { console.warn('sync', e); }
+    startPolling();
+  }
+  function startPolling() {
+    clearInterval(sync.poll); loadComments();
+    sync.poll = setInterval(() => { if (document.visibilityState !== 'visible' || !collab()) return; pull(); loadComments(); }, 8000);
+  }
+  S.afterSave = p => { if (p === project && collab() && can('editor')) pushSoon(1500); };
+  function pushSoon(ms) { clearTimeout(sync.t); sync.t = setTimeout(push, ms); }
+  async function push() {
+    if (!collab() || !can('editor') || sync.pushing) return;
+    const data = pack(project), sig = JSON.stringify([data.layout, data.style, data.name, data.edits?.[0]?.t, data.profile, data.roomStyles]);
+    if (sig === sync.sig) return;
+    sync.pushing = true;
+    try { const r = await S.api('/api/homedata', { homeId: project.id, version: sync.version, data }, 'PUT'); sync.version = r.version; sync.sig = sig; if (project.shared) project.shared.version = r.version; }
+    catch (e) { if (e.status === 409) { flash('Someone else changed this home a moment ago. You now see their version; try your change again.', true); await pull(true); } else console.warn('sync push', e); }
+    finally { sync.pushing = false; }
+  }
+  async function pull(force) {
+    if (!collab() || (sync.pushing && !force)) return;
+    try {
+      const r = await S.api(`/api/homedata?home=${encodeURIComponent(project.id)}&since=${sync.version}`);
+      if (r.same || !r.data || r.version <= sync.version && !force) return;
+      if (sync.t && !force && can('editor')) { clearTimeout(sync.t); sync.t = null; }
+      applyRemote(r);
+    } catch (e) { if (e.status === 403) { clearInterval(sync.poll); flash('Your access to this home was removed.', true); } }
+  }
+  function applyRemote(r) {
+    if (running || editing) return;   // never swap the home out from under a running change
+    const keep = { id: project.id, inspo: project.inspo, roomInspo: project.roomInspo, shared: project.shared ? { ...project.shared, version: r.version, by: r.updated_by } : undefined, plan: project.plan?.image ? project.plan : r.data.plan };
+    const pos = { x: player.x, z: player.z, y: player.y, yaw: player.yaw, pitch: player.pitch };
+    Object.assign(project, r.data, keep); if (!keep.shared) delete project.shared;
+    project.style = normalizeStyle(project.style); project.edits ||= []; project.roomStyles ||= {};
+    layout = project.layout; layout.furniture ||= []; layout.railings ||= [];
+    sync.version = r.version; sync.sig = JSON.stringify([project.layout, project.style, project.name, project.edits?.[0]?.t, project.profile, project.roomStyles]);
+    for (const k in MC) delete MC[k]; select(null); buildAll(); Object.assign(player, pos);
+    $('projName').value = project.name || ''; renderPhist(); renderProfileSum(); updateMeta(); store.put(project);
+    const e = project.edits?.[0]; if (r.updated_by && r.updated_by !== myEmail()) flash(`${short(r.updated_by)} updated the home${e?.text ? ': ' + e.text : ''}.`);
+  }
+
+  // roles shape what each person sees
+  function renderCollabUI() {
+    let btn = $('btnShare');
+    if (!btn) { btn = document.createElement('button'); btn.id = 'btnShare'; btn.className = 'ws-only'; btn.textContent = 'Share'; $('btnWallet').before(btn); btn.onclick = openShare; }
+    btn.hidden = !project || project.id === 'sample-home';
+    let grp = $('collabGrp');
+    if (!grp) { grp = document.createElement('div'); grp.id = 'collabGrp'; grp.className = 'grp gpanel'; grp.innerHTML = `<button id="btnComment" title="Pin a comment to a spot in the home">＋ Comment</button><button id="btnComments" title="All comments">Comments <b id="cCount"></b></button>`; document.querySelector('.hud .modes').appendChild(grp); $('btnComment').onclick = startPin; $('btnComments').onclick = openComments; }
+    grp.hidden = !collab(); $('btnComment').hidden = !can('commenter');
+    let note = $('sharedNote');
+    if (!note) { note = document.createElement('div'); note.id = 'sharedNote'; note.className = 'step'; $('side').prepend(note); }
+    note.hidden = !project?.shared;
+    if (project?.shared) note.innerHTML = `<h3><span class="t"><i>↗</i>Shared with you</span><small>${esc(ROLE_TXT[S.role] || '')}</small></h3><p class="note" style="margin:0">${S.role === 'editor' ? 'You can change this home by asking, in the bar below or through Mira. Changes count against the owner\'s plan, and everyone sees who made them.' : S.role === 'commenter' ? 'Walk through, then pin comments to any spot with ＋ Comment.' : 'Walk through and look around. Ask the owner if you need to comment or edit.'}</p>`;
+  }
+  const _canEdit = S.canEdit;
+  S.canEdit = async p => {
+    if (p?.shared) { if (can('editor')) return true; flash('You can view this home but not change it. Ask the owner for edit access.', true); return false; }
+    return _canEdit(p);
+  };
+  const _onError = S.onError;
+  S.onError = e => { if (project?.shared && PAY_CODES.includes(e?.code)) { S.lastPaywall = { reason: 'owner', t: Date.now() }; flash("The owner's plan has no changes left for this home. Ask them to add more.", true); return; } _onError(e); };
+
+  // the share sheet
+  async function openShare() {
+    if (!project || project.id === 'sample-home') return;
+    await S.ensureAuth(); if (!S.me) await S.refresh();
+    if (!project.shared) { if (!project.plan?.image) { flash('Add a floor plan first, then share the home.', true); return; } try { await S.api('/api/homes', { id: project.id, name: project.name }); } catch (e) { flash(e.message, true); return; } }
+    const link = `${location.origin}${location.pathname}?home=${encodeURIComponent(project.id)}`, owner = !project.shared;
+    const m = modal(`<div class="eyebrow">[ Share ]</div><h2>${esc(project.name || 'This home')}</h2>
+      <p class="lead">${owner ? 'Invite clients, family or your team by email. They sign in with that email to open it.' : 'People with access to this home.'}</p>
+      ${owner ? `<div class="shrow"><input type="text" id="shEmail" inputmode="email" placeholder="name@example.com" data-autofocus><select id="shRole"><option value="viewer">Can view</option><option value="commenter" selected>Can comment</option><option value="editor">Can edit</option></select><button class="primary" id="shGo">Invite</button></div>
+      <p class="note" style="margin:6px 0 0">Viewers walk through. Commenters pin notes in 3D. Editors change the home by asking; their changes count against your plan.</p>` : ''}
+      <div id="shList" class="shlist"><p class="note">Loading…</p></div>
+      <div class="mact"><button id="shCopy">Copy link</button>${owner ? '' : '<button id="shLeave">Leave this home</button>'}<button class="primary" data-close>Done</button></div>`, { wide: true });
+    const L = m.el.querySelector('#shList');
+    const draw = (members, ownerEmail) => {
+      L.innerHTML = `<div class="shm"><span><b>${esc(ownerEmail || (owner ? myEmail() : 'Owner'))}</b>${owner ? ' (you)' : ''}</span><span class="r">Owner</span></div>` + (members.length ? members.map(x => `<div class="shm" data-e="${esc(x.email)}"><span><b>${esc(x.email)}</b>${x.email === myEmail() ? ' (you)' : ''}${x.joined ? '' : ' <small>invited</small>'}</span>${owner ? `<select data-role>${Object.entries(ROLE_TXT).map(([k, v]) => `<option value="${k}"${k === x.role ? ' selected' : ''}>${v}</option>`).join('')}</select><button class="ghost icon" data-rm title="Remove">✕</button>` : `<span class="r">${ROLE_TXT[x.role]}</span>`}</div>`).join('') : '<p class="note">Nobody else yet.</p>');
+      L.querySelectorAll('[data-role]').forEach(s => s.onchange = () => act('role', s.closest('[data-e]').dataset.e, s.value));
+      L.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => act('remove', b.closest('[data-e]').dataset.e));
+    };
+    const act = async (action, email, role) => {
+      try { const r = await S.api('/api/share', { homeId: project.id, action, email, role }); draw(r.members, myEmail()); await S.refresh(); if (action === 'invite' && r.members.length === 1) { await firstSync(); } renderCollabUI(); if (action === 'invite') flash(`${email} can open it at your link once they sign in.`); }
+      catch (e) { flash(e.message, true); }
+    };
+    try { const r = await S.api('/api/share?home=' + encodeURIComponent(project.id)); draw(r.members, r.owner); } catch (e) { L.innerHTML = `<p class="note">${esc(e.message)}</p>`; }
+    const go = () => { const e = m.el.querySelector('#shEmail'); if (!e.value.trim()) return; act('invite', e.value.trim(), m.el.querySelector('#shRole').value); e.value = ''; };
+    m.el.querySelector('#shGo')?.addEventListener('click', go);
+    m.el.querySelector('#shEmail')?.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') go(); });
+    m.el.querySelector('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); flash('Link copied. Only people you invited can open it.'); } catch { prompt('Copy this link', link); } };
+    m.el.querySelector('#shLeave')?.addEventListener('click', async () => { try { await S.api('/api/share', { homeId: project.id, action: 'remove', email: myEmail() }); m.close(); const id = project.id; showHome(); await store.del(id); S.refresh().then(renderHome); flash('You left the home.'); } catch (e) { flash(e.message, true); } });
+  }
+
+  // pinned comments
+  async function loadComments() {
+    if (!collab()) return;
+    try { const r = await S.api('/api/comments?home=' + encodeURIComponent(project.id)); const before = sync.comments.length; sync.comments = r.comments || []; renderPins();
+      const fresh = sync.comments.slice(before).filter(c => c.author !== myEmail()); if (before && fresh.length) flash(`${short(fresh.at(-1).author)} commented${fresh.at(-1).room ? ' in ' + fresh.at(-1).room : ''}: “${fresh.at(-1).text.slice(0, 60)}”`); }
+    catch { }
+  }
+  function renderPins() {
+    let wrap = $('pins'); if (!wrap) { wrap = document.createElement('div'); wrap.id = 'pins'; $('view3d').appendChild(wrap); }
+    const open = sync.comments.filter(c => !c.resolved && c.x != null);
+    wrap.innerHTML = open.map((c, i) => `<button class="pin" data-id="${esc(c.id)}" title="${esc(short(c.author))}: ${esc(c.text.slice(0, 80))}">${i + 1}</button>`).join('');
+    wrap.querySelectorAll('.pin').forEach(b => b.onclick = e => { e.stopPropagation(); showBubble(sync.comments.find(c => c.id === b.dataset.id), b); });
+    const n = sync.comments.filter(c => !c.resolved).length; if ($('cCount')) $('cCount').textContent = n ? n : '';
+  }
+  const _v = new THREE.Vector3();
+  S.frame = () => {
+    const wrap = $('pins'); if (!wrap || !wrap.childElementCount) return;
+    const r = stage.getBoundingClientRect(), here = mode === 'walk' ? roomAt(player.x, player.z)?.name : null;
+    for (const b of wrap.children) {
+      const c = sync.comments.find(x => x.id === b.dataset.id); if (!c) continue;
+      _v.set(c.x, c.y, c.z).project(camera);
+      const show = _v.z < 1 && Math.abs(_v.x) < 1.1 && Math.abs(_v.y) < 1.1 && (!here || !c.room || c.room === here);
+      b.style.display = show ? '' : 'none'; if (show) b.style.transform = `translate(${(_v.x + 1) / 2 * r.width - 13}px,${(1 - _v.y) / 2 * r.height - 30}px)`;
+    }
+  };
+  function showBubble(c, anchor) {
+    document.querySelector('.cbubble')?.remove(); if (!c) return;
+    const el = document.createElement('div'); el.className = 'cbubble gpanel';
+    const mayResolve = c.author === myEmail() || can('editor');
+    el.innerHTML = `<div class="who"><b>${esc(short(c.author))}</b><small>${c.room ? esc(c.room) + ' · ' : ''}${ago(Date.parse(c.created_at))}</small></div><p>${esc(c.text)}</p><div class="mact" style="margin:8px 0 0">${mayResolve ? `<button class="primary" data-res>Resolve</button>` : ''}<button data-x>Close</button></div>`;
+    const r = anchor.getBoundingClientRect(), sr = $('view3d').getBoundingClientRect();
+    el.style.left = Math.min(sr.width - 270, Math.max(8, r.left - sr.left - 120)) + 'px'; el.style.top = Math.max(8, r.top - sr.top + 34) + 'px';
+    $('view3d').appendChild(el);
+    el.querySelector('[data-x]').onclick = () => el.remove();
+    el.querySelector('[data-res]')?.addEventListener('click', () => resolve(c.id, true).then(() => el.remove()));
+  }
+  async function resolve(id, v) { try { await S.api('/api/comments', { id, resolved: v }, 'PATCH'); const c = sync.comments.find(x => x.id === id); if (c) c.resolved = v; renderPins(); } catch (e) { flash(e.message, true); } }
+  function startPin() {
+    if (!can('commenter')) return;
+    const ov = document.createElement('div'); ov.id = 'pinOverlay'; ov.innerHTML = '<div class="gpanel">Tap the spot you want to comment on · <button type="button">Cancel</button></div>';
+    $('view3d').appendChild(ov);
+    ov.querySelector('button').onclick = e => { e.stopPropagation(); ov.remove(); };
+    ov.addEventListener('click', e => {
+      if (e.target.closest('.gpanel')) return;
+      const hit = pick(e); ov.remove();
+      const pt = hit?.point || new THREE.Vector3(player.x, 4, player.z), room = roomAt(pt.x, pt.z)?.name || roomAt(player.x, player.z)?.name || null;
+      const sr = $('view3d').getBoundingClientRect(), el = document.createElement('div'); el.className = 'cbubble gpanel';
+      el.innerHTML = `<div class="who"><b>New comment</b><small>${esc(room || '')}</small></div><textarea id="cText" rows="3" placeholder="e.g. Could this wall be a lighter colour?"></textarea><div class="mact" style="margin:8px 0 0"><button data-x>Cancel</button><button class="primary" data-go>Post</button></div>`;
+      el.style.left = Math.min(sr.width - 270, Math.max(8, e.clientX - sr.left - 120)) + 'px'; el.style.top = Math.min(sr.height - 170, Math.max(8, e.clientY - sr.top + 14)) + 'px';
+      document.querySelector('.cbubble')?.remove(); $('view3d').appendChild(el);
+      const ta = el.querySelector('textarea'); ta.focus(); ta.addEventListener('keydown', ev => ev.stopPropagation());
+      el.querySelector('[data-x]').onclick = () => el.remove();
+      el.querySelector('[data-go]').onclick = async () => {
+        const text = ta.value.trim(); if (!text) return;
+        try { const r = await S.api('/api/comments', { homeId: project.id, text, room, x: pt.x, y: pt.y, z: pt.z }); sync.comments.push(r.comment); renderPins(); el.remove(); flash('Comment pinned. Everyone with access can see it.'); }
+        catch (err) { flash(err.message, true); }
+      };
+    });
+  }
+  function openComments() {
+    const list = sync.comments.filter(c => sync.showResolved || !c.resolved).slice().reverse();
+    const m = modal(`<div class="eyebrow">[ Comments ]</div><h2>${list.length ? list.length + ' comment' + (list.length > 1 ? 's' : '') : 'No open comments'}</h2>
+      <div class="clist">${list.map(c => `<div class="crow${c.resolved ? ' done' : ''}" data-id="${esc(c.id)}"><div><b>${esc(short(c.author))}</b> <small>${c.room ? esc(c.room) + ' · ' : ''}${ago(Date.parse(c.created_at))}</small><p>${esc(c.text)}</p></div><div class="ca">${c.room ? '<button data-go>Go there</button>' : ''}${c.author === myEmail() || can('editor') ? `<button data-res>${c.resolved ? 'Reopen' : 'Resolve'}</button>` : ''}</div></div>`).join('') || '<p class="note">Pin one with ＋ Comment while you walk.</p>'}</div>
+      <div class="mact"><label class="note" style="flex:1;align-self:center"><input type="checkbox" id="cShowRes"${sync.showResolved ? ' checked' : ''}> Show resolved</label><button class="primary" data-close>Done</button></div>`, { wide: true });
+    m.el.querySelector('#cShowRes').onchange = e => { sync.showResolved = e.target.checked; m.close(); openComments(); };
+    m.el.querySelectorAll('.crow').forEach(row => {
+      const c = sync.comments.find(x => x.id === row.dataset.id);
+      row.querySelector('[data-go]')?.addEventListener('click', () => { m.close(); const r = layout.rooms.find(x => x.name === c.room); if (r) goToRoom(r); });
+      row.querySelector('[data-res]')?.addEventListener('click', async () => { await resolve(c.id, !c.resolved); m.close(); openComments(); });
+    });
+  }
+
   /* ---------- boot ---------- */
   (async () => {
     try { S.cfg = await (await fetch('/api/config')).json(); } catch { S.cfg = null; }
@@ -316,5 +525,8 @@ if (SITE) (() => {
     // Deep links from the landing page: /app#start opens a new home, /app#sample opens the sample home.
     const hash = location.hash.slice(1);
     if (hash === 'start' || hash === 'sample') { history.replaceState(null, '', location.pathname); setTimeout(() => $(hash === 'start' ? 'btnNewProj' : 'btnSampleHome')?.click(), 300); }
+    // invite links: /app?home=<id> opens a home someone shared with you
+    const shared = new URLSearchParams(location.search).get('home');
+    if (shared) { history.replaceState(null, '', location.pathname); setTimeout(async () => { await S.ensureAuth(); await S.refresh(); const own = (await store.all()).find(p => p.id === shared && !p.shared); if (own) openProject(own); else openShared(shared); }, 300); }
   })();
 })();

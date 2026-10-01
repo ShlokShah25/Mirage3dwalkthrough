@@ -428,6 +428,72 @@
     .modal h2{font-size:28px}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+  /* the brief questionnaire */
+  .profsum{display:flex;align-items:center;gap:8px;justify-content:space-between;font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px;margin-bottom:9px}
+  .profsum button{padding:5px 10px;font-size:12px;flex:none}
+  .linkish{background:none;border:0;padding:0 0 0 6px;color:var(--gold);font-size:12.5px;text-decoration:underline;cursor:pointer}
+  .qgrid{display:grid;gap:10px;margin-top:6px}
+  .qgrid.two{grid-template-columns:1fr 1fr}.qgrid.three{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:600px){.qgrid.two,.qgrid.three{grid-template-columns:1fr}}
+  .qcard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px;border-radius:14px;min-height:92px;transition:transform .15s,border-color .15s}
+  .qcard b{font-size:16px;font-weight:600}.qcard span{font-size:12.5px;line-height:1.45;color:var(--muted);font-weight:400}
+  .qcard[aria-pressed="true"] span{color:var(--gold-ink);opacity:.8}
+  .qcard:hover{transform:translateY(-1px)}
+  .qcompass{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:6px;position:relative;width:max-content}
+  .qcompass button{font-size:18px;padding:0;border-radius:10px}
+  .qcompass img{grid-column:2;grid-row:2;width:44px;height:44px;object-fit:contain;border-radius:8px;background:#fff;opacity:.9}
+  .qcompass [data-n="0"]{grid-column:2;grid-row:1}.qcompass [data-n="45"]{grid-column:3;grid-row:1}.qcompass [data-n="90"]{grid-column:3;grid-row:2}.qcompass [data-n="135"]{grid-column:3;grid-row:3}
+  .qcompass [data-n="180"]{grid-column:2;grid-row:3}.qcompass [data-n="225"]{grid-column:1;grid-row:3}.qcompass [data-n="270"]{grid-column:1;grid-row:2}.qcompass [data-n="315"]{grid-column:1;grid-row:1}
+  .qcompass.small{grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,36px)}.qcompass.small img{width:36px;height:36px}
+  .qlist{display:grid;gap:2px;margin-top:4px}
+  .qstep{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line)}
+  .qstep>div{display:flex;align-items:center;gap:8px}
+  .qstep [data-k]{width:34px;height:34px;padding:0;border-radius:99px;font-size:16px}
+  .qstep output{min-width:28px;text-align:center;font-family:var(--mono);font-size:15px}
+  .qtog{min-width:64px}
+  .qdots{display:flex;gap:6px;justify-content:center;margin:18px 0 4px}
+  .qdots i{width:6px;height:6px;border-radius:99px;background:var(--line2)}.qdots i.on{background:var(--gold);width:18px}
+  /* Mira's cards and options */
+  .gmsg.card{max-width:96%;align-self:stretch;background:var(--surface2);border:1px solid var(--line);padding:12px}
+  .vhead{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+  .vhead small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .vring{--p:0;width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--gold) calc(var(--p)*1%),var(--line2) 0)}
+  .vring b{width:38px;height:38px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-family:var(--mono);font-size:14px}
+  .vlist{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:12.5px}
+  .vlist li{display:flex;gap:8px;line-height:1.4}.vlist li span{color:var(--muted)}.vlist li b{color:var(--ink);font-weight:600}
+  .vlist li em{display:block;font-style:normal;color:var(--faint);margin-top:2px}
+  .vlist i{flex:none;width:18px;height:18px;border-radius:99px;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700}
+  .vlist .ok i{background:rgba(91,240,209,.16);color:var(--gold)}.vlist .warn i{background:rgba(240,190,90,.18);color:#f0be5a}.vlist .fail i{background:rgba(240,100,90,.18);color:#f0645a}
+  .vlist .more{color:var(--faint);padding-left:26px}
+  .vact{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.vact button{font-size:12px;padding:6px 11px}
+  .gopts{display:flex;flex-direction:column;gap:6px;align-self:flex-start;max-width:92%}
+  .gopts button{text-align:left;font-size:12.5px;padding:8px 12px;border-radius:12px;font-weight:500}
+  .gopts button.chosen{border-color:var(--gold);color:var(--gold)}
+  /* collaborators */
+  body[data-role="viewer"] #side .step,body[data-role="commenter"] #side .step,body[data-role="editor"] #side .step{display:none}
+  body[data-role] #side #sharedNote{display:block}
+  body[data-role="viewer"] #pbar,body[data-role="commenter"] #pbar,body[data-role="viewer"] #btnAdd,body[data-role="commenter"] #btnAdd,body[data-role="viewer"] #btnEdit,body[data-role="commenter"] #btnEdit,body[data-role="viewer"] #drawer,body[data-role="commenter"] #drawer{display:none!important}
+  body[data-role="viewer"] #tabPlan,body[data-role="commenter"] #tabPlan,body[data-role="editor"] #tabPlan,body[data-role="viewer"] #tabStyle,body[data-role="commenter"] #tabStyle{display:none}
+  body[data-role="owner"] #sharedNote{display:none}
+  .shrow{display:flex;gap:8px;flex-wrap:wrap}.shrow input{flex:1;min-width:200px;padding:11px 12px;font-size:14px}
+  .shlist{margin:16px 0 4px;border:1px solid var(--line);border-radius:14px;padding:4px 14px}
+  .shm{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}.shm:last-child{border-bottom:0}
+  .shm>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.shm small{color:var(--faint);margin-left:6px}.shm .r{color:var(--muted);font-size:12.5px}
+  .shm select{font-size:12.5px;padding:5px 8px}
+  #pins{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+  .pin{position:absolute;left:0;top:0;pointer-events:auto;width:26px;height:26px;padding:0;border-radius:50% 50% 50% 4px;background:var(--gold);color:var(--gold-ink);font-weight:700;font-size:12px;border:2px solid #0A0B0C;box-shadow:0 6px 18px rgba(0,0,0,.45);transform-origin:0 100%}
+  #pinOverlay{position:absolute;inset:0;z-index:6;cursor:crosshair;background:rgba(91,240,209,.04)}
+  #pinOverlay .gpanel{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:99px;font-size:13px;cursor:default;white-space:nowrap}
+  #pinOverlay .gpanel button{padding:4px 10px;font-size:12px;margin-left:6px}
+  .cbubble{position:absolute;z-index:7;width:260px;padding:12px;border-radius:14px;font-size:13px}
+  .cbubble .who{display:flex;justify-content:space-between;gap:8px}.cbubble .who small{color:var(--faint)}
+  .cbubble p{margin:6px 0 0;line-height:1.45}.cbubble textarea{width:100%;margin-top:8px;font-size:13px}
+  .cbubble .mact button{padding:6px 11px;font-size:12px}
+  .clist{display:grid;gap:8px;margin:6px 0 4px;max-height:52vh;overflow:auto}
+  .crow{display:flex;gap:10px;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
+  .crow p{margin:4px 0 0;line-height:1.45}.crow small{color:var(--faint)}.crow.done{opacity:.55}
+  .crow .ca{display:flex;flex-direction:column;gap:6px}.crow .ca button{font-size:12px;padding:5px 10px;white-space:nowrap}
+  #cCount:empty{display:none}#cCount{background:var(--gold);color:var(--gold-ink);border-radius:99px;padding:0 6px;margin-left:4px;font-size:11px}
 </style>
 </head>
 <body>
@@ -487,6 +553,7 @@
       </div>
       <div class="step" id="step3">
         <h3><span class="t"><i>03</i>Anything special?</span><small>optional</small></h3>
+        <div class="profsum" id="profileSum"></div>
         <div class="chips pick" id="ideaChips"></div>
         <div class="field"><label for="brief" class="sr">Notes for the design</label><textarea id="brief" placeholder="e.g. a study corner in the second bedroom, a pooja unit in the living room, lots of plants on the balcony"></textarea></div>
         <div class="row2" style="margin-top:9px">
@@ -536,7 +603,7 @@
           <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Your guide · walks, answers, changes</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Close">✕</button></header>
           <div id="guideTourBar" hidden><span class="live"></span><span>Touring · <b id="guideStep"></b></span><button id="guidePause">Pause</button><button id="guideStop">End tour</button></div>
           <div id="guideLog" role="log"></div>
-          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button">Show me the kitchen</button><button type="button">Which is the biggest bedroom?</button><button type="button">Make it night</button></div>
+          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="vastu">Is my home Vastu compliant?</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button">Show me the kitchen</button><button type="button">Make it night</button></div>
           <form id="guideForm"><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira anything, or say what to change" aria-label="Message your guide"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>
@@ -2656,7 +2723,7 @@ function tick() {
     orbit.update();
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
-  drawMap();
+  drawMap(); SITE?.frame?.();
   if (composer) composer.render(); else renderer.render(scene, camera);
 }
 
@@ -2755,7 +2822,7 @@ function baseSettings(ceil, view, st) { return { ceilingHeight: ceil, slabThickn
 function emptyProject() { const st = normalizeStyle(structuredClone(PRESETS[0].style)); return { id: uid(), version: 2, presetId: PRESETS[0].id, name: 'My new home', created: Date.now(), updated: Date.now(), status: 'draft', brief: '', plan: null, inspo: [], style: st, edits: [], layout: { settings: baseSettings(10, st.view || 'sea', st), walls: [], rooms: [], railings: [], furniture: [] } }; }
 let saveT, undoStack = [];
 function saveSoon() { clearTimeout(saveT); saveT = setTimeout(persistNow, 700); }
-async function persistNow() { clearTimeout(saveT); if (!project) return; project.updated = Date.now(); await store.put(project); }
+async function persistNow() { clearTimeout(saveT); if (!project) return; project.updated = Date.now(); await store.put(project); SITE?.afterSave?.(project); }
 function captureCover() {
   if (!project || !layout.walls.length || activeView !== '3d' || photo) return;
   try { if (composer) composer.render(); else renderer.render(scene, camera); const src = renderer.domElement, c = document.createElement('canvas'); c.width = 640; c.height = 400; const g = c.getContext('2d'); const k = Math.max(640 / src.width, 400 / src.height), w = src.width * k, h = src.height * k; g.drawImage(src, (640 - w) / 2, (400 - h) / 2, w, h); project.cover = c.toDataURL('image/jpeg', .8); } catch { }
@@ -2772,7 +2839,8 @@ function loadProject(p) {
   for (const k in MC) delete MC[k];
   buildAll(); placeSpawn(); setMode('walk');
   $('empty3d').hidden = !!layout.walls.length; $('pbar').hidden = !layout.walls.length;
-  pv.fitted = false; renderPhist(); renderSugg(); renderPresets(); renderIdeas(); $('coach').hidden = true;
+  pv.fitted = false; renderPhist(); renderSugg(); renderPresets(); renderIdeas(); renderProfileSum(); $('coach').hidden = true;
+  SITE?.onProjectLoaded?.(project);
 }
 function showHome() {
   if (photo) exitPhoto();
@@ -2790,7 +2858,7 @@ async function renderHome() {
   const list = (await store.all()).sort((a, b) => (b.updated || 0) - (a.updated || 0)), grid = $('projGrid');
   const stat = p => { const rooms = (p.layout?.rooms || []).filter(r => r.kind === 'room' && r.polygon?.length > 2); const area = rooms.reduce((a, r) => a + polyArea(r.polygon), 0); return rooms.length ? `${rooms.length} rooms · ${Math.round(area).toLocaleString()} sq ft · ${ago(p.updated || Date.now())}` : `Draft · ${ago(p.updated || Date.now())}`; };
   grid.innerHTML = `<button class="card new" id="cardNew"><div class="inner"><div class="plus">+</div><h3>New home</h3><p>Floor plan in,<br>furnished 3D home out.</p></div></button>` +
-    list.map(p => { const cover = p.cover || p.plan?.image || ''; return `<div class="card" role="button" tabindex="0" data-id="${esc(p.id)}" aria-label="Open ${esc(p.name)}"><span class="cover" style="${cover ? `background-image:url('${cover}')` : ''}"></span><span class="chip${p.status === 'generated' ? ' gen' : ''}">${p.status === 'generated' ? 'Ready to walk' : p.status === 'traced' ? 'Plan read' : 'Draft'}</span><button class="kill" data-kill="${esc(p.id)}">Delete</button><div class="meta"><h3>${esc(p.name || 'My new home')}</h3><p>${esc(stat(p))}</p></div></div>`; }).join('');
+    list.map(p => { const cover = p.cover || p.plan?.image || ''; return `<div class="card" role="button" tabindex="0" data-id="${esc(p.id)}" aria-label="Open ${esc(p.name)}"><span class="cover" style="${cover ? `background-image:url('${cover}')` : ''}"></span><span class="chip${p.status === 'generated' ? ' gen' : ''}">${p.shared ? 'Shared · ' + esc(p.shared.role) : p.status === 'generated' ? 'Ready to walk' : p.status === 'traced' ? 'Plan read' : 'Draft'}</span><button class="kill" data-kill="${esc(p.id)}">Delete</button><div class="meta"><h3>${esc(p.name || 'My new home')}</h3><p>${esc(stat(p))}</p></div></div>`; }).join('');
   $('cardNew').onclick = newProject;
   grid.querySelectorAll('.card[data-id]').forEach(c => {
     const go = () => { const p = list.find(x => x.id === c.dataset.id); if (p) openProject(p); };
@@ -2800,8 +2868,9 @@ async function renderHome() {
   grid.querySelectorAll('[data-kill]').forEach(b => b.onclick = e => {
     e.stopPropagation();
     if (b.dataset.armed) { store.del(b.dataset.kill).then(renderHome); return; }
-    b.dataset.armed = '1'; b.textContent = 'Tap again to delete'; b.style.opacity = 1; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'Delete'; b.style.opacity = ''; } }, 3000);
+    b.dataset.armed = '1'; b.textContent = list.find(p => p.id === b.dataset.kill)?.shared ? 'Tap again to remove' : 'Tap again to delete'; b.style.opacity = 1; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'Delete'; b.style.opacity = ''; } }, 3000);
   });
+  SITE?.decorateHome?.(grid, list);
 }
 function newProject() { const p = emptyProject(); store.put(p); openProject(p); document.body.classList.remove('side-hidden'); }
 $('btnNewProj').onclick = newProject;
@@ -2932,6 +3001,7 @@ Reply with only one JSON object of this shape:
  "openings": [ {"type": "door", "a": [x, y], "b": [x, y]} ],
  "rooms": [ {"name": "Living / Dining", "type": "living", "poly": [[x, y], ...]} ],
  "entrance": [x, y],
+ "north": 0,
  "notes": "one short sentence on anything uncertain"
 }
 
@@ -2939,8 +3009,9 @@ Rules:
 - labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08; metres stay metres). bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
 - walls: every wall as a straight centreline segment. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments.
 - openings: a and b are the two jambs, on the wall centreline. type is "door" (hinged, usually with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill) or "opening" (a gap with no door).
-- rooms: every enclosed space, including toilets, balconies, terraces and utility areas; skip ducts and shafts. poly follows the wall centrelines. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, balcony, terrace, other. A combined space such as Living / Dining is one room.
+- rooms: every enclosed space, including toilets, balconies, terraces and utility areas; skip ducts and shafts. poly follows the wall centrelines. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room.
 - entrance: the main entrance door position, or null.
+- north: if the drawing has a north arrow or compass, the direction it points as degrees clockwise from straight up on the image (0 = up, 90 = right, 180 = down, 270 = left); otherwise null.
 - Ignore furniture drawings, hatching, text and dimension lines except to identify rooms.
 ${brief ? 'Homeowner notes (for context only): ' + brief.slice(0, 600) : ''}`;
 
@@ -2995,7 +3066,7 @@ function normalizeStyle(raw) {
     features: Array.isArray(r.features) ? r.features.slice(0, 10).map(String) : [],
   };
 }
-const roomCat = t => ['bedroom', 'master', 'walkin', 'staff', 'study'].includes(t) ? 'bedroom' : ['bath', 'utility'].includes(t) ? 'wet' : isOutdoorType(t) ? 'outdoor' : 'living';
+const roomCat = t => ['bedroom', 'master', 'walkin', 'staff', 'study', 'cabin'].includes(t) ? 'bedroom' : ['bath', 'utility'].includes(t) ? 'wet' : isOutdoorType(t) ? 'outdoor' : 'living';
 function applyStyleToRooms(L, st) {
   for (const r of L.rooms) {
     if (r.kind === 'ledge') continue;
@@ -3007,15 +3078,15 @@ function applyStyleToRooms(L, st) {
 }
 
 /* ================= plan trace → 3D layout ================= */
-const TYPES = ['living', 'dining', 'kitchen', 'bedroom', 'master', 'bath', 'foyer', 'passage', 'study', 'walkin', 'utility', 'staff', 'balcony', 'terrace', 'other'];
+const TYPES = ['living', 'dining', 'kitchen', 'bedroom', 'master', 'bath', 'foyer', 'passage', 'study', 'walkin', 'utility', 'staff', 'balcony', 'terrace', 'pooja', 'workspace', 'cabin', 'meeting', 'reception', 'pantry', 'other'];
 function normType(t, name) {
   const s = (String(t || '') + ' ' + String(name || '')).toLowerCase();
   if (TYPES.includes(String(t).toLowerCase())) return String(t).toLowerCase();
-  const map = [[/master/, 'master'], [/toilet|bath|wc|powder|shower/, 'bath'], [/bed/, 'bedroom'], [/kitchen|pantry/, 'kitchen'], [/dining/, 'dining'], [/living|lounge|family|drawing/, 'living'], [/terrace/, 'terrace'], [/balcony|deck|sit.?out|veranda/, 'balcony'], [/foyer|entry|lobby/, 'foyer'], [/passage|corridor|hall/, 'passage'], [/study|office|library/, 'study'], [/walk|dress|wardrobe/, 'walkin'], [/utility|laundry|wash|store/, 'utility'], [/staff|servant|maid/, 'staff']];
+  const map = [[/pooja|puja|prayer|mandir/, 'pooja'], [/reception/, 'reception'], [/conference|meeting|board ?room/, 'meeting'], [/cabin/, 'cabin'], [/work ?station|open office|work ?area/, 'workspace'], [/master/, 'master'], [/toilet|bath|wc|powder|shower/, 'bath'], [/bed/, 'bedroom'], [/kitchen|pantry/, 'kitchen'], [/dining/, 'dining'], [/living|lounge|family|drawing/, 'living'], [/terrace/, 'terrace'], [/balcony|deck|sit.?out|veranda/, 'balcony'], [/foyer|entry|lobby/, 'foyer'], [/passage|corridor|hall/, 'passage'], [/study|office|library/, 'study'], [/walk|dress|wardrobe/, 'walkin'], [/utility|laundry|wash|store/, 'utility'], [/staff|servant|maid/, 'staff']];
   for (const [re, ty] of map) if (re.test(s)) return ty;
   return 'other';
 }
-const typeLabel = t => ({ living: 'Living', dining: 'Dining', kitchen: 'Kitchen', bedroom: 'Bedroom', master: 'Master Bedroom', bath: 'Bathroom', foyer: 'Foyer', passage: 'Passage', study: 'Study', walkin: 'Walk-in', utility: 'Utility', staff: 'Staff Room', balcony: 'Balcony', terrace: 'Terrace', other: 'Room' })[t] || 'Room';
+const typeLabel = t => ({ living: 'Living', dining: 'Dining', kitchen: 'Kitchen', bedroom: 'Bedroom', master: 'Master Bedroom', bath: 'Bathroom', foyer: 'Foyer', passage: 'Passage', study: 'Study', walkin: 'Walk-in', utility: 'Utility', staff: 'Staff Room', balcony: 'Balcony', terrace: 'Terrace', pooja: 'Pooja Room', workspace: 'Workspace', cabin: 'Cabin', meeting: 'Meeting Room', reception: 'Reception', pantry: 'Pantry', other: 'Room' })[t] || 'Room';
 function fmtFtIn(v) { const ft = Math.floor(v + 1e-6), inch = Math.round((v - ft) * 12); return inch === 12 ? `${ft + 1}'` : inch ? `${ft}'${inch}"` : `${ft}'`; }
 const numOk = v => Array.isArray(v) && v.length >= 2 && isFinite(+v[0]) && isFinite(+v[1]);
 function deriveScale(tr, W, Hh) {
@@ -3125,6 +3196,7 @@ function traceToLayout(tr, W, Hh, opt) {
     }
   }
   const st = opt.style, settings = baseSettings(opt.ceiling, opt.view, st);
+  if (tr.north !== null && tr.north !== undefined && tr.north !== '' && isFinite(+tr.north)) settings.north = (Math.round(+tr.north / 45) * 45 % 360 + 360) % 360;
   const L = { name: opt.name, units: 'feet', settings, walls, rooms, railings, furniture: [] };
   applyStyleToRooms(L, st);
   const big = [...rooms].filter(r => r.kind === 'room').sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
@@ -3153,15 +3225,15 @@ function roomFaces(r) {
       const P = s => [w.a[0] + ux * s + nx * t2, w.a[1] + uz * s + nz * t2];
       const ops = (w.openings || []).filter(o => o.end > s0 && o.start < s1).map(o => { const p = P(Math.max(o.start, s0)), q = P(Math.min(o.end, s1)); return `${o.type}${o.type === 'window' ? ' (sill ' + o.sill + ')' : ''} from (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])})`; });
       const p = P(s0), q = P(s1);
-      out.push(`  - wall face (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])}), facing into the room along (${f1(nx)},${f1(nz)})${ops.length ? '; openings: ' + ops.join('; ') : ''}`);
+      out.push(`  - ${hasNorth() ? `the room's ${DIRNAME[dirOf(bearingOf(-nx, -nz))]} wall: ` : ''}wall face (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])}), facing into the room along (${f1(nx)},${f1(nz)})${ops.length ? '; openings: ' + ops.join('; ') : ''}`);
     }
   }
   return [...new Set(out)];
 }
 function furnishPrompt(rooms, extra = '') {
   const st = project.style, cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
-  const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', ');
-  const blocks = rooms.map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `ROOM "${r.name}" — type ${r.type}${r.size ? ', printed size ' + r.size : ''}, ${r.kind === 'outdoor' ? 'outdoor, ' : ''}area ${Math.round(polyArea(r.polygon))} sq ft${project.roomStyles?.[r.name] ? `
+  const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', '), FR = hasNorth() ? homeFrame() : null, BRIEF = briefForFurnish();
+  const blocks = rooms.map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `ROOM "${r.name}" — type ${r.type}${r.size ? ', printed size ' + r.size : ''}, ${hasNorth() ? 'in the ' + DIRNAME[roomZone(r, FR)] + ' of the home, ' : ''}${r.kind === 'outdoor' ? 'outdoor, ' : ''}area ${Math.round(polyArea(r.polygon))} sq ft${project.roomStyles?.[r.name] ? `
   ROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : ''}
   floor polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}
   bounds: x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))}
@@ -3171,7 +3243,7 @@ ${roomFaces(r).join('\n') || '  (no wall faces found; keep items inside the poly
 STYLE: ${st.summary} Signature elements: ${(st.features || []).join(', ') || 'none given'}. Plants: ${st.plants}.
 FINISH TOKENS (use these so the style stays consistent): wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal. Also allowed: linen, linen-white, white-ceramic, black-metal, brass, felt, terracotta, concrete, plaster, teak, glass, glass-bronze, onyx, marble-green, marble-rosso, travertine-dark, velvet-emerald, velvet-rust, velvet-navy, velvet-blush, velvet-mustard, velvet-ink, or a "#rrggbb" hex (rugs and fabrics). Use one or two rich contrast materials per room (a velvet, a dark or veined stone, brass) against the calm base tokens.
 HOMEOWNER'S NOTES: ${(project.brief || 'none').slice(0, 1200)}${extra ? '\nREQUEST FOR THESE ROOMS (takes priority over the notes): ' + String(extra).slice(0, 600) : ''}
-CEILING HEIGHT: ${layout.settings.ceilingHeight} ft. The whole home has: ${others}.
+CEILING HEIGHT: ${layout.settings.ceilingHeight} ft. The whole home has: ${others}.${BRIEF ? '\n' + BRIEF : ''}${FR ? '\nCOMPASS: ' + compassVecsText() : ''}
 
 ORIENTATION: rot is in degrees. An item's FRONT faces +z at rot 0, +x at rot 90, -z at rot 180, -x at rot -90. Its back is opposite its front. x,z is the item's centre. w is its width across the front, d its depth front-to-back, h its height, y its lift off the floor.
 Items listed as going against a wall (beds, sofas along walls, wardrobes, consoles, desks, vanities, counters, tall units, bookshelves, wc, TVs, mirrors, artwork, wall panels, curtains) must have their back touching the wall face: centre = point on the face + (d/2) along the face's inward direction, and rot chosen so the front faces into the room.
@@ -3197,6 +3269,7 @@ RULES:
 - Kitchens: kitchen-luxe on the main wall (sink and hobAt offsets), kitchen-tall-luxe on a second wall when there is room, plain kitchen-counter for short runs, and an island-waterfall with bar stools and a pendant-linear above only if the kitchen or kitchen+foyer is at least 11 ft deep.
 - Walk-in closets and dressing rooms: closet-lit on every solid wall, a closet-island in the middle if 3 ft clear all round, a pouf-round, a pendant-globes or chandelier.
 - Lounges and dens: a media-wall, a sectional facing it, coffee-nest, lounge-leather, a plant-tree.
+- Pooja rooms: a pooja-unit centred on the east or west wall, a rug, sconces either side, a floor-vase; nothing else.
 - Honour the architect brief wherever it applies to these rooms.
 Reply with only JSON: {"items":[{"room":"<room name>","type":"<catalog type>","name":"<short label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token>","accent":"<token>"}]} — include any extra fields a type's note mentions.`;
 }
@@ -3346,13 +3419,15 @@ async function requestGenerate() {
   const ok = needImg ? await ensureImages() : await getSample().then(sm => sm ? { sample: sm, max: 4 } : (flash('Claude is not available in this view.', true), null)); if (!ok) return;
   if (SITE) { if (!(await SITE.canDesign?.(project))) return; }
   else if (wallet.credits < BILLING.perWalkthrough) { openWallet('empty'); return; }
+  if (!profile().done && !(await askProfile())) return;
   const regen = project.status === 'generated', roomsWith = Object.entries(project.roomInspo || {}).filter(([k, v]) => v.length);
   const m = modal(`<div class="eyebrow">${regen ? 'Redesign' : 'Design'} my home</div><h2>${esc(project.name || 'My new home')}</h2>
     <p class="lead">Every one of the ${inspRooms().length} rooms gets designed and furnished. It usually takes 2 to 5 minutes, and you can watch it happen.${regen ? ' This replaces the current furniture and your changes.' : ''}</p>
-    <dl class="sumlist"><dt>Rooms</dt><dd>${inspRooms().length}</dd><dt>Style</dt><dd>${project.inspo.length ? project.inspo.length + ' photo' + (project.inspo.length > 1 ? 's' : '') + ' of yours' : esc(presetById(project.presetId)?.name || 'Warm Minimal')}</dd><dt>Rooms with their own look</dt><dd>${roomsWith.length ? roomsWith.map(([k, v]) => `${esc(k)} (${v.length})`).join(', ') : 'None'}</dd><dt>Special requests</dt><dd>${project.brief ? esc(project.brief.slice(0, 140)) + (project.brief.length > 140 ? '…' : '') : 'None'}</dd></dl>
+    <dl class="sumlist"><dt>Rooms</dt><dd>${inspRooms().length}</dd><dt>Style</dt><dd>${project.inspo.length ? project.inspo.length + ' photo' + (project.inspo.length > 1 ? 's' : '') + ' of yours' : esc(presetById(project.presetId)?.name || 'Warm Minimal')}</dd><dt>Rooms with their own look</dt><dd>${roomsWith.length ? roomsWith.map(([k, v]) => `${esc(k)} (${v.length})`).join(', ') : 'None'}</dd><dt>Brief</dt><dd>${esc(profileLine())} <button type="button" class="linkish" id="editBrief">Change</button></dd><dt>Special requests</dt><dd>${project.brief ? esc(project.brief.slice(0, 140)) + (project.brief.length > 140 ? '…' : '') : 'None'}</dd></dl>
     <div class="costline"><div><div class="eyebrow">Cost</div><div style="margin-top:4px;color:var(--muted);font-size:12.5px">${SITE ? 'Only counted when it finishes. Stop or fail and nothing is used.' : 'Charged only when it finishes. Stop or fail and you pay nothing.'}</div></div><b>${SITE ? esc(SITE.costLabel?.(project) || '') : creditsWord(BILLING.perWalkthrough)}</b></div>
     <div class="mact"><span style="flex:1;align-self:center;color:var(--faint);font-size:12.5px">${SITE ? esc(SITE.balanceText?.(project) || '') : 'Balance after: ' + creditsWord(wallet.credits - BILLING.perWalkthrough)}</span><button data-close>Cancel</button><button class="primary" id="goGen">${regen ? 'Redesign' : 'Design my home'}</button></div>`);
   m.el.querySelector('#goGen').onclick = () => { m.close(); runGenerate(ok); };
+  m.el.querySelector('#editBrief').onclick = async () => { m.close(); if (await askProfile()) requestGenerate(); };
 }
 async function runGenerate(ok) {
   const { sample, max } = ok;
@@ -3363,11 +3438,18 @@ async function runGenerate(ok) {
   project.brief = $('brief').value;
   const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
   const preset = presetById(project.presetId) || PRESETS[0];
-  const steps = [{ id: 'style', label: project.inspo.length ? `Reading your ${project.inspo.length} photo${project.inspo.length > 1 ? 's' : ''}` : `Using the ${preset.name} style`, state: 'active' }];
+  const P = profile(), prog = P.done && (P.use === 'office' || vastuOn() || P.household.kids || P.household.elders || P.household.wfh);
+  const steps = prog ? [{ id: 'prog', label: P.use === 'office' ? 'Planning the office' : vastuOn() ? 'Planning rooms by Vastu' : 'Planning rooms for your family', state: 'active' }] : [];
+  steps.push({ id: 'style', label: project.inspo.length ? `Reading your ${project.inspo.length} photo${project.inspo.length > 1 ? 's' : ''}` : `Using the ${preset.name} style`, state: 'active' });
   if (roomsWith.length) steps.push({ id: 'rstyle', label: `Reading photos for ${roomsWith.length} room${roomsWith.length > 1 ? 's' : ''}`, state: 'active' });
   steps.push({ id: 'furn', label: 'Designing and furnishing rooms' }); stepUI(steps);
   let placed = 0;
   try {
+    if (prog) {
+      try { const ch = await planRooms(sample, signal); buildAll(); stepSet('prog', 'done', ch?.length ? ch.slice(0, 4).join(' · ') : 'Rooms kept as they are'); renderUploads(); }
+      catch (e) { if (e?.code === 'cancelled') throw e; stepSet('prog', 'error', errText(e) + ' Keeping the rooms as they are.'); }
+    }
+    const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
     const ts = ticker('style', 'Reading materials and colours');
     const homeP = project.inspo.length ? collages(project.inspo, max).then(imgs => sample.json(STYLE_PROMPT(project.brief), { images: imgs, modelTier: 'default', signal, onText: ts.onText })) : Promise.resolve(null);
     const roomJobs = roomsWith.map(r => async () => {
@@ -3394,7 +3476,7 @@ async function runGenerate(ok) {
     else { console.error(e); flash('Something went wrong while building: ' + (e?.message || e) + '. Nothing was charged.', true); }
   } finally {
     running = false;
-    if (placed > 0) { if (!SITE) charge(`Home design · ${project.name || 'My new home'}`); project.status = 'generated'; project.generatedAt = Date.now(); captureCover(); flash(SITE ? 'Your home is ready. Walk in and look around.' : `Your home is ready. ${creditsWord(BILLING.perWalkthrough)} used, ${creditsWord(wallet.credits)} left.`); renderSugg(); setTimeout(maybeCoach, 400); }
+    if (placed > 0) { if (!SITE) charge(`Home design · ${project.name || 'My new home'}`); project.status = 'generated'; project.generatedAt = Date.now(); captureCover(); flash(SITE ? 'Your home is ready. Walk in and look around.' : `Your home is ready. ${creditsWord(BILLING.perWalkthrough)} used, ${creditsWord(wallet.credits)} left.`); renderSugg(); setTimeout(maybeCoach, 400); const A = vastuOn() && vastuAudit(); if (A) setTimeout(() => flash(`Vastu score ${A.score}/100. Ask Mira “is my home Vastu compliant?” for the details.`), 2600); }
     if (SITE && genId) SITE.finishGen?.(genId);
     renderPresets();
     renderUploads(); renderPhist(); saveSoon();
@@ -3444,7 +3526,7 @@ function renderSugg() {
 }
 function renderPhist() {
   const e = (project?.edits || []).slice(0, 8);
-  phist.innerHTML = e.map((x, i) => `<div><span>${esc(x.text)}<small>${esc(x.summary || '')} · ${ago(x.t)}</small></span>${i === 0 && undoStack.length ? '<button type="button" id="undoLast">Undo</button>' : ''}</div>`).join('');
+  phist.innerHTML = e.map((x, i) => `<div><span>${esc(x.text)}<small>${esc(x.summary || '')} · ${x.by && x.by !== SITE?.me?.user?.email ? esc(x.by.split('@')[0]) + ' · ' : ''}${ago(x.t)}</small></span>${i === 0 && undoStack.length ? '<button type="button" id="undoLast">Undo</button>' : ''}</div>`).join('');
   $('undoLast')?.addEventListener('click', undoEdit);
 }
 pinput.addEventListener('focus', () => pbar.classList.add('open'));
@@ -3456,21 +3538,24 @@ function editPrompt(text) {
   let focus = layout.rooms.filter(r => r.kind !== 'ledge' && low.includes(r.name.toLowerCase()));
   if (!focus.length) { const types = [['bedroom', /bedroom|bed room/], ['bath', /bath|toilet|washroom/], ['kitchen', /kitchen/], ['living', /living|lounge/], ['terrace', /terrace|balcon/]]; for (const [t, re] of types) if (re.test(low)) focus.push(...layout.rooms.filter(r => r.type === t || (t === 'bedroom' && r.type === 'master') || (t === 'terrace' && r.kind === 'outdoor'))); }
   if (!focus.length) focus = [selRoom || here].filter(Boolean);
-  focus = [...new Set(focus)].slice(0, 4);
+  const vReq = /vastu/i.test(text);
+  if (vReq) for (const m of text.matchAll(/"([^"]+)"/g)) { const r = layout.rooms.find(x => x.name === m[1]); if (r) focus.push(r); }
+  focus = [...new Set(focus)].slice(0, vReq ? 8 : 4);
   const extrasOf = it => Object.entries(it).filter(([k]) => !['id', 'type', 'name', 'room', 'x', 'z', 'rot', 'w', 'd', 'h', 'y', 'finish', 'accent'].includes(k)).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
   let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
-  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}`; }).join('\n');
+  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
   const detail = focus.map(r => `ROOM "${r.name}" polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}\n${roomFaces(r).join('\n')}`).join('\n\n');
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
-HOMEOWNER'S REQUEST: "${text.slice(0, 800)}"
+HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 800)}"
 WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. Words like "this", "here" or "that" refer to these.
 STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
-CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.
+CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.${profile().done ? '\n' + spaceText() : ''}
+${hasNorth() ? `COMPASS: ${compassVecsText()}` : ''}${(vReq || vastuOn()) && hasNorth() ? '\n' + VASTU_RULES : ''}
 
-ROOMS (name | type | area | bounds | floor):
+ROOMS (name | type | area | bounds | floor${hasNorth() ? ' | position in the home' : ''}):
 ${rooms}
 
 ${detail}
@@ -3490,6 +3575,7 @@ Reply with only JSON: {"summary":"one short sentence saying what you changed","o
 {"op":"paint","walls":"#hex","ceiling":"#hex"}
 {"op":"time","value":"golden|day|night"}
 {"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
+{"op":"swap","a":"<room>","b":"<room>"} swap what two rooms are used for (their names and types trade places; walls stay). Always follow it with a refurnish op for both rooms, using the names after the swap.
 Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
 RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. If the request cannot be done, return an empty ops list and explain why in summary.`;
 }
@@ -3517,6 +3603,7 @@ function applyOps(res) {
       for (const nm of names) { const r = roomByName(nm); if (!r) continue; if (['stone-large', 'wood', 'tile-2ft', 'tile-1ft', 'terrazzo', 'stone', 'plain'].includes(op.finish)) r.finish = op.finish; r.floor = hexOk(op.color, r.floor); shell = true; n++; }
     } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
     else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
+    else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
   if (added.length) { const items = settleItems(added, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; }
@@ -3547,7 +3634,7 @@ $('pform').addEventListener('submit', async e => {
     clearInterval(iv);
     const { n, refurn } = applyOps(res);
     const summary = String(res?.summary || '').slice(0, 220) || (n ? 'Done.' : 'No changes were made.');
-    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text, summary }); project.edits = project.edits.slice(0, 50); }
+    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
     pstatus.innerHTML = `<span>${esc(summary)}</span>${n || refurn.length ? '<button type="button" id="undoNow">Undo</button>' : ''}`;
     $('undoNow')?.addEventListener('click', undoEdit);
     pinput.value = ''; renderPhist(); saveSoon();
@@ -3849,7 +3936,7 @@ function homeFacts({ ids = false } = {}) {
   });
   return { area: Math.round(area), rooms, text: lines.join('\n') };
 }
-const TOUR_ORDER = ['foyer', 'living', 'dining', 'kitchen', 'balcony', 'terrace', 'study', 'master', 'walkin', 'bath', 'bedroom', 'staff', 'passage', 'utility', 'other'];
+const TOUR_ORDER = ['foyer', 'reception', 'living', 'workspace', 'dining', 'kitchen', 'pantry', 'pooja', 'balcony', 'terrace', 'meeting', 'cabin', 'study', 'master', 'walkin', 'bath', 'bedroom', 'staff', 'passage', 'utility', 'other'];
 function tourRooms() {
   const rs = layout.rooms.filter(r => r.polygon?.length > 2 && r.kind !== 'ledge' && !['passage', 'utility'].includes(r.type) && polyArea(r.polygon) > (r.type === 'bath' ? 64 : 30) && !/powder/i.test(r.name));
   return rs.sort((a, b) => TOUR_ORDER.indexOf(a.type) - TOUR_ORDER.indexOf(b.type) || polyArea(b.polygon) - polyArea(a.polygon));
@@ -3876,16 +3963,20 @@ function chatPrompt(text) {
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
+${profile().done ? 'THE CLIENT: ' + spaceText() + ' Budget ' + (BUDGETS[profile().budget]?.name || '') + '. Vastu: ' + profile().vastu + '.\n' : ''}${compassFacts()}
 THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${GUIDE.touring ? ' A guided tour is running.' : ''}
 ${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 600)}"
-Reply with only JSON: {"say":"what you say","actions":[...]} using at most three actions:
+Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} using at most three actions:
 {"do":"go","room":"<exact room name>"} take them to a room (use when they ask to see or go somewhere, or when showing helps your answer)
 {"do":"look","item":"<id>"} turn to face a piece
 {"do":"time","value":"dusk|golden|night|day"} change the light
 {"do":"edit","request":"<a precise instruction for the design engine, naming the room and pieces>"} for ANY change to furniture, colours, materials, floors, walls or layout. It uses one of their changes; mention that you're making it.
 {"do":"real"} when they want a real photo of the view
 {"do":"tour"} start the full guided tour · {"do":"stop"} stop the tour
-Questions (sizes, what is in a room, ideas) get an answer and usually a go or look.`;
+{"do":"vastu"} show the Vastu report card (when they ask whether the home is Vastu compliant, about directions, or Vastu in general). Summarise the score and the main points in "say".
+{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls (when they ask to make it Vastu compliant or fix it). It uses one change.
+OPTIONS: when they ask for ideas, what could be done differently, or how a room could be used, do NOT edit yet. Offer 2 to 4 distinct ideas as "options":[{"label":"under 8 words","request":"a precise instruction for the design engine naming the room and pieces"}], go to that room, and keep "say" to one sentence that introduces them. They tap one to make it happen. Ideas can change the room's use (a study, a kids' room, a guest room, a gym, a pooja room), its mood, or its layout.
+Questions (sizes, what is in a room) get an answer and usually a go or look.`;
 }
 
 /* ---------- talking to Claude ---------- */
@@ -3941,6 +4032,7 @@ async function guideSend(text) {
     typing.remove();
     const line = String(j?.say || '').slice(0, 600) || 'Done.';
     gSay(line); gSpeak(line);
+    if (Array.isArray(j?.options) && j.options.length) gOptions(j.options);
     for (const a of (Array.isArray(j?.actions) ? j.actions : []).slice(0, 3)) await runAction(a);
   } catch (e) { typing.remove(); gNote(e?.message || 'Something went wrong. Try again.', 'sys'); }
   finally { GUIDE.busy = false; if (GUIDE.queued) { const q = GUIDE.queued; GUIDE.queued = null; guideSend(q); } }
@@ -3955,6 +4047,8 @@ async function runAction(a) {
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
   else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
+  else if (a.do === 'vastu') await showVastu(true);
+  else if (a.do === 'vastu_fix') await vastuFix();
 }
 function guideEdit(request) {
   return new Promise(res => {
@@ -3986,7 +4080,10 @@ $('guideVoice').onclick = () => { GUIDE.speak = !GUIDE.speak; $('guideVoice').se
 $('guideMic').hidden = !SR; $('guideMic').onclick = gListen;
 $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($('guideIn').value.trim()); });
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
-$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
+$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour()
+  : b.dataset.act === 'vastu' ? (gSay(b.textContent, 'you'), showVastu())
+  : b.dataset.act === 'ideas' ? guideSend(`What could be done differently with ${roomAt(player.x, player.z)?.name || 'this room'}? Give me a few options.`)
+  : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));
 addEventListener('keydown', e => { if (GUIDE.touring && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) stopTour(); });
@@ -4442,6 +4539,332 @@ addEventListener('keydown', e => {   // Esc closes the Ask panel first, then end
 
 window.__present = { cols: () => ({ wallCols, itemCols, groups: [...itemGroups.entries()].map(([k, g]) => [k, g.userData.cols]) }), sightOk, gOk, gCell, walkableAt, losOk, roomDimsP: r => roomDims(r), PRES, presentRoom, focalItem, presentCam, startPresent, endPresent, findPath, navGrid, presentSpot, ensure: ensurePresenter, place: placePresenter };
 
+/* ================= the brief: home or office, Vastu, who lives there, budget ================= */
+const PROFILE_DEFAULT = () => ({ use: 'home', vastu: 'no', household: { adults: 2, kids: 0, elders: false, pets: false, wfh: 0 }, office: { team: 10, cabins: 1, meeting: true, reception: true }, budget: 'premium', done: false });
+function profile() { if (!project.profile) project.profile = PROFILE_DEFAULT(); return project.profile; }
+const BUDGETS = { essential: { name: 'Essential', line: 'Well made and simple. Fewer statement pieces.' }, premium: { name: 'Premium', line: 'Feature walls, layered light, a hero piece per room.' }, luxury: { name: 'Luxury', line: 'Stone, velvet, brass and custom joinery throughout.' } };
+
+/* ---------- compass ---------- */
+const DIRS8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const DIRNAME = { N: 'north', NE: 'north-east', E: 'east', SE: 'south-east', S: 'south', SW: 'south-west', W: 'west', NW: 'north-west', C: 'centre' };
+const ARROWS = { N: '↑', NE: '↗', E: '→', SE: '↘', S: '↓', SW: '↙', W: '←', NW: '↖' };
+const hasNorth = () => Number.isFinite(layout?.settings?.north);
+function compassVecs() { const n = (layout.settings.north || 0) * D2R; return { N: [Math.sin(n), -Math.cos(n)], E: [Math.cos(n), Math.sin(n)] }; }
+function bearingOf(dx, dz) { const { N, E } = compassVecs(); return (Math.atan2(dx * E[0] + dz * E[1], dx * N[0] + dz * N[1]) / D2R + 360) % 360; }
+const dirOf = b => DIRS8[Math.round((((b % 360) + 360) % 360) / 45) % 8];
+function homeFrame() {
+  const { N, E } = compassVecs(); let e0 = 1e9, e1 = -1e9, n0 = 1e9, n1 = -1e9;
+  const pts = layout.walls.length ? layout.walls.flatMap(w => [w.a, w.b]) : layout.rooms.flatMap(r => r.polygon || []);
+  for (const [x, z] of pts) { const e = x * E[0] + z * E[1], n = x * N[0] + z * N[1]; e0 = Math.min(e0, e); e1 = Math.max(e1, e); n0 = Math.min(n0, n); n1 = Math.max(n1, n); }
+  return { N, E, e0, e1, n0, n1 };
+}
+// the Vastu grid: the home's footprint cut into thirds along north-south and east-west
+function zoneAt(x, z, F = homeFrame()) {
+  const e = x * F.E[0] + z * F.E[1], n = x * F.N[0] + z * F.N[1];
+  const u = 2 * (e - F.e0) / Math.max(F.e1 - F.e0, 1) - 1, v = 2 * (n - F.n0) / Math.max(F.n1 - F.n0, 1) - 1;
+  return ((v > 1 / 3 ? 'N' : v < -1 / 3 ? 'S' : '') + (u > 1 / 3 ? 'E' : u < -1 / 3 ? 'W' : '')) || 'C';
+}
+const roomZone = (r, F) => { const [x, z] = centroid(r.polygon); return zoneAt(x, z, F); };
+const frontVec = it => { const t = (it.rot || 0) * D2R; return [Math.sin(t), Math.cos(t)]; };
+const backDir = it => { const [fx, fz] = frontVec(it); return dirOf(bearingOf(-fx, -fz)); };   // the wall an item's back is on
+function mainDoor() {
+  for (const w of layout.walls) for (const o of w.openings || []) if (o.name === 'Main door') {
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L, m = (o.start + o.end) / 2, cx = w.a[0] + ux * m, cz = w.a[1] + uz * m, off = w.thickness / 2 + 1.3;
+    const p = roomAt(cx - uz * off, cz + ux * off), q = roomAt(cx + uz * off, cz - ux * off);
+    let ox = -uz, oz = ux; if (p && !q) { ox = uz; oz = -ux; } else if (p && q) { const F = homeFrame(), [hx, hz] = [(F.e0 + F.e1) / 2, (F.n0 + F.n1) / 2]; const c = [hx * F.E[0] + hz * F.N[0], hx * F.E[1] + hz * F.N[1]]; if ((cx - c[0]) * ox + (cz - c[1]) * oz < 0) { ox = -ox; oz = -oz; } }
+    return { x: cx, z: cz, faces: dirOf(bearingOf(ox, oz)) };
+  }
+  return null;
+}
+// rooms joined by a door (for "attached bath")
+function doorLinks() {
+  const out = [];
+  for (const w of layout.walls) { const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]); if (L < .1) continue; const ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
+    for (const o of w.openings || []) { if (o.type === 'window') continue; const m = (o.start + o.end) / 2, cx = w.a[0] + ux * m, cz = w.a[1] + uz * m, off = w.thickness / 2 + 1.3;
+      const p = roomAt(cx - uz * off, cz + ux * off), q = roomAt(cx + uz * off, cz - ux * off); if (p && q && p !== q) out.push([p, q]); } }
+  return out;
+}
+const attachedBath = r => doorLinks().some(([a, b]) => (a === r && b.type === 'bath') || (b === r && a.type === 'bath'));
+
+/* ---------- describing the brief ---------- */
+function profileLine(P = profile()) {
+  if (!P.done) return 'Not set yet';
+  const h = P.household, o = P.office, bits = [P.use === 'office' ? 'Office' : 'Home'];
+  bits.push(P.vastu === 'yes' ? 'Vastu' : P.vastu === 'partly' ? 'Vastu where easy' : 'No Vastu');
+  if (P.use === 'office') bits.push(`team of ${o.team}`, `${o.cabins} cabin${o.cabins === 1 ? '' : 's'}`); else { const w = [`${h.adults} adult${h.adults === 1 ? '' : 's'}`]; if (h.kids) w.push(`${h.kids} kid${h.kids > 1 ? 's' : ''}`); if (h.elders) w.push('elders'); if (h.pets) w.push('pets'); if (h.wfh) w.push(`${h.wfh} WFH`); bits.push(w.join(', ')); }
+  bits.push(BUDGETS[P.budget]?.name || 'Premium'); return bits.join(' · ');
+}
+function spaceText(P = profile()) {
+  if (P.use === 'office') { const o = P.office; return `An OFFICE for a team of ${o.team}, with ${o.cabins} private cabin${o.cabins === 1 ? '' : 's'}${o.meeting ? ', a meeting room' : ''}${o.reception ? ', a reception' : ''}.`; }
+  const h = P.household, who = [`${h.adults} adult${h.adults === 1 ? '' : 's'}`]; if (h.kids) who.push(`${h.kids} child${h.kids > 1 ? 'ren' : ''}`); if (h.elders) who.push('elderly parents'); if (h.pets) who.push('pets');
+  return `A HOME for ${who.join(', ')}${h.wfh ? `; ${h.wfh} ${h.wfh > 1 ? 'people work' : 'person works'} from home` : ''}.`;
+}
+function needsText(P = profile()) {
+  if (P.use === 'office') return `OFFICE RULES (this is a workplace, not a home: no beds, wardrobes or nightstands anywhere):
+- workspace: desks in rows or clusters with an office-chair each (about 5×2.5 ft per person, 3 ft aisles), bookshelf or tall-unit storage on the walls, pendant-linear or pendants over the desks, plants. Seat as many of the team as fit.
+- cabin: a desk with an office-chair behind it facing the door, two armchairs as visitor chairs in front, a bookshelf behind, artwork, a plant; a small sofa if over 150 sq ft.
+- meeting: table-dining-long as the conference table with office-chair all round, a tv on the end wall, pendant-linear above.
+- reception: a console as the front desk with an office-chair behind, a sofa and armchairs for waiting, a feature wall with the brand moment (panel-slats or feature-stone), plants.
+- pantry: kitchen-counter on a wall, bar-stool at a counter or a table-round with dining-chairs.
+- Any room still typed as living, bedroom or master is used as workspace or a cabin.`;
+  const h = P.household, n = [];
+  if (h.kids) n.push("kids' rooms get a study desk with an office-chair, generous storage, playful colour in the accent and a rug-round");
+  if (h.elders) n.push("the elders' bedroom keeps wide clear paths (3 ft), an armchair with arms, a lamp by the bed, low rugs only; no jhoola or low poufs in their path");
+  if (h.pets) n.push('pets: durable fabrics (leather, fabric-second in darker tones), fewer floor vases and decor clusters at floor level');
+  if (h.wfh) n.push(`work from home: ${h.wfh} proper desk${h.wfh > 1 ? 's' : ''} with an office-chair in the study or a quiet bedroom corner, facing a wall or window, with a lamp`);
+  return n.length ? 'HOUSEHOLD NEEDS: ' + n.join('; ') + '.' : '';
+}
+function budgetText(P = profile()) {
+  return { essential: 'BUDGET: ESSENTIAL. This overrides the PREMIUM rules below: keep rooms well made but simple. One light layer plus a lamp, ceiling-cove only in the living room, at most one feature wall in the home (living), plain bed with nightstands in secondary bedrooms, kitchen-counter rather than kitchen-luxe for short runs, no bar-unit, media-wall, feature-stone or chandelier. Fewer, better pieces.',
+    premium: 'BUDGET: PREMIUM. Follow the PREMIUM rules below.',
+    luxury: 'BUDGET: LUXURY. Go beyond the PREMIUM rules: rich materials in every room (marble, onyx, velvet, brass), feature-stone or wall-panel-wood on focal walls, chandeliers in living, dining and master, bed-luxe in every bedroom, closet-lit in walk-ins, kitchen-luxe with kitchen-tall-luxe and an island-waterfall where it fits.' }[P.budget] || '';
+}
+const VASTU_RULES = `VASTU (the client wants the home to follow Vastu Shastra). Compass directions are given for every room and wall. Follow these where the room allows, without blocking doors:
+- Beds: headboard against the SOUTH or WEST wall (east is acceptable); never against the north wall.
+- Desks and work tables: the person sits facing NORTH or EAST, so the desk's back goes on the north or east wall (or it floats with the chair on its south or west side).
+- Cooking: the cook faces EAST, so the hob (kitchen-luxe) goes on the kitchen's east wall when there is one.
+- Pooja: a pooja-unit in the NORTH-EAST of the home (or the north-east corner of the living room), against an east or west wall, never sharing a wall with a toilet.
+- Heavy storage (wardrobe, tall-unit, bookshelf, closet-lit, kitchen-tall-luxe): on SOUTH or WEST walls.
+- Mirrors: on NORTH or EAST walls, never facing the bed.
+- Keep the centre of the home open and light; heavy pieces stay out of it.
+- Living and seating: the main sofa's back on the south or west wall, so people face north or east.`;
+const vastuOn = () => ['yes', 'partly'].includes(profile().vastu) && hasNorth();
+function briefForFurnish() {
+  const P = profile(); if (!P.done) return '';
+  return [`SPACE: ${spaceText(P)}`, needsText(P), budgetText(P), vastuOn() ? VASTU_RULES + (P.vastu === 'partly' ? '\n(The client said "where it is easy": prefer Vastu, but never at the cost of a good layout.)' : '') : ''].filter(Boolean).join('\n');
+}
+
+/* ---------- the questionnaire ---------- */
+function askProfile() {
+  return new Promise(resolve => {
+    const P = structuredClone(profile()); P.household ||= PROFILE_DEFAULT().household; P.office ||= PROFILE_DEFAULT().office;
+    let step = 0, settled = false; const north0 = layout.settings.north;
+    let north = Number.isFinite(north0) ? north0 : null;
+    const m = modal(`<div id="qz"></div>`, { wide: true });
+    const end = ok => { if (settled) return; settled = true; mo.disconnect(); if (ok) { P.done = true; project.profile = P; layout.settings.north = north; renderProfileSum(); saveSoon(); } resolve(ok); };
+    const mo = new MutationObserver(() => { if (!m.el.isConnected) end(false); }); mo.observe($('modalRoot'), { childList: true });
+    const card = (grp, val, title, line, on) => `<button type="button" class="qcard" data-g="${grp}" data-v="${val}" aria-pressed="${on}"><b>${title}</b><span>${line}</span></button>`;
+    const stepper = (k, label, v, min, max) => `<div class="qstep"><span>${label}</span><div><button type="button" data-k="${k}" data-d="-1" aria-label="Fewer">−</button><output>${v}</output><button type="button" data-k="${k}" data-d="1" aria-label="More">+</button></div></div>`;
+    const toggle = (k, label, v) => `<div class="qstep"><span>${label}</span><div><button type="button" class="qtog" data-t="${k}" aria-pressed="${!!v}">${v ? 'Yes' : 'No'}</button></div></div>`;
+    const pages = [
+      () => `<div class="eyebrow">Before we design · 1 of 4</div><h2>What is this space?</h2><p class="lead">It changes how every room gets planned.</p>
+        <div class="qgrid two">${card('use', 'home', 'A home', 'Bedrooms, living, kitchen, family life', P.use === 'home')}${card('use', 'office', 'An office', 'Workstations, cabins, meeting room, reception', P.use === 'office')}</div>`,
+      () => `<div class="eyebrow">Before we design · 2 of 4</div><h2>Should it follow Vastu?</h2><p class="lead">Mirage plans rooms, beds, desks, the stove and the pooja by direction. You can ask Mira to check or fix it any time.</p>
+        <div class="qgrid three">${card('vastu', 'yes', 'Yes', 'Follow Vastu throughout', P.vastu === 'yes')}${card('vastu', 'partly', 'Where it\'s easy', 'Prefer it, never at the cost of a good layout', P.vastu === 'partly')}${card('vastu', 'no', 'No', 'Design freely', P.vastu === 'no')}</div>
+        <div class="qnorth"${P.vastu === 'no' ? ' hidden' : ''}><div class="eyebrow" style="margin:16px 0 8px">Which way is north on your plan?${Number.isFinite(north0) ? ' <span style="color:var(--gold)">Read from the plan\'s north arrow</span>' : ''}</div>
+        <div class="qcompass">${DIRS8.map((d, i) => `<button type="button" data-n="${i * 45}" aria-pressed="${north === i * 45}" title="North is ${['up', 'up and right', 'right', 'down and right', 'down', 'down and left', 'left', 'up and left'][i]} on the plan">${ARROWS[d]}</button>`).join('')}${project.plan?.image ? `<img src="${project.plan.image}" alt="Your floor plan">` : ''}</div>
+        <p class="note" style="margin-top:8px">Point the arrow where north is on the plan image as you uploaded it.</p></div>`,
+      () => P.use === 'office' ? `<div class="eyebrow">Before we design · 3 of 4</div><h2>Who works here?</h2><p class="lead">Rooms get assigned to fit the team.</p>
+        <div class="qlist">${stepper('office.team', 'People on the team', P.office.team, 1, 200)}${stepper('office.cabins', 'Private cabins', P.office.cabins, 0, 12)}${toggle('office.meeting', 'A meeting room', P.office.meeting)}${toggle('office.reception', 'A reception', P.office.reception)}</div>`
+        : `<div class="eyebrow">Before we design · 3 of 4</div><h2>Who will live here?</h2><p class="lead">Kids get study corners, elders get clear paths, work-from-home gets a real desk.</p>
+        <div class="qlist">${stepper('household.adults', 'Adults', P.household.adults, 1, 12)}${stepper('household.kids', 'Children', P.household.kids, 0, 8)}${toggle('household.elders', 'Elderly parents', P.household.elders)}${toggle('household.pets', 'Pets', P.household.pets)}${stepper('household.wfh', 'People working from home', P.household.wfh, 0, 8)}</div>`,
+      () => `<div class="eyebrow">Before we design · 4 of 4</div><h2>What's the budget level?</h2><p class="lead">It sets the materials and how many statement pieces each room gets.</p>
+        <div class="qgrid three">${Object.entries(BUDGETS).map(([k, b]) => card('budget', k, b.name, b.line, P.budget === k)).join('')}</div>`,
+    ];
+    const lims = { 'office.team': [1, 200], 'office.cabins': [0, 12], 'household.adults': [1, 12], 'household.kids': [0, 8], 'household.wfh': [0, 8] };
+    const draw = () => {
+      const root = m.el.querySelector('#qz');
+      root.innerHTML = pages[step]() + `<div class="qdots">${pages.map((_, i) => `<i${i === step ? ' class="on"' : ''}></i>`).join('')}</div>
+        <div class="mact">${step ? '<button type="button" id="qBack">Back</button>' : '<button type="button" data-close>Cancel</button>'}<button type="button" class="primary" id="qNext">${step === pages.length - 1 ? 'Continue' : 'Next'}</button></div>`;
+      root.querySelectorAll('[data-close]').forEach(b => b.onclick = () => m.close());
+      root.querySelectorAll('.qcard').forEach(b => b.onclick = () => { P[b.dataset.g] = b.dataset.v; draw(); });
+      root.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { north = +b.dataset.n; draw(); });
+      root.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { const [g, k] = b.dataset.k.split('.'), [lo, hi] = lims[b.dataset.k]; P[g][k] = clamp((+P[g][k] || 0) + +b.dataset.d, lo, hi); draw(); });
+      root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const [g, k] = b.dataset.t.split('.'); P[g][k] = !P[g][k]; draw(); });
+      const back = root.querySelector('#qBack'); if (back) back.onclick = () => { step--; draw(); };
+      root.querySelector('#qNext').onclick = () => {
+        if (step === 1 && P.vastu !== 'no' && north === null) { flash('Pick which way north points on your plan, or choose No for Vastu.', true); return; }
+        if (step < pages.length - 1) { step++; draw(); } else { end(true); m.close(); }
+      };
+      setTimeout(() => root.querySelector('#qNext')?.focus(), 20);
+    };
+    draw();
+  });
+}
+function renderProfileSum() {
+  const el = $('profileSum'); if (!el || !project) return;
+  const P = profile();
+  el.innerHTML = `<span>${esc(profileLine(P))}</span><button type="button" class="ghost" id="btnProfile">${P.done ? 'Change' : 'Answer'}</button>`;
+  $('btnProfile').onclick = () => askProfile();
+}
+
+/* ---------- room program: what each room is used for ---------- */
+const FIXED_TYPES = new Set(['bath', 'balcony', 'terrace', 'passage', 'foyer', 'utility']);
+function programPrompt() {
+  const P = profile(), F = hasNorth() ? homeFrame() : null, md = hasNorth() ? mainDoor() : null;
+  const rooms = layout.rooms.filter(r => r.kind !== 'ledge' && r.polygon?.length > 2).map(r => `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft${F ? ' | ' + DIRNAME[roomZone(r, F)] + ' of the home' : ''}${['master', 'bedroom', 'study', 'staff'].includes(r.type) && attachedBath(r) ? ' | has an attached bath' : ''}`).join('\n');
+  const types = P.use === 'office' ? 'workspace, cabin, meeting, reception, pantry, study, bath, utility, foyer, passage, balcony, terrace, other' : 'living, dining, kitchen, master, bedroom, study, pooja, walkin, bath, foyer, passage, utility, staff, balcony, terrace, other';
+  return `You are an architect deciding how a ${P.use} will use its rooms. The walls are fixed: you only decide what each room is used for and what it is called.
+CLIENT: ${spaceText(P)} Budget: ${BUDGETS[P.budget]?.name || 'Premium'}.
+${P.use === 'office' ? `Plan the office: ${P.office.cabins} cabin(s) (the largest, quietest one is the owner's cabin, called "Director's Cabin"), ${P.office.meeting ? 'a meeting room, ' : ''}${P.office.reception ? 'a reception by the entrance, ' : ''}a pantry in the old kitchen, and everything else as open workspace with room for ${P.office.team} people. Bathrooms stay bathrooms.` : `Plan the home: one master bedroom (normally the largest bedroom with an attached bath), ${P.household.kids ? `${P.household.kids > 1 ? 'kids\' bedrooms' : 'a kid\'s bedroom'} named for them, ` : ''}${P.household.elders ? 'a parents\' bedroom that is close to the living area and a common bath, ' : ''}${P.household.wfh ? 'a study or home office if a small room is spare (otherwise a work corner is added to a bedroom later), ' : ''}guest bedroom for any spare bedroom. Kitchens, living and dining stay as they are unless a room is clearly mislabelled.`}
+${vastuOn() ? `VASTU: the client wants Vastu. Prefer: master bedroom (or the owner's cabin) in the south-west; kids' or guest bedrooms in the west or north-west; a study in the north, east or west; ${P.use === 'office' ? 'reception in the north or east, meeting room in the north-west, pantry in the south-east or north-west' : 'a small spare room in the north-east may become a pooja room'}. Main entrance faces ${md ? DIRNAME[md.faces] : 'unknown'}.` : ''}
+ROOMS (current name | type | area${F ? ' | position' : ''} | notes):
+${rooms}
+Rules: bath, balcony, terrace, passage, foyer and utility rooms keep their type (you may rename them, e.g. "Kids' Bath"). Names are short (under 28 characters) and unique. Every room appears once.
+Reply with only JSON: {"rooms":[{"room":"<current name>","name":"<new name>","type":"<one of: ${types}>","why":"<under 12 words>"}]}`;
+}
+function renameRoom(r, to) {
+  const from = r.name; if (from === to) return;
+  for (const k of ['roomInspo', 'roomStyles']) if (project[k]?.[from]) { project[k][to] = project[k][from]; delete project[k][from]; }
+  for (const it of layout.furniture) if (it.room === from) it.room = to;
+  for (const w of layout.walls) for (const o of w.openings || []) if (o.name === from + ' door') o.name = to + ' door';
+  r.name = to;
+}
+function applyProgram(res) {
+  const P = profile(), list = Array.isArray(res?.rooms) ? res.rooms : [], ok = new Set(TYPES), changes = [];
+  const plan = [];
+  for (const e of list) {
+    const r = layout.rooms.find(x => x.name === e?.room); if (!r || plan.some(p => p.r === r)) continue;
+    let type = String(e.type || r.type).toLowerCase(); if (!ok.has(type) || FIXED_TYPES.has(r.type) || r.kind === 'outdoor') type = r.type;
+    if (P.use === 'home' && ['workspace', 'cabin', 'meeting', 'reception'].includes(type)) type = r.type;
+    if (P.use === 'office' && ['master', 'bedroom', 'living', 'dining', 'staff', 'walkin'].includes(type)) type = 'workspace';
+    let name = String(e.name || r.name).replace(/[\n\r"]/g, '').trim().slice(0, 30) || r.name;
+    if (type === r.type && FIXED_TYPES.has(type) && !['other', type].includes(normType('', name))) name = r.name;   // a bath must not be named like a bedroom
+    plan.push({ r, name, type, orig: { name: r.name, type: r.type }, why: String(e.why || '').slice(0, 90) });
+  }
+  // two-phase rename so swaps between names never collide
+  plan.forEach((p, i) => renameRoom(p.r, `\u0000tmp${i}`));
+  const taken = new Set(layout.rooms.filter(r => !plan.some(p => p.r === r)).map(r => r.name));
+  for (const p of plan) {
+    let nm = p.name, k = 2; while (taken.has(nm)) nm = `${p.name} ${k++}`; taken.add(nm);
+    renameRoom(p.r, nm); p.r.type = p.type;
+    if (p.orig.type !== p.type || p.orig.name !== nm) changes.push(`${p.orig.name} → ${nm}${p.why ? ' (' + p.why + ')' : ''}`);
+  }
+  return changes;
+}
+async function planRooms(sample, signal) {
+  const P = profile(); if (!P.done) return null;
+  const h = P.household, worth = P.use === 'office' || vastuOn() || h.kids || h.elders || h.wfh; if (!worth) return null;
+  const res = await sample.json(programPrompt(), { modelTier: 'default', signal });
+  return applyProgram(res);
+}
+
+/* ================= Vastu: check and fix ================= */
+const HEAVY = new Set(['wardrobe', 'tall-unit', 'bookshelf', 'closet-lit', 'kitchen-tall-luxe']);
+function vGrade(zone, good, bad) { return good.includes(zone) ? 'ok' : bad.includes(zone) ? 'fail' : 'warn'; }
+function vastuAudit() {
+  if (!hasNorth() || !layout.rooms.length) return null;
+  const F = homeFrame(), office = profile().use === 'office', items = [];
+  const R = layout.rooms.filter(r => r.kind !== 'ledge' && r.polygon?.length > 2), z = r => roomZone(r, F);
+  const add = (key, w, label, status, detail, fix) => items.push({ key, w, label, status, detail, fix });
+  const md = mainDoor();
+  if (md) add('entrance', 3, 'Main entrance', vGrade(md.faces, ['N', 'NE', 'E', 'NW'], ['SW']), `Faces ${DIRNAME[md.faces]}. ${vGrade(md.faces, ['N', 'NE', 'E', 'NW'], ['SW']) === 'ok' ? 'An auspicious direction.' : 'North, north-east or east is preferred.'}`, { kind: 'remedy', text: 'The entrance is part of the building. Traditional remedies: a brass or copper threshold strip, a well-lit nameplate, and a clean, uncluttered approach.' });
+  const kit = R.filter(r => ['kitchen', 'pantry'].includes(r.type));
+  for (const r of kit) { const s = vGrade(z(r), ['SE', 'NW'], ['NE', 'C']); add('kitchen:' + r.name, 3, r.name, s, `In the ${DIRNAME[z(r)]}. ${s === 'ok' ? 'South-east (fire) is ideal, north-west is fine.' : 'South-east is ideal; a kitchen can\'t move without plumbing work.'}`, { kind: 'remedy', text: 'Cook facing east, keep the hob away from the sink, and use warm colours (terracotta, yellow) in this kitchen.' }); }
+  const bed = office ? R.filter(r => r.type === 'cabin') : R.filter(r => r.type === 'master');
+  const owner = office ? (bed.find(r => /director|owner|ceo|md|principal|founder|partner/i.test(r.name)) || [...bed].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0]) : bed[0];
+  if (owner) { const s = vGrade(z(owner), ['SW', 'S', 'W'], ['NE', 'SE']), swap = s !== 'ok' && swapCandidate(owner, F);
+    add('owner', 3, owner.name, s, `In the ${DIRNAME[z(owner)]}. ${office ? "The owner's cabin" : 'The master bedroom'} belongs in the south-west.${swap ? ` ${swap.name} is in the ${DIRNAME[z(swap)]}, so the two can swap.` : ''}`, swap ? { kind: 'swap', a: owner.name, b: swap.name } : { kind: 'remedy', text: 'No other room of the same kind sits in the south-west. Earthy tones and heavier furniture on the south and west walls help.' }); }
+  for (const r of R.filter(r => ['bedroom'].includes(r.type))) add('bed:' + r.name, 1, r.name, vGrade(z(r), ['W', 'NW', 'S', 'SW', 'N', 'E'], []), `In the ${DIRNAME[z(r)]}.${vGrade(z(r), ['W', 'NW', 'S', 'SW', 'N', 'E'], []) === 'ok' ? '' : ' West or north-west suits children and guests better.'}`);
+  for (const r of R.filter(r => r.type === 'bath')) { const s = vGrade(z(r), ['NW', 'W', 'S', 'SE', 'E', 'N'], ['NE', 'C']); add('bath:' + r.name, 1.5, r.name, s, `In the ${DIRNAME[z(r)]}.${s === 'ok' ? '' : ' North-east and the centre are kept free of toilets.'}`, s === 'ok' ? null : { kind: 'remedy', text: 'Keep the door shut, use light colours, and a sea-salt bowl is the traditional remedy.' }); }
+  for (const r of R.filter(r => r.type === 'living')) add('living:' + r.name, 1, r.name, vGrade(z(r), ['N', 'NE', 'E', 'NW', 'C', 'W'], []), `In the ${DIRNAME[z(r)]}.`);
+  for (const r of R.filter(r => r.type === 'study')) add('study:' + r.name, 1, r.name, vGrade(z(r), ['N', 'E', 'NE', 'W'], []), `In the ${DIRNAME[z(r)]}.`);
+  if (office) {
+    for (const r of R.filter(r => r.type === 'reception')) add('rec:' + r.name, 1, r.name, vGrade(z(r), ['N', 'NE', 'E', 'NW'], ['SW']), `In the ${DIRNAME[z(r)]}.`);
+    for (const r of R.filter(r => r.type === 'meeting')) add('meet:' + r.name, 1, r.name, vGrade(z(r), ['NW', 'W', 'N'], ['SW']), `In the ${DIRNAME[z(r)]}. North-west keeps meetings moving.`);
+  }
+  // centre of the home stays open
+  const mid = R.filter(r => ['bath', 'kitchen'].includes(r.type) && z(r) === 'C');
+  const midHeavy = layout.furniture.filter(it => HEAVY.has(it.type) && zoneAt(it.x, it.z, F) === 'C');
+  add('centre', 2, 'Centre of the home', mid.length ? 'fail' : midHeavy.length ? 'warn' : 'ok', mid.length ? `${mid.map(r => r.name).join(', ')} sit${mid.length > 1 ? '' : 's'} at the centre, which should stay open.` : midHeavy.length ? `Heavy storage stands in the centre: ${midHeavy.slice(0, 3).map(i => i.name || i.type).join(', ')}.` : 'Open and light.', midHeavy.length && !mid.length ? { kind: 'orient', rooms: [...new Set(midHeavy.map(i => i.room))], text: 'move the heavy storage out of the centre of the home, onto a south or west wall of its room' } : mid.length ? { kind: 'remedy', text: 'This needs the walls to move. Keep that room light and clutter-free.' } : null);
+  // pieces
+  const piece = (types, key, w, label, good, bad, rule, why, how = d => `on the ${DIRNAME[d]} wall`) => {
+    const its = layout.furniture.filter(it => types.includes(it.type)); if (!its.length) return;
+    const bad_ = its.filter(it => vGrade(rule(it), good, bad) !== 'ok'), worst = bad_.some(it => vGrade(rule(it), good, bad) === 'fail') ? 'fail' : bad_.length ? 'warn' : 'ok';
+    add(key, w, label, worst, bad_.length ? `${bad_.length} of ${its.length}: ${bad_.slice(0, 3).map(it => `${it.name || CAT[it.type]?.label} in ${it.room}, ${how(rule(it))}`).join('; ')}. ${why}` : `All ${its.length} placed well.`, bad_.length ? { kind: 'orient', rooms: [...new Set(bad_.map(i => i.room))], ids: bad_.map(i => i.id), text: why } : null);
+  };
+  if (!office) piece(['bed', 'bed-luxe'], 'beds', 2, 'Beds', ['S', 'W', 'SW', 'E', 'SE'], ['N'], backDir, 'Headboards go on the south or west wall, never the north.', d => `headboard on the ${DIRNAME[d]} wall`);
+  piece(['desk'], 'desks', office ? 2 : 1, 'Desks', ['N', 'E', 'NE'], [], backDir, 'Whoever sits there should face north or east.', d => `facing ${DIRNAME[d]}`);
+  piece(['kitchen-luxe'], 'hob', 1.5, 'Cooking', ['E', 'NE', 'SE'], ['S', 'SW'], backDir, 'The cook should face east.', d => `the cook faces ${DIRNAME[d]}`);
+  piece(['mirror'], 'mirrors', .5, 'Mirrors', ['N', 'E', 'NE'], ['S', 'SW'], backDir, 'Mirrors go on north or east walls.');
+  piece([...HEAVY], 'storage', 1, 'Heavy storage', ['S', 'W', 'SW', 'NW', 'SE'], ['NE'], backDir, 'Wardrobes and tall storage go on south or west walls.');
+  if (!office) {
+    const pu = layout.furniture.filter(it => it.type === 'pooja-unit'), pr = R.filter(r => r.type === 'pooja');
+    if (pu.length || pr.length) { const zz = pu.length ? zoneAt(pu[0].x, pu[0].z, F) : z(pr[0]); add('pooja', 1.5, 'Pooja', vGrade(zz, ['NE', 'E', 'N'], ['S', 'SW', 'SE']), `In the ${DIRNAME[zz]}. North-east is ideal.`, vGrade(zz, ['NE', 'E', 'N'], ['S', 'SW', 'SE']) === 'ok' ? null : { kind: 'add', text: 'move the pooja-unit to the north-east of the home, against an east or west wall' }); }
+    else if (profile().vastu !== 'no') add('pooja', 1, 'Pooja', 'warn', 'There is no prayer space yet. The north-east is the place for it.', { kind: 'add', text: 'add a pooja-unit in the north-east of the home (the north-east corner of the living room, or a north-east room), against an east or west wall, with a sconce' });
+  }
+  const val = { ok: 1, warn: .5, fail: 0 }, W = items.reduce((a, i) => a + i.w, 0);
+  const score = W ? Math.round(100 * items.reduce((a, i) => a + i.w * val[i.status], 0) / W) : 100;
+  return { score, items, fixable: items.filter(i => i.status !== 'ok' && i.fix && i.fix.kind !== 'remedy'), remedies: items.filter(i => i.status !== 'ok' && i.fix?.kind === 'remedy') };
+}
+function swapCandidate(r, F) {
+  const like = profile().use === 'office' ? ['cabin', 'workspace'] : ['bedroom'], a = polyArea(r.polygon);
+  const c = layout.rooms.filter(x => x !== r && like.includes(x.type) && ['SW', 'S', 'W'].includes(roomZone(x, F)) && polyArea(x.polygon) > a * .6);
+  return c.sort((p, q) => (roomZone(q, F) === 'SW') - (roomZone(p, F) === 'SW') || polyArea(q.polygon) - polyArea(p.polygon))[0] || null;
+}
+function vastuFixRequest(A) {
+  const lines = []; let n = 1;
+  for (const it of A.fixable) {
+    const f = it.fix;
+    if (f.kind === 'swap') { const a = layout.rooms.find(r => r.name === f.a); lines.push(`${n++}. Swap what "${f.a}" and "${f.b}" are used for with {"op":"swap","a":"${f.a}","b":"${f.b}"}, then refurnish both for their new use (use the names after the swap: "${f.a}" becomes the room that was "${f.b}"). ${a?.type === 'master' || a?.type === 'cabin' ? 'In the new ' + f.a + ', put the bed or desk by the Vastu rules.' : ''}`); }
+    else if (f.kind === 'orient') lines.push(`${n++}. ${it.label}${f.rooms?.length ? ' in ' + f.rooms.join(', ') : ''}${f.ids?.length ? ' (ids ' + f.ids.slice(0, 12).join(', ') + ')' : ''}: ${f.text} Move or rotate those pieces to a better wall of the same room if one is free; otherwise leave them.`);
+    else if (f.kind === 'add') lines.push(`${n++}. ${f.text}.`);
+  }
+  return `Vastu fix. The walls, doors and windows stay exactly where they are. Make these changes: ${lines.join(' ')}`;
+}
+let vastuFixing = false;
+async function vastuFix() {
+  if (vastuFixing) return; if (!layout.walls.length) return gNote('Open a designed home first.', 'sys');
+  if (!hasNorth()) { const ok = await askNorthInChat(); if (!ok) return; }
+  const A = vastuAudit(); if (!A) return;
+  if (!A.fixable.length) { const t = A.remedies.length ? `Your home scores ${A.score} out of 100. What's left needs walls to move, so I can't change it by rearranging. ${A.remedies[0].fix.text}` : `Your home already scores ${A.score} out of 100 for Vastu. Nothing to change.`; gSay(t); gSpeak(t); return; }
+  if (profile().vastu === 'no') { profile().vastu = 'yes'; renderProfileSum(); saveSoon(); }
+  vastuFixing = true;
+  try {
+    const say = `I'll make it Vastu compliant without moving any walls: ${A.fixable.length} change${A.fixable.length > 1 ? 's' : ''}. This uses one change.`; gSay(say); gSpeak(say);
+    const ok = await guideEdit(vastuFixRequest(A));
+    if (ok) { const B = vastuAudit(); const t = `Done. Your Vastu score went from ${A.score} to ${B?.score ?? A.score}.${B?.remedies?.length ? ` ${B.remedies.length} item${B.remedies.length > 1 ? 's' : ''} need${B.remedies.length > 1 ? '' : 's'} walls to move, so I've listed remedies.` : ''}`; gSay(t); gSpeak(t); if (B) vastuCard(B, true); }
+  } finally { vastuFixing = false; }
+}
+function vastuSpoken(A) {
+  const bad = A.items.filter(i => i.status === 'fail'), warn = A.items.filter(i => i.status === 'warn');
+  const lead = A.score >= 85 ? 'This home follows Vastu well' : A.score >= 65 ? 'This home mostly follows Vastu' : 'This home needs work to follow Vastu';
+  const top = [...bad, ...warn].slice(0, 2).map(i => `${i.label.toLowerCase()}: ${i.detail.split('.')[0].toLowerCase()}`).join('; ');
+  return `${lead}: ${A.score} out of 100.${top ? ' The main points are ' + top + '.' : ''}${A.fixable.length ? ` I can fix ${A.fixable.length} of them by rearranging, without moving walls.` : ''}`;
+}
+function vastuCard(A, quiet) {
+  const order = { fail: 0, warn: 1, ok: 2 }, its = [...A.items].sort((a, b) => order[a.status] - order[b.status]);
+  const ic = { ok: '✓', warn: '!', fail: '✕' };
+  const el = document.createElement('div'); el.className = 'gmsg card';
+  el.innerHTML = `<div class="vhead"><div class="vring" style="--p:${A.score}"><b>${A.score}</b></div><div><b>Vastu check</b><small>${A.items.filter(i => i.status === 'ok').length} of ${A.items.length} in place · north is ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][Math.round(layout.settings.north / 45) % 8]} on the plan</small></div></div>
+    <ul class="vlist">${its.slice(0, 9).map(i => `<li class="${i.status}"><i>${ic[i.status]}</i><span><b>${esc(i.label)}</b> ${esc(i.detail)}${i.status !== 'ok' && i.fix?.kind === 'remedy' ? `<em>${esc(i.fix.text)}</em>` : ''}</span></li>`).join('')}${its.length > 9 ? `<li class="more">+${its.length - 9} more in place</li>` : ''}</ul>
+    <div class="vact">${A.fixable.length ? `<button type="button" class="primary" data-v="fix">Make it Vastu compliant</button>` : ''}<button type="button" data-v="north">North is wrong?</button></div>`;
+  el.querySelector('[data-v="fix"]')?.addEventListener('click', () => { gSay('Make it Vastu compliant', 'you'); vastuFix(); });
+  el.querySelector('[data-v="north"]').onclick = () => askNorthInChat(true).then(ok => ok && showVastu());
+  const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
+  return el;
+}
+async function showVastu(say) {
+  if (!layout.walls.length) return gNote('Open a designed home first.', 'sys');
+  if (!hasNorth()) { const ok = await askNorthInChat(); if (!ok) return; }
+  const A = vastuAudit(); if (!A) return;
+  vastuCard(A); if (!say) { const t = vastuSpoken(A); GUIDE.hist.push({ who: 'guide', text: t }); gSpeak(t); }
+}
+function askNorthInChat(force) {
+  return new Promise(res => {
+    if (hasNorth() && !force) return res(true);
+    gSay('Which way is north on your floor plan? Tap the arrow that points north on the plan as you uploaded it.');
+    const el = document.createElement('div'); el.className = 'gmsg card';
+    el.innerHTML = `<div class="qcompass small">${DIRS8.map((d, i) => `<button type="button" data-n="${i * 45}" aria-pressed="${layout.settings.north === i * 45}">${ARROWS[d]}</button>`).join('')}${project.plan?.image ? `<img src="${project.plan.image}" alt="">` : ''}</div>`;
+    el.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { layout.settings.north = +b.dataset.n; saveSoon(); el.querySelectorAll('[data-n]').forEach(x => x.disabled = true); b.setAttribute('aria-pressed', 'true'); gNote(`North set: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][+b.dataset.n / 45]} on the plan.`, 'sys'); res(true); });
+    const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
+  });
+}
+// Mira's tappable ideas
+function gOptions(opts) {
+  const list = (Array.isArray(opts) ? opts : []).filter(o => o?.label && o?.request).slice(0, 4); if (!list.length) return;
+  const el = document.createElement('div'); el.className = 'gopts';
+  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}">${esc(String(o.label).slice(0, 80))}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = async () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); await guideEdit(String(o.request).slice(0, 600)); });
+  const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
+}
+function compassFacts() {
+  if (!hasNorth()) return 'COMPASS: north is not set for this plan (if they ask about Vastu, use the vastu action and it will ask them).';
+  const F = homeFrame(), md = mainDoor(), A = vastuAudit();
+  return `COMPASS: ${layout.rooms.filter(r => r.kind !== 'ledge' && r.polygon?.length > 2).map(r => `${r.name} is in the ${DIRNAME[roomZone(r, F)]}`).join('; ')}.${md ? ' The main entrance faces ' + DIRNAME[md.faces] + '.' : ''}${A ? `\nVASTU CHECK: score ${A.score}/100. ${A.items.filter(i => i.status !== 'ok').map(i => `${i.label}: ${i.detail}`).join(' | ') || 'Everything in place.'}` : ''}`;
+}
+function compassVecsText() { const { N, E } = compassVecs(); return `north points along (x,z) = (${f1(N[0])},${f1(N[1])}) on the plan and east along (${f1(E[0])},${f1(E[1])}).`; }
+
 
 /* ================= plan check (2D editor) ================= */
 const pc = $('planCanvas'), pg = pc.getContext('2d'), pin = $('pinspect');
@@ -4767,6 +5190,7 @@ if (SITE) (() => {
     if (!S.token) return null;
     try { S.me = await S.api('/api/me'); } catch (e) { if (e.status !== 401) console.warn(e); return null; }
     renderCredits(); if (project && $('genLabel')) renderGenState();
+    if (activeView === 'home' && S.me.shared?.length) renderHome();
     if (project && S.token && project.id !== 'sample-home' && !S.me.homes[project.id] && project.plan?.image) S.api('/api/homes', { id: project.id, name: project.name }).catch(() => { });
     return S.me;
   };
@@ -4996,6 +5420,214 @@ if (SITE) (() => {
   if ($('btnReal')) $('btnReal').onclick = renderReal;
   S.renderReal = renderReal;
 
+  /* ---------- collaborators: share, sync, roles, pinned comments ---------- */
+  const ROLE_TXT = { viewer: 'Can view', commenter: 'Can comment', editor: 'Can edit' };
+  const RANKS = { viewer: 1, commenter: 2, editor: 3, owner: 4 };
+  const myEmail = () => S.me?.user?.email || '';
+  const short = e => String(e || 'someone').split('@')[0];
+  S.role = 'owner';
+  const roleOf = p => p?.shared?.role || 'owner';
+  const can = min => RANKS[S.role] >= RANKS[min];
+  const collab = () => project && project.id !== 'sample-home' && S.token && (project.shared || (home()?.members || 0) > 0);
+  const sync = { version: 0, sig: '', t: null, pushing: false, poll: null, comments: [], showResolved: false };
+
+  // homes shared with me, on the home screen
+  S.decorateHome = (grid, list) => {
+    const shared = (S.me?.shared || []).filter(h => !list.some(p => p.id === h.id));
+    for (const h of shared) {
+      const el = document.createElement('div'); el.className = 'card'; el.tabIndex = 0; el.setAttribute('role', 'button');
+      el.innerHTML = `<span class="cover"></span><span class="chip gen">Shared · ${esc(h.role)}</span><div class="meta"><h3>${esc(h.name)}</h3><p>${esc(h.owner ? 'From ' + h.owner : 'Shared with you')}${h.ready ? '' : ' · waiting for the owner to sync'}</p></div>`;
+      el.onclick = () => openShared(h.id); el.onkeydown = e => { if (e.key === 'Enter') openShared(h.id); };
+      grid.appendChild(el);
+    }
+  };
+  const pack = p => { const d = { ...p }; delete d.shared; d.inspo = []; d.roomInspo = {}; return structuredClone(d); };
+  async function openShared(id) {
+    try {
+      const r = await S.api('/api/homedata?home=' + encodeURIComponent(id));
+      if (!r.data) { flash('The owner has not synced this home yet. Ask them to open it in Mirage once.', true); return; }
+      const p = { ...r.data, id, shared: { role: r.role, version: r.version, by: r.updated_by } };
+      p.inspo ||= []; p.roomInspo ||= {}; await store.put(p); openProject(p);
+    } catch (e) { flash(e.message, true); }
+  }
+  S.openShared = openShared;
+
+  S.onProjectLoaded = p => {
+    S.role = roleOf(p); document.body.dataset.role = S.role;
+    clearInterval(sync.poll); sync.version = p.shared?.version || 0; sync.sig = ''; sync.comments = []; renderPins(); renderCollabUI();
+    if (!S.token || p.id === 'sample-home') return;
+    if (p.shared) startPolling();
+    else if (home()?.members) firstSync();
+  };
+  async function firstSync() {
+    try {
+      const r = await S.api('/api/homedata?home=' + encodeURIComponent(project.id));
+      sync.version = r.version || 0;
+      if (r.data && r.updated_by && r.updated_by !== myEmail()) applyRemote(r);
+      else pushSoon(0);
+    } catch (e) { console.warn('sync', e); }
+    startPolling();
+  }
+  function startPolling() {
+    clearInterval(sync.poll); loadComments();
+    sync.poll = setInterval(() => { if (document.visibilityState !== 'visible' || !collab()) return; pull(); loadComments(); }, 8000);
+  }
+  S.afterSave = p => { if (p === project && collab() && can('editor')) pushSoon(1500); };
+  function pushSoon(ms) { clearTimeout(sync.t); sync.t = setTimeout(push, ms); }
+  async function push() {
+    if (!collab() || !can('editor') || sync.pushing) return;
+    const data = pack(project), sig = JSON.stringify([data.layout, data.style, data.name, data.edits?.[0]?.t, data.profile, data.roomStyles]);
+    if (sig === sync.sig) return;
+    sync.pushing = true;
+    try { const r = await S.api('/api/homedata', { homeId: project.id, version: sync.version, data }, 'PUT'); sync.version = r.version; sync.sig = sig; if (project.shared) project.shared.version = r.version; }
+    catch (e) { if (e.status === 409) { flash('Someone else changed this home a moment ago. You now see their version; try your change again.', true); await pull(true); } else console.warn('sync push', e); }
+    finally { sync.pushing = false; }
+  }
+  async function pull(force) {
+    if (!collab() || (sync.pushing && !force)) return;
+    try {
+      const r = await S.api(`/api/homedata?home=${encodeURIComponent(project.id)}&since=${sync.version}`);
+      if (r.same || !r.data || r.version <= sync.version && !force) return;
+      if (sync.t && !force && can('editor')) { clearTimeout(sync.t); sync.t = null; }
+      applyRemote(r);
+    } catch (e) { if (e.status === 403) { clearInterval(sync.poll); flash('Your access to this home was removed.', true); } }
+  }
+  function applyRemote(r) {
+    if (running || editing) return;   // never swap the home out from under a running change
+    const keep = { id: project.id, inspo: project.inspo, roomInspo: project.roomInspo, shared: project.shared ? { ...project.shared, version: r.version, by: r.updated_by } : undefined, plan: project.plan?.image ? project.plan : r.data.plan };
+    const pos = { x: player.x, z: player.z, y: player.y, yaw: player.yaw, pitch: player.pitch };
+    Object.assign(project, r.data, keep); if (!keep.shared) delete project.shared;
+    project.style = normalizeStyle(project.style); project.edits ||= []; project.roomStyles ||= {};
+    layout = project.layout; layout.furniture ||= []; layout.railings ||= [];
+    sync.version = r.version; sync.sig = JSON.stringify([project.layout, project.style, project.name, project.edits?.[0]?.t, project.profile, project.roomStyles]);
+    for (const k in MC) delete MC[k]; select(null); buildAll(); Object.assign(player, pos);
+    $('projName').value = project.name || ''; renderPhist(); renderProfileSum(); updateMeta(); store.put(project);
+    const e = project.edits?.[0]; if (r.updated_by && r.updated_by !== myEmail()) flash(`${short(r.updated_by)} updated the home${e?.text ? ': ' + e.text : ''}.`);
+  }
+
+  // roles shape what each person sees
+  function renderCollabUI() {
+    let btn = $('btnShare');
+    if (!btn) { btn = document.createElement('button'); btn.id = 'btnShare'; btn.className = 'ws-only'; btn.textContent = 'Share'; $('btnWallet').before(btn); btn.onclick = openShare; }
+    btn.hidden = !project || project.id === 'sample-home';
+    let grp = $('collabGrp');
+    if (!grp) { grp = document.createElement('div'); grp.id = 'collabGrp'; grp.className = 'grp gpanel'; grp.innerHTML = `<button id="btnComment" title="Pin a comment to a spot in the home">＋ Comment</button><button id="btnComments" title="All comments">Comments <b id="cCount"></b></button>`; document.querySelector('.hud .modes').appendChild(grp); $('btnComment').onclick = startPin; $('btnComments').onclick = openComments; }
+    grp.hidden = !collab(); $('btnComment').hidden = !can('commenter');
+    let note = $('sharedNote');
+    if (!note) { note = document.createElement('div'); note.id = 'sharedNote'; note.className = 'step'; $('side').prepend(note); }
+    note.hidden = !project?.shared;
+    if (project?.shared) note.innerHTML = `<h3><span class="t"><i>↗</i>Shared with you</span><small>${esc(ROLE_TXT[S.role] || '')}</small></h3><p class="note" style="margin:0">${S.role === 'editor' ? 'You can change this home by asking, in the bar below or through Mira. Changes count against the owner\'s plan, and everyone sees who made them.' : S.role === 'commenter' ? 'Walk through, then pin comments to any spot with ＋ Comment.' : 'Walk through and look around. Ask the owner if you need to comment or edit.'}</p>`;
+  }
+  const _canEdit = S.canEdit;
+  S.canEdit = async p => {
+    if (p?.shared) { if (can('editor')) return true; flash('You can view this home but not change it. Ask the owner for edit access.', true); return false; }
+    return _canEdit(p);
+  };
+  const _onError = S.onError;
+  S.onError = e => { if (project?.shared && PAY_CODES.includes(e?.code)) { S.lastPaywall = { reason: 'owner', t: Date.now() }; flash("The owner's plan has no changes left for this home. Ask them to add more.", true); return; } _onError(e); };
+
+  // the share sheet
+  async function openShare() {
+    if (!project || project.id === 'sample-home') return;
+    await S.ensureAuth(); if (!S.me) await S.refresh();
+    if (!project.shared) { if (!project.plan?.image) { flash('Add a floor plan first, then share the home.', true); return; } try { await S.api('/api/homes', { id: project.id, name: project.name }); } catch (e) { flash(e.message, true); return; } }
+    const link = `${location.origin}${location.pathname}?home=${encodeURIComponent(project.id)}`, owner = !project.shared;
+    const m = modal(`<div class="eyebrow">[ Share ]</div><h2>${esc(project.name || 'This home')}</h2>
+      <p class="lead">${owner ? 'Invite clients, family or your team by email. They sign in with that email to open it.' : 'People with access to this home.'}</p>
+      ${owner ? `<div class="shrow"><input type="text" id="shEmail" inputmode="email" placeholder="name@example.com" data-autofocus><select id="shRole"><option value="viewer">Can view</option><option value="commenter" selected>Can comment</option><option value="editor">Can edit</option></select><button class="primary" id="shGo">Invite</button></div>
+      <p class="note" style="margin:6px 0 0">Viewers walk through. Commenters pin notes in 3D. Editors change the home by asking; their changes count against your plan.</p>` : ''}
+      <div id="shList" class="shlist"><p class="note">Loading…</p></div>
+      <div class="mact"><button id="shCopy">Copy link</button>${owner ? '' : '<button id="shLeave">Leave this home</button>'}<button class="primary" data-close>Done</button></div>`, { wide: true });
+    const L = m.el.querySelector('#shList');
+    const draw = (members, ownerEmail) => {
+      L.innerHTML = `<div class="shm"><span><b>${esc(ownerEmail || (owner ? myEmail() : 'Owner'))}</b>${owner ? ' (you)' : ''}</span><span class="r">Owner</span></div>` + (members.length ? members.map(x => `<div class="shm" data-e="${esc(x.email)}"><span><b>${esc(x.email)}</b>${x.email === myEmail() ? ' (you)' : ''}${x.joined ? '' : ' <small>invited</small>'}</span>${owner ? `<select data-role>${Object.entries(ROLE_TXT).map(([k, v]) => `<option value="${k}"${k === x.role ? ' selected' : ''}>${v}</option>`).join('')}</select><button class="ghost icon" data-rm title="Remove">✕</button>` : `<span class="r">${ROLE_TXT[x.role]}</span>`}</div>`).join('') : '<p class="note">Nobody else yet.</p>');
+      L.querySelectorAll('[data-role]').forEach(s => s.onchange = () => act('role', s.closest('[data-e]').dataset.e, s.value));
+      L.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => act('remove', b.closest('[data-e]').dataset.e));
+    };
+    const act = async (action, email, role) => {
+      try { const r = await S.api('/api/share', { homeId: project.id, action, email, role }); draw(r.members, myEmail()); await S.refresh(); if (action === 'invite' && r.members.length === 1) { await firstSync(); } renderCollabUI(); if (action === 'invite') flash(`${email} can open it at your link once they sign in.`); }
+      catch (e) { flash(e.message, true); }
+    };
+    try { const r = await S.api('/api/share?home=' + encodeURIComponent(project.id)); draw(r.members, r.owner); } catch (e) { L.innerHTML = `<p class="note">${esc(e.message)}</p>`; }
+    const go = () => { const e = m.el.querySelector('#shEmail'); if (!e.value.trim()) return; act('invite', e.value.trim(), m.el.querySelector('#shRole').value); e.value = ''; };
+    m.el.querySelector('#shGo')?.addEventListener('click', go);
+    m.el.querySelector('#shEmail')?.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') go(); });
+    m.el.querySelector('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); flash('Link copied. Only people you invited can open it.'); } catch { prompt('Copy this link', link); } };
+    m.el.querySelector('#shLeave')?.addEventListener('click', async () => { try { await S.api('/api/share', { homeId: project.id, action: 'remove', email: myEmail() }); m.close(); const id = project.id; showHome(); await store.del(id); S.refresh().then(renderHome); flash('You left the home.'); } catch (e) { flash(e.message, true); } });
+  }
+
+  // pinned comments
+  async function loadComments() {
+    if (!collab()) return;
+    try { const r = await S.api('/api/comments?home=' + encodeURIComponent(project.id)); const before = sync.comments.length; sync.comments = r.comments || []; renderPins();
+      const fresh = sync.comments.slice(before).filter(c => c.author !== myEmail()); if (before && fresh.length) flash(`${short(fresh.at(-1).author)} commented${fresh.at(-1).room ? ' in ' + fresh.at(-1).room : ''}: “${fresh.at(-1).text.slice(0, 60)}”`); }
+    catch { }
+  }
+  function renderPins() {
+    let wrap = $('pins'); if (!wrap) { wrap = document.createElement('div'); wrap.id = 'pins'; $('view3d').appendChild(wrap); }
+    const open = sync.comments.filter(c => !c.resolved && c.x != null);
+    wrap.innerHTML = open.map((c, i) => `<button class="pin" data-id="${esc(c.id)}" title="${esc(short(c.author))}: ${esc(c.text.slice(0, 80))}">${i + 1}</button>`).join('');
+    wrap.querySelectorAll('.pin').forEach(b => b.onclick = e => { e.stopPropagation(); showBubble(sync.comments.find(c => c.id === b.dataset.id), b); });
+    const n = sync.comments.filter(c => !c.resolved).length; if ($('cCount')) $('cCount').textContent = n ? n : '';
+  }
+  const _v = new THREE.Vector3();
+  S.frame = () => {
+    const wrap = $('pins'); if (!wrap || !wrap.childElementCount) return;
+    const r = stage.getBoundingClientRect(), here = mode === 'walk' ? roomAt(player.x, player.z)?.name : null;
+    for (const b of wrap.children) {
+      const c = sync.comments.find(x => x.id === b.dataset.id); if (!c) continue;
+      _v.set(c.x, c.y, c.z).project(camera);
+      const show = _v.z < 1 && Math.abs(_v.x) < 1.1 && Math.abs(_v.y) < 1.1 && (!here || !c.room || c.room === here);
+      b.style.display = show ? '' : 'none'; if (show) b.style.transform = `translate(${(_v.x + 1) / 2 * r.width - 13}px,${(1 - _v.y) / 2 * r.height - 30}px)`;
+    }
+  };
+  function showBubble(c, anchor) {
+    document.querySelector('.cbubble')?.remove(); if (!c) return;
+    const el = document.createElement('div'); el.className = 'cbubble gpanel';
+    const mayResolve = c.author === myEmail() || can('editor');
+    el.innerHTML = `<div class="who"><b>${esc(short(c.author))}</b><small>${c.room ? esc(c.room) + ' · ' : ''}${ago(Date.parse(c.created_at))}</small></div><p>${esc(c.text)}</p><div class="mact" style="margin:8px 0 0">${mayResolve ? `<button class="primary" data-res>Resolve</button>` : ''}<button data-x>Close</button></div>`;
+    const r = anchor.getBoundingClientRect(), sr = $('view3d').getBoundingClientRect();
+    el.style.left = Math.min(sr.width - 270, Math.max(8, r.left - sr.left - 120)) + 'px'; el.style.top = Math.max(8, r.top - sr.top + 34) + 'px';
+    $('view3d').appendChild(el);
+    el.querySelector('[data-x]').onclick = () => el.remove();
+    el.querySelector('[data-res]')?.addEventListener('click', () => resolve(c.id, true).then(() => el.remove()));
+  }
+  async function resolve(id, v) { try { await S.api('/api/comments', { id, resolved: v }, 'PATCH'); const c = sync.comments.find(x => x.id === id); if (c) c.resolved = v; renderPins(); } catch (e) { flash(e.message, true); } }
+  function startPin() {
+    if (!can('commenter')) return;
+    const ov = document.createElement('div'); ov.id = 'pinOverlay'; ov.innerHTML = '<div class="gpanel">Tap the spot you want to comment on · <button type="button">Cancel</button></div>';
+    $('view3d').appendChild(ov);
+    ov.querySelector('button').onclick = e => { e.stopPropagation(); ov.remove(); };
+    ov.addEventListener('click', e => {
+      if (e.target.closest('.gpanel')) return;
+      const hit = pick(e); ov.remove();
+      const pt = hit?.point || new THREE.Vector3(player.x, 4, player.z), room = roomAt(pt.x, pt.z)?.name || roomAt(player.x, player.z)?.name || null;
+      const sr = $('view3d').getBoundingClientRect(), el = document.createElement('div'); el.className = 'cbubble gpanel';
+      el.innerHTML = `<div class="who"><b>New comment</b><small>${esc(room || '')}</small></div><textarea id="cText" rows="3" placeholder="e.g. Could this wall be a lighter colour?"></textarea><div class="mact" style="margin:8px 0 0"><button data-x>Cancel</button><button class="primary" data-go>Post</button></div>`;
+      el.style.left = Math.min(sr.width - 270, Math.max(8, e.clientX - sr.left - 120)) + 'px'; el.style.top = Math.min(sr.height - 170, Math.max(8, e.clientY - sr.top + 14)) + 'px';
+      document.querySelector('.cbubble')?.remove(); $('view3d').appendChild(el);
+      const ta = el.querySelector('textarea'); ta.focus(); ta.addEventListener('keydown', ev => ev.stopPropagation());
+      el.querySelector('[data-x]').onclick = () => el.remove();
+      el.querySelector('[data-go]').onclick = async () => {
+        const text = ta.value.trim(); if (!text) return;
+        try { const r = await S.api('/api/comments', { homeId: project.id, text, room, x: pt.x, y: pt.y, z: pt.z }); sync.comments.push(r.comment); renderPins(); el.remove(); flash('Comment pinned. Everyone with access can see it.'); }
+        catch (err) { flash(err.message, true); }
+      };
+    });
+  }
+  function openComments() {
+    const list = sync.comments.filter(c => sync.showResolved || !c.resolved).slice().reverse();
+    const m = modal(`<div class="eyebrow">[ Comments ]</div><h2>${list.length ? list.length + ' comment' + (list.length > 1 ? 's' : '') : 'No open comments'}</h2>
+      <div class="clist">${list.map(c => `<div class="crow${c.resolved ? ' done' : ''}" data-id="${esc(c.id)}"><div><b>${esc(short(c.author))}</b> <small>${c.room ? esc(c.room) + ' · ' : ''}${ago(Date.parse(c.created_at))}</small><p>${esc(c.text)}</p></div><div class="ca">${c.room ? '<button data-go>Go there</button>' : ''}${c.author === myEmail() || can('editor') ? `<button data-res>${c.resolved ? 'Reopen' : 'Resolve'}</button>` : ''}</div></div>`).join('') || '<p class="note">Pin one with ＋ Comment while you walk.</p>'}</div>
+      <div class="mact"><label class="note" style="flex:1;align-self:center"><input type="checkbox" id="cShowRes"${sync.showResolved ? ' checked' : ''}> Show resolved</label><button class="primary" data-close>Done</button></div>`, { wide: true });
+    m.el.querySelector('#cShowRes').onchange = e => { sync.showResolved = e.target.checked; m.close(); openComments(); };
+    m.el.querySelectorAll('.crow').forEach(row => {
+      const c = sync.comments.find(x => x.id === row.dataset.id);
+      row.querySelector('[data-go]')?.addEventListener('click', () => { m.close(); const r = layout.rooms.find(x => x.name === c.room); if (r) goToRoom(r); });
+      row.querySelector('[data-res]')?.addEventListener('click', async () => { await resolve(c.id, !c.resolved); m.close(); openComments(); });
+    });
+  }
+
   /* ---------- boot ---------- */
   (async () => {
     try { S.cfg = await (await fetch('/api/config')).json(); } catch { S.cfg = null; }
@@ -5013,6 +5645,9 @@ if (SITE) (() => {
     // Deep links from the landing page: /app#start opens a new home, /app#sample opens the sample home.
     const hash = location.hash.slice(1);
     if (hash === 'start' || hash === 'sample') { history.replaceState(null, '', location.pathname); setTimeout(() => $(hash === 'start' ? 'btnNewProj' : 'btnSampleHome')?.click(), 300); }
+    // invite links: /app?home=<id> opens a home someone shared with you
+    const shared = new URLSearchParams(location.search).get('home');
+    if (shared) { history.replaceState(null, '', location.pathname); setTimeout(async () => { await S.ensureAuth(); await S.refresh(); const own = (await store.all()).find(p => p.id === shared && !p.shared); if (own) openProject(own); else openShared(shared); }, 300); }
   })();
 })();
 

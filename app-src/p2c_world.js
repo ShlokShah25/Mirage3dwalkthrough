@@ -694,6 +694,6 @@ function tick() {
     orbit.update();
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
-  drawMap();
+  drawMap(); SITE?.frame?.();
   if (composer) composer.render(); else renderer.render(scene, camera);
 }

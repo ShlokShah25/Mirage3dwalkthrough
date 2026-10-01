@@ -93,7 +93,7 @@ function baseSettings(ceil, view, st) { return { ceilingHeight: ceil, slabThickn
 function emptyProject() { const st = normalizeStyle(structuredClone(PRESETS[0].style)); return { id: uid(), version: 2, presetId: PRESETS[0].id, name: 'My new home', created: Date.now(), updated: Date.now(), status: 'draft', brief: '', plan: null, inspo: [], style: st, edits: [], layout: { settings: baseSettings(10, st.view || 'sea', st), walls: [], rooms: [], railings: [], furniture: [] } }; }
 let saveT, undoStack = [];
 function saveSoon() { clearTimeout(saveT); saveT = setTimeout(persistNow, 700); }
-async function persistNow() { clearTimeout(saveT); if (!project) return; project.updated = Date.now(); await store.put(project); }
+async function persistNow() { clearTimeout(saveT); if (!project) return; project.updated = Date.now(); await store.put(project); SITE?.afterSave?.(project); }
 function captureCover() {
   if (!project || !layout.walls.length || activeView !== '3d' || photo) return;
   try { if (composer) composer.render(); else renderer.render(scene, camera); const src = renderer.domElement, c = document.createElement('canvas'); c.width = 640; c.height = 400; const g = c.getContext('2d'); const k = Math.max(640 / src.width, 400 / src.height), w = src.width * k, h = src.height * k; g.drawImage(src, (640 - w) / 2, (400 - h) / 2, w, h); project.cover = c.toDataURL('image/jpeg', .8); } catch { }
@@ -110,7 +110,8 @@ function loadProject(p) {
   for (const k in MC) delete MC[k];
   buildAll(); placeSpawn(); setMode('walk');
   $('empty3d').hidden = !!layout.walls.length; $('pbar').hidden = !layout.walls.length;
-  pv.fitted = false; renderPhist(); renderSugg(); renderPresets(); renderIdeas(); $('coach').hidden = true;
+  pv.fitted = false; renderPhist(); renderSugg(); renderPresets(); renderIdeas(); renderProfileSum(); $('coach').hidden = true;
+  SITE?.onProjectLoaded?.(project);
 }
 function showHome() {
   if (photo) exitPhoto();
@@ -128,7 +129,7 @@ async function renderHome() {
   const list = (await store.all()).sort((a, b) => (b.updated || 0) - (a.updated || 0)), grid = $('projGrid');
   const stat = p => { const rooms = (p.layout?.rooms || []).filter(r => r.kind === 'room' && r.polygon?.length > 2); const area = rooms.reduce((a, r) => a + polyArea(r.polygon), 0); return rooms.length ? `${rooms.length} rooms · ${Math.round(area).toLocaleString()} sq ft · ${ago(p.updated || Date.now())}` : `Draft · ${ago(p.updated || Date.now())}`; };
   grid.innerHTML = `<button class="card new" id="cardNew"><div class="inner"><div class="plus">+</div><h3>New home</h3><p>Floor plan in,<br>furnished 3D home out.</p></div></button>` +
-    list.map(p => { const cover = p.cover || p.plan?.image || ''; return `<div class="card" role="button" tabindex="0" data-id="${esc(p.id)}" aria-label="Open ${esc(p.name)}"><span class="cover" style="${cover ? `background-image:url('${cover}')` : ''}"></span><span class="chip${p.status === 'generated' ? ' gen' : ''}">${p.status === 'generated' ? 'Ready to walk' : p.status === 'traced' ? 'Plan read' : 'Draft'}</span><button class="kill" data-kill="${esc(p.id)}">Delete</button><div class="meta"><h3>${esc(p.name || 'My new home')}</h3><p>${esc(stat(p))}</p></div></div>`; }).join('');
+    list.map(p => { const cover = p.cover || p.plan?.image || ''; return `<div class="card" role="button" tabindex="0" data-id="${esc(p.id)}" aria-label="Open ${esc(p.name)}"><span class="cover" style="${cover ? `background-image:url('${cover}')` : ''}"></span><span class="chip${p.status === 'generated' ? ' gen' : ''}">${p.shared ? 'Shared · ' + esc(p.shared.role) : p.status === 'generated' ? 'Ready to walk' : p.status === 'traced' ? 'Plan read' : 'Draft'}</span><button class="kill" data-kill="${esc(p.id)}">Delete</button><div class="meta"><h3>${esc(p.name || 'My new home')}</h3><p>${esc(stat(p))}</p></div></div>`; }).join('');
   $('cardNew').onclick = newProject;
   grid.querySelectorAll('.card[data-id]').forEach(c => {
     const go = () => { const p = list.find(x => x.id === c.dataset.id); if (p) openProject(p); };
@@ -138,8 +139,9 @@ async function renderHome() {
   grid.querySelectorAll('[data-kill]').forEach(b => b.onclick = e => {
     e.stopPropagation();
     if (b.dataset.armed) { store.del(b.dataset.kill).then(renderHome); return; }
-    b.dataset.armed = '1'; b.textContent = 'Tap again to delete'; b.style.opacity = 1; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'Delete'; b.style.opacity = ''; } }, 3000);
+    b.dataset.armed = '1'; b.textContent = list.find(p => p.id === b.dataset.kill)?.shared ? 'Tap again to remove' : 'Tap again to delete'; b.style.opacity = 1; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'Delete'; b.style.opacity = ''; } }, 3000);
   });
+  SITE?.decorateHome?.(grid, list);
 }
 function newProject() { const p = emptyProject(); store.put(p); openProject(p); document.body.classList.remove('side-hidden'); }
 $('btnNewProj').onclick = newProject;

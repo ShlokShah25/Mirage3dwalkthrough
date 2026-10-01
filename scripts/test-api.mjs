@@ -170,6 +170,41 @@ r = await call(F, '/api/render', { homeId: 'h1', image: VIEW }); assert.equal(r.
 r = await call(A, '/api/render', { homeId: 'h1', image: 'https://evil.example/x.png' }); assert.equal(r.status, 400); ok('only an image of the view is accepted');
 delete process.env.FAL_KEY; r = await call(A, '/api/render', { homeId: 'h1', image: VIEW }); assert.equal(r.status, 503); process.env.FAL_KEY = 'fal_test'; ok('without FAL_KEY renders are cleanly off');
 
+// --- collaborators ---
+const ED = '77777777-eeee-4eee-8eee-000000000001', VW = '77777777-eeee-4eee-8eee-000000000002', NO = '77777777-eeee-4eee-8eee-000000000003', em = u => `${u}@test.local`;
+r = await call(ED, '/api/share', { homeId: 'h1', action: 'invite', email: em(VW), role: 'viewer' }); assert.equal(r.status, 403); ok('only invited people can touch a home');
+r = await call(A, '/api/share', { homeId: 'h1', action: 'invite', email: 'not-an-email', role: 'viewer' }); assert.equal(r.status, 400);
+r = await call(A, '/api/share', { homeId: 'h1', action: 'invite', email: em(ED), role: 'owner' }); assert.equal(r.status, 400); ok('invites need a real email and a known role');
+r = await call(A, '/api/share', { homeId: 'h1', action: 'invite', email: em(ED).toUpperCase(), role: 'editor' }); assert.equal(r.status, 200); assert.equal(r.body.members[0].email, em(ED));
+r = await call(A, '/api/share', { homeId: 'h1', action: 'invite', email: em(VW), role: 'commenter' });
+r = await call(A, '/api/share', { homeId: 'h1', action: 'role', email: em(VW), role: 'viewer' }); assert.equal(r.body.members.length, 2); assert.equal(r.body.members[1].role, 'viewer'); ok('owner invites by email and changes roles');
+r = await call(ED, '/api/share', { homeId: 'h1', action: 'invite', email: em(NO), role: 'editor' }); assert.equal(r.status, 403); ok('editors cannot invite others');
+r = await call(VW, '/api/share?home=h1'); assert.equal(r.body.role, 'viewer'); assert.equal(r.body.members.length, 2); assert.equal(r.body.owner, `${A}@test.local`);
+assert.equal((await me(ED)).shared[0].role, 'editor'); assert.equal((await me(A)).homes.h1.members, 2); ok('members see the home in their list, the owner sees the count');
+r = await call(VW, '/api/homedata?home=h1'); assert.equal(r.body.version, 0); assert.equal(r.body.data, null);
+r = await call(VW, '/api/homedata', { homeId: 'h1', version: 0, data: { name: 'x', layout: {} } }, 'PUT'); assert.equal(r.status, 403); ok('viewers cannot save');
+r = await call(A, '/api/homedata', { homeId: 'h1', version: 0, data: { name: 'Sea View 4BHK', layout: { walls: [], rooms: [], furniture: [] } } }, 'PUT'); assert.equal(r.body.version, 1);
+r = await call(ED, '/api/homedata', { homeId: 'h1', version: 0, data: { name: 'stale', layout: {} } }, 'PUT'); assert.equal(r.status, 409); assert.equal(r.body.error.version, 1); ok('a stale save is refused with 409');
+r = await call(ED, '/api/homedata', { homeId: 'h1', version: 1, data: { name: 'Sea View 4BHK', layout: { walls: [1], rooms: [], furniture: [] } } }, 'PUT'); assert.equal(r.body.version, 2);
+r = await call(VW, '/api/homedata?home=h1&since=2'); assert.equal(r.body.same, true);
+r = await call(VW, '/api/homedata?home=h1&since=1'); assert.equal(r.body.data.layout.walls[0], 1); assert.equal(r.body.updated_by, em(ED)); ok('editors save, viewers pull the new version and see who changed it');
+assert.equal((await me(ED)).shared[0].name, 'Sea View 4BHK');
+r = await call(NO, '/api/homedata?home=h1'); assert.equal(r.status, 403); ok('strangers cannot read a shared home');
+let before = (await me(A)).homes.h1.changes_left;
+r = await ai(ED, { kind: 'edit', homeId: 'h1', prompt: 'You are editing a furnished 3D model' }); assert.ok(r.done); assert.ok(r.meta?.editId);
+assert.equal((await me(A)).homes.h1.changes_left, before - 1); ok("an editor's change is paid from the owner's plan");
+r = await ai(ED, { kind: 'edit_followup', editId: r.meta.editId, prompt: FURNISH }); assert.ok(r.done); ok('editors can finish a change with room redos');
+r = await ai(VW, { kind: 'edit', homeId: 'h1', prompt: 'You are editing' }); assert.equal(r.status, 403); ok('viewers cannot change the home');
+r = await call(VW, '/api/comments', { homeId: 'h1', text: 'Love this' }); assert.equal(r.status, 403);
+await call(A, '/api/share', { homeId: 'h1', action: 'role', email: em(VW), role: 'commenter' });
+r = await call(VW, '/api/comments', { homeId: 'h1', text: 'Can the sofa face the window?', room: 'Living / Dining', x: 10.123, y: 3, z: 12 }); assert.equal(r.status, 200); assert.equal(r.body.comment.x, 10.12);
+const cid = r.body.comment.id; r = await call(ED, '/api/comments?home=h1'); assert.equal(r.body.comments.length, 1); assert.equal(r.body.comments[0].author, em(VW)); ok('commenters pin comments, everyone sees them');
+r = await call(NO, '/api/comments', { id: cid, resolved: true }, 'PATCH'); assert.equal(r.status, 403);
+r = await call(ED, '/api/comments', { id: cid, resolved: true }, 'PATCH'); assert.equal(r.status, 200); assert.equal((await call(A, '/api/comments?home=h1')).body.comments[0].resolved, true); ok('editors resolve comments; strangers cannot');
+await call(A, '/api/share', { homeId: 'h1', action: 'remove', email: em(VW) });
+assert.equal((await me(VW)).shared.length, 0); assert.equal((await call(VW, '/api/homedata?home=h1')).status, 403); ok('removing someone ends their access');
+r = await call(ED, '/api/share', { homeId: 'h1', action: 'remove', email: em(ED) }); assert.equal(r.status, 200); assert.equal((await me(ED)).shared.length, 0); ok('a member can leave a shared home');
+
 // launch tiers step up: simulate sales until the first tier is gone
 for (let i = 0; i < 4; i++) { const u = `55555555-dddd-4ddd-8ddd-00000000000${i}`; await ai(u, { kind: 'plan_read', homeId: 'L' + i, prompt: 'You are an architectural draftsperson', images: ['data:image/png;base64,' + Buffer.from('L' + i).toString('base64')] }); const o = await call(u, '/api/billing', { action: 'pass', homeId: 'L' + i }); await pay(u, { orderId: o.body.orderId }); }
 cfg = await (await fetch(B + '/api/config')).json(); assert.equal(cfg.launch.amount, 249900); assert.equal(cfg.launch.spotsLeft, 45); ok('after 5 sales the price steps up to ₹2,499 for the next 45');

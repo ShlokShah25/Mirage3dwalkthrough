@@ -11,8 +11,8 @@ import * as E from './_lib/entitle.js';
 
 const KINDS = ['plan_read', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
 
-async function authorize(uid, b) {
-  const { kind } = b;
+async function authorize(user, b) {
+  const { kind } = b, uid = user.id;
   const items = j => Array.isArray(j?.items) ? j.items.length : 0;
   switch (kind) {
     case 'plan_read': {
@@ -31,15 +31,16 @@ async function authorize(uid, b) {
       return { homeId: g.home_id, model: MODELS.default(), after: kind === 'design' ? j => E.addGenerationItems(g.id, items(j)) : null };
     }
     case 'edit': {
-      const e = await E.startEdit(uid, b.homeId);
+      const payer = await E.payerFor(user, b.homeId);
+      const e = await E.startEdit(payer, b.homeId);
       return {
         homeId: b.homeId, model: MODELS.default(), meta: { editId: e.id },
-        after: async j => { if (!(Array.isArray(j?.ops) && j.ops.length)) await E.refundEdit(uid, e); },
-        onFail: () => E.refundEdit(uid, e),
+        after: async j => { if (!(Array.isArray(j?.ops) && j.ops.length)) await E.refundEdit(payer, e); },
+        onFail: () => E.refundEdit(payer, e),
       };
     }
     case 'edit_followup': {
-      const e = await E.useEditFollowup(uid, b.editId);
+      const e = await E.useEditFollowup(user, b.editId);
       return { homeId: e.home_id, model: MODELS.default() };
     }
     case 'guide': {
@@ -47,8 +48,9 @@ async function authorize(uid, b) {
       return { homeId: b.homeId ? String(b.homeId).slice(0, 80) : null, model: MODELS.fast(), maxTokens: 3000 };
     }
     case 'refurnish': {
-      const r = await E.startRefurnish(uid, b.homeId);
-      const back = () => E.giveChangeBack(uid, b.homeId, r.source);
+      const payer = await E.payerFor(user, b.homeId);
+      const r = await E.startRefurnish(payer, b.homeId);
+      const back = () => E.giveChangeBack(payer, b.homeId, r.source);
       return { homeId: b.homeId, model: MODELS.default(), after: async j => { if (!items(j)) await back(); }, onFail: back };
     }
   }
@@ -63,7 +65,7 @@ export const POST = route(async req => {
   const images = Array.isArray(b.images) ? b.images : [];
   if (images.length > LIMITS.images || images.some(s => typeof s !== 'string' || s.length > LIMITS.imageChars)) throw new HttpError(413, 'prompt_too_large', 'Too many or too large images.');
 
-  const plan = await authorize(user.id, { ...b, images });
+  const plan = await authorize(user, { ...b, images });
   const enc = new TextEncoder();
   const ac = new AbortController();
   req.signal?.addEventListener?.('abort', () => ac.abort());

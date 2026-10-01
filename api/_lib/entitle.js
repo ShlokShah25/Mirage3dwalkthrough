@@ -31,6 +31,40 @@ export async function ownHome(uid, homeId, { create, name } = {}) {
   return h;
 }
 
+// ---- collaborators: owner > editor > commenter > viewer ----
+export const ROLES = ['viewer', 'commenter', 'editor'];
+const RANK = { viewer: 1, commenter: 2, editor: 3, owner: 4 };
+export const normEmail = e => String(e || '').trim().toLowerCase();
+export async function homeRole(user, homeId) {
+  if (!homeId || typeof homeId !== 'string' || homeId.length > 80) throw new HttpError(400, 'bad_request', 'Missing home.');
+  const home = await db.one('homes', { id: homeId });
+  if (!home) throw new HttpError(404, 'not_found', 'Home not found.');
+  if (home.user_id === user.id) return { home, role: 'owner' };
+  const email = normEmail(user.email), m = email ? await db.one('home_members', { home_id: homeId, email }) : null;
+  if (!m) throw new HttpError(403, 'forbidden', 'You have not been invited to this home. Ask its owner to share it with ' + (user.email || 'your email') + '.');
+  if (m.user_id !== user.id) await db.update('home_members', { id: m.id }, { user_id: user.id });
+  return { home, role: m.role, member: m };
+}
+export async function needRole(user, homeId, min) {
+  const r = await homeRole(user, homeId);
+  if (RANK[r.role] < RANK[min]) throw new HttpError(403, 'forbidden', min === 'editor' ? 'You can view this home but not change it. Ask the owner for edit access.' : 'You can view this home but not comment on it.');
+  return r;
+}
+export const atLeast = (role, min) => RANK[role] >= RANK[min];
+// Changes made by an editor are paid for by the home's owner.
+export async function payerFor(user, homeId) { return (await needRole(user, homeId, 'editor')).home.user_id; }
+export async function sharedHomes(user) {
+  const email = normEmail(user.email); if (!email) return [];
+  const rows = await db.select('home_members', { email });
+  const out = [];
+  for (const m of rows) {
+    const h = await db.one('homes', { id: m.home_id }); if (!h || h.user_id === user.id) continue;
+    const d = await db.one('home_data', { home_id: m.home_id });
+    out.push({ id: h.id, name: d?.name || h.name || 'Shared home', role: m.role, owner: h.owner_email || null, version: d?.version || 0, updated_at: d?.updated_at || null, ready: !!d });
+  }
+  return out;
+}
+
 async function activePass(home) {
   if (home.access !== 'pass' || !home.pass_id) return null;
   return db.one('passes', { id: home.pass_id });
@@ -168,9 +202,10 @@ export async function refundEdit(uid, edit) {
   const won = await db.update('edits', { id: edit.id, refunded: false }, { refunded: true, followups_left: 0 });
   if (won.length) await giveChangeBack(uid, edit.home_id, edit.source);
 }
-export async function useEditFollowup(uid, editId) {
+export async function useEditFollowup(user, editId) {
   const e = await db.one('edits', { id: editId });
-  if (!e || e.user_id !== uid) throw new HttpError(404, 'not_found', 'Change not found.');
+  if (!e) throw new HttpError(404, 'not_found', 'Change not found.');
+  if (e.user_id !== user.id) { try { await needRole(user, e.home_id, 'editor'); } catch { throw new HttpError(404, 'not_found', 'Change not found.'); } }
   const ok = await cas('edits', { id: editId }, 'followups_left', v => v - 1, v => v > 0);
   if (!ok) throw new HttpError(429, 'rate_limited', 'That change has used its room redos.');
   return e;
@@ -266,6 +301,8 @@ export async function snapshot(uid) {
     db.one('profiles', { id: uid }), getSub(uid), db.select('homes', { user_id: uid }), db.select('passes', { user_id: uid }),
   ]);
   const byId = Object.fromEntries(passes.map(p => [p.id, p]));
+  const members = await db.select('home_members', { owner_id: uid });
+  const nMembers = id => members.filter(m => m.home_id === id).length;
   const active = subActive(sub), plan = planOf(sub);
   const recentPass = passes.some(p => new Date(p.created_at) > addDays(now(), -PRICING.upgradeWindowDays));
   const out = {};
@@ -274,7 +311,7 @@ export async function snapshot(uid) {
     const editable = h.access === 'pass' ? !!p && new Date(p.expires_at) > now() : h.access === 'pro' ? active : false;
     out[h.id] = {
       access: h.access, editable, locked: !!h.locked_hash, teaser_used: !!h.teaser_used, designed: !!h.designed_at, has_plan: !!h.plan_hash,
-      designs_left: p?.designs_left ?? null, changes_left: p?.changes_left ?? null, expires_at: p?.expires_at ?? null,
+      members: nMembers(h.id), designs_left: p?.designs_left ?? null, changes_left: p?.changes_left ?? null, expires_at: p?.expires_at ?? null,
     };
   }
   return {

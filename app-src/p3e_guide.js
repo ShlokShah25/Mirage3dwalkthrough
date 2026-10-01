@@ -137,7 +137,7 @@ function homeFacts({ ids = false } = {}) {
   });
   return { area: Math.round(area), rooms, text: lines.join('\n') };
 }
-const TOUR_ORDER = ['foyer', 'living', 'dining', 'kitchen', 'balcony', 'terrace', 'study', 'master', 'walkin', 'bath', 'bedroom', 'staff', 'passage', 'utility', 'other'];
+const TOUR_ORDER = ['foyer', 'reception', 'living', 'workspace', 'dining', 'kitchen', 'pantry', 'pooja', 'balcony', 'terrace', 'meeting', 'cabin', 'study', 'master', 'walkin', 'bath', 'bedroom', 'staff', 'passage', 'utility', 'other'];
 function tourRooms() {
   const rs = layout.rooms.filter(r => r.polygon?.length > 2 && r.kind !== 'ledge' && !['passage', 'utility'].includes(r.type) && polyArea(r.polygon) > (r.type === 'bath' ? 64 : 30) && !/powder/i.test(r.name));
   return rs.sort((a, b) => TOUR_ORDER.indexOf(a.type) - TOUR_ORDER.indexOf(b.type) || polyArea(b.polygon) - polyArea(a.polygon));
@@ -164,16 +164,20 @@ function chatPrompt(text) {
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
+${profile().done ? 'THE CLIENT: ' + spaceText() + ' Budget ' + (BUDGETS[profile().budget]?.name || '') + '. Vastu: ' + profile().vastu + '.\n' : ''}${compassFacts()}
 THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${GUIDE.touring ? ' A guided tour is running.' : ''}
 ${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 600)}"
-Reply with only JSON: {"say":"what you say","actions":[...]} using at most three actions:
+Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} using at most three actions:
 {"do":"go","room":"<exact room name>"} take them to a room (use when they ask to see or go somewhere, or when showing helps your answer)
 {"do":"look","item":"<id>"} turn to face a piece
 {"do":"time","value":"dusk|golden|night|day"} change the light
 {"do":"edit","request":"<a precise instruction for the design engine, naming the room and pieces>"} for ANY change to furniture, colours, materials, floors, walls or layout. It uses one of their changes; mention that you're making it.
 {"do":"real"} when they want a real photo of the view
 {"do":"tour"} start the full guided tour · {"do":"stop"} stop the tour
-Questions (sizes, what is in a room, ideas) get an answer and usually a go or look.`;
+{"do":"vastu"} show the Vastu report card (when they ask whether the home is Vastu compliant, about directions, or Vastu in general). Summarise the score and the main points in "say".
+{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls (when they ask to make it Vastu compliant or fix it). It uses one change.
+OPTIONS: when they ask for ideas, what could be done differently, or how a room could be used, do NOT edit yet. Offer 2 to 4 distinct ideas as "options":[{"label":"under 8 words","request":"a precise instruction for the design engine naming the room and pieces"}], go to that room, and keep "say" to one sentence that introduces them. They tap one to make it happen. Ideas can change the room's use (a study, a kids' room, a guest room, a gym, a pooja room), its mood, or its layout.
+Questions (sizes, what is in a room) get an answer and usually a go or look.`;
 }
 
 /* ---------- talking to Claude ---------- */
@@ -229,6 +233,7 @@ async function guideSend(text) {
     typing.remove();
     const line = String(j?.say || '').slice(0, 600) || 'Done.';
     gSay(line); gSpeak(line);
+    if (Array.isArray(j?.options) && j.options.length) gOptions(j.options);
     for (const a of (Array.isArray(j?.actions) ? j.actions : []).slice(0, 3)) await runAction(a);
   } catch (e) { typing.remove(); gNote(e?.message || 'Something went wrong. Try again.', 'sys'); }
   finally { GUIDE.busy = false; if (GUIDE.queued) { const q = GUIDE.queued; GUIDE.queued = null; guideSend(q); } }
@@ -243,6 +248,8 @@ async function runAction(a) {
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
   else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
+  else if (a.do === 'vastu') await showVastu(true);
+  else if (a.do === 'vastu_fix') await vastuFix();
 }
 function guideEdit(request) {
   return new Promise(res => {
@@ -274,7 +281,10 @@ $('guideVoice').onclick = () => { GUIDE.speak = !GUIDE.speak; $('guideVoice').se
 $('guideMic').hidden = !SR; $('guideMic').onclick = gListen;
 $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($('guideIn').value.trim()); });
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
-$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour() : guideSend(b.textContent));
+$('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour()
+  : b.dataset.act === 'vastu' ? (gSay(b.textContent, 'you'), showVastu())
+  : b.dataset.act === 'ideas' ? guideSend(`What could be done differently with ${roomAt(player.x, player.z)?.name || 'this room'}? Give me a few options.`)
+  : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));
 addEventListener('keydown', e => { if (GUIDE.touring && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown'].includes(e.code)) stopTour(); });

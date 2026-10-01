@@ -57,13 +57,15 @@ async function requestGenerate() {
   const ok = needImg ? await ensureImages() : await getSample().then(sm => sm ? { sample: sm, max: 4 } : (flash('Claude is not available in this view.', true), null)); if (!ok) return;
   if (SITE) { if (!(await SITE.canDesign?.(project))) return; }
   else if (wallet.credits < BILLING.perWalkthrough) { openWallet('empty'); return; }
+  if (!profile().done && !(await askProfile())) return;
   const regen = project.status === 'generated', roomsWith = Object.entries(project.roomInspo || {}).filter(([k, v]) => v.length);
   const m = modal(`<div class="eyebrow">${regen ? 'Redesign' : 'Design'} my home</div><h2>${esc(project.name || 'My new home')}</h2>
     <p class="lead">Every one of the ${inspRooms().length} rooms gets designed and furnished. It usually takes 2 to 5 minutes, and you can watch it happen.${regen ? ' This replaces the current furniture and your changes.' : ''}</p>
-    <dl class="sumlist"><dt>Rooms</dt><dd>${inspRooms().length}</dd><dt>Style</dt><dd>${project.inspo.length ? project.inspo.length + ' photo' + (project.inspo.length > 1 ? 's' : '') + ' of yours' : esc(presetById(project.presetId)?.name || 'Warm Minimal')}</dd><dt>Rooms with their own look</dt><dd>${roomsWith.length ? roomsWith.map(([k, v]) => `${esc(k)} (${v.length})`).join(', ') : 'None'}</dd><dt>Special requests</dt><dd>${project.brief ? esc(project.brief.slice(0, 140)) + (project.brief.length > 140 ? '…' : '') : 'None'}</dd></dl>
+    <dl class="sumlist"><dt>Rooms</dt><dd>${inspRooms().length}</dd><dt>Style</dt><dd>${project.inspo.length ? project.inspo.length + ' photo' + (project.inspo.length > 1 ? 's' : '') + ' of yours' : esc(presetById(project.presetId)?.name || 'Warm Minimal')}</dd><dt>Rooms with their own look</dt><dd>${roomsWith.length ? roomsWith.map(([k, v]) => `${esc(k)} (${v.length})`).join(', ') : 'None'}</dd><dt>Brief</dt><dd>${esc(profileLine())} <button type="button" class="linkish" id="editBrief">Change</button></dd><dt>Special requests</dt><dd>${project.brief ? esc(project.brief.slice(0, 140)) + (project.brief.length > 140 ? '…' : '') : 'None'}</dd></dl>
     <div class="costline"><div><div class="eyebrow">Cost</div><div style="margin-top:4px;color:var(--muted);font-size:12.5px">${SITE ? 'Only counted when it finishes. Stop or fail and nothing is used.' : 'Charged only when it finishes. Stop or fail and you pay nothing.'}</div></div><b>${SITE ? esc(SITE.costLabel?.(project) || '') : creditsWord(BILLING.perWalkthrough)}</b></div>
     <div class="mact"><span style="flex:1;align-self:center;color:var(--faint);font-size:12.5px">${SITE ? esc(SITE.balanceText?.(project) || '') : 'Balance after: ' + creditsWord(wallet.credits - BILLING.perWalkthrough)}</span><button data-close>Cancel</button><button class="primary" id="goGen">${regen ? 'Redesign' : 'Design my home'}</button></div>`);
   m.el.querySelector('#goGen').onclick = () => { m.close(); runGenerate(ok); };
+  m.el.querySelector('#editBrief').onclick = async () => { m.close(); if (await askProfile()) requestGenerate(); };
 }
 async function runGenerate(ok) {
   const { sample, max } = ok;
@@ -74,11 +76,18 @@ async function runGenerate(ok) {
   project.brief = $('brief').value;
   const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
   const preset = presetById(project.presetId) || PRESETS[0];
-  const steps = [{ id: 'style', label: project.inspo.length ? `Reading your ${project.inspo.length} photo${project.inspo.length > 1 ? 's' : ''}` : `Using the ${preset.name} style`, state: 'active' }];
+  const P = profile(), prog = P.done && (P.use === 'office' || vastuOn() || P.household.kids || P.household.elders || P.household.wfh);
+  const steps = prog ? [{ id: 'prog', label: P.use === 'office' ? 'Planning the office' : vastuOn() ? 'Planning rooms by Vastu' : 'Planning rooms for your family', state: 'active' }] : [];
+  steps.push({ id: 'style', label: project.inspo.length ? `Reading your ${project.inspo.length} photo${project.inspo.length > 1 ? 's' : ''}` : `Using the ${preset.name} style`, state: 'active' });
   if (roomsWith.length) steps.push({ id: 'rstyle', label: `Reading photos for ${roomsWith.length} room${roomsWith.length > 1 ? 's' : ''}`, state: 'active' });
   steps.push({ id: 'furn', label: 'Designing and furnishing rooms' }); stepUI(steps);
   let placed = 0;
   try {
+    if (prog) {
+      try { const ch = await planRooms(sample, signal); buildAll(); stepSet('prog', 'done', ch?.length ? ch.slice(0, 4).join(' · ') : 'Rooms kept as they are'); renderUploads(); }
+      catch (e) { if (e?.code === 'cancelled') throw e; stepSet('prog', 'error', errText(e) + ' Keeping the rooms as they are.'); }
+    }
+    const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
     const ts = ticker('style', 'Reading materials and colours');
     const homeP = project.inspo.length ? collages(project.inspo, max).then(imgs => sample.json(STYLE_PROMPT(project.brief), { images: imgs, modelTier: 'default', signal, onText: ts.onText })) : Promise.resolve(null);
     const roomJobs = roomsWith.map(r => async () => {
@@ -105,7 +114,7 @@ async function runGenerate(ok) {
     else { console.error(e); flash('Something went wrong while building: ' + (e?.message || e) + '. Nothing was charged.', true); }
   } finally {
     running = false;
-    if (placed > 0) { if (!SITE) charge(`Home design · ${project.name || 'My new home'}`); project.status = 'generated'; project.generatedAt = Date.now(); captureCover(); flash(SITE ? 'Your home is ready. Walk in and look around.' : `Your home is ready. ${creditsWord(BILLING.perWalkthrough)} used, ${creditsWord(wallet.credits)} left.`); renderSugg(); setTimeout(maybeCoach, 400); }
+    if (placed > 0) { if (!SITE) charge(`Home design · ${project.name || 'My new home'}`); project.status = 'generated'; project.generatedAt = Date.now(); captureCover(); flash(SITE ? 'Your home is ready. Walk in and look around.' : `Your home is ready. ${creditsWord(BILLING.perWalkthrough)} used, ${creditsWord(wallet.credits)} left.`); renderSugg(); setTimeout(maybeCoach, 400); const A = vastuOn() && vastuAudit(); if (A) setTimeout(() => flash(`Vastu score ${A.score}/100. Ask Mira “is my home Vastu compliant?” for the details.`), 2600); }
     if (SITE && genId) SITE.finishGen?.(genId);
     renderPresets();
     renderUploads(); renderPhist(); saveSoon();
@@ -155,7 +164,7 @@ function renderSugg() {
 }
 function renderPhist() {
   const e = (project?.edits || []).slice(0, 8);
-  phist.innerHTML = e.map((x, i) => `<div><span>${esc(x.text)}<small>${esc(x.summary || '')} · ${ago(x.t)}</small></span>${i === 0 && undoStack.length ? '<button type="button" id="undoLast">Undo</button>' : ''}</div>`).join('');
+  phist.innerHTML = e.map((x, i) => `<div><span>${esc(x.text)}<small>${esc(x.summary || '')} · ${x.by && x.by !== SITE?.me?.user?.email ? esc(x.by.split('@')[0]) + ' · ' : ''}${ago(x.t)}</small></span>${i === 0 && undoStack.length ? '<button type="button" id="undoLast">Undo</button>' : ''}</div>`).join('');
   $('undoLast')?.addEventListener('click', undoEdit);
 }
 pinput.addEventListener('focus', () => pbar.classList.add('open'));
@@ -167,21 +176,24 @@ function editPrompt(text) {
   let focus = layout.rooms.filter(r => r.kind !== 'ledge' && low.includes(r.name.toLowerCase()));
   if (!focus.length) { const types = [['bedroom', /bedroom|bed room/], ['bath', /bath|toilet|washroom/], ['kitchen', /kitchen/], ['living', /living|lounge/], ['terrace', /terrace|balcon/]]; for (const [t, re] of types) if (re.test(low)) focus.push(...layout.rooms.filter(r => r.type === t || (t === 'bedroom' && r.type === 'master') || (t === 'terrace' && r.kind === 'outdoor'))); }
   if (!focus.length) focus = [selRoom || here].filter(Boolean);
-  focus = [...new Set(focus)].slice(0, 4);
+  const vReq = /vastu/i.test(text);
+  if (vReq) for (const m of text.matchAll(/"([^"]+)"/g)) { const r = layout.rooms.find(x => x.name === m[1]); if (r) focus.push(r); }
+  focus = [...new Set(focus)].slice(0, vReq ? 8 : 4);
   const extrasOf = it => Object.entries(it).filter(([k]) => !['id', 'type', 'name', 'room', 'x', 'z', 'rot', 'w', 'd', 'h', 'y', 'finish', 'accent'].includes(k)).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
   let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
-  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}`; }).join('\n');
+  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
   const detail = focus.map(r => `ROOM "${r.name}" polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}\n${roomFaces(r).join('\n')}`).join('\n\n');
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
-HOMEOWNER'S REQUEST: "${text.slice(0, 800)}"
+HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 800)}"
 WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. Words like "this", "here" or "that" refer to these.
 STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
-CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.
+CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.${profile().done ? '\n' + spaceText() : ''}
+${hasNorth() ? `COMPASS: ${compassVecsText()}` : ''}${(vReq || vastuOn()) && hasNorth() ? '\n' + VASTU_RULES : ''}
 
-ROOMS (name | type | area | bounds | floor):
+ROOMS (name | type | area | bounds | floor${hasNorth() ? ' | position in the home' : ''}):
 ${rooms}
 
 ${detail}
@@ -201,6 +213,7 @@ Reply with only JSON: {"summary":"one short sentence saying what you changed","o
 {"op":"paint","walls":"#hex","ceiling":"#hex"}
 {"op":"time","value":"golden|day|night"}
 {"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
+{"op":"swap","a":"<room>","b":"<room>"} swap what two rooms are used for (their names and types trade places; walls stay). Always follow it with a refurnish op for both rooms, using the names after the swap.
 Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
 RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. If the request cannot be done, return an empty ops list and explain why in summary.`;
 }
@@ -228,6 +241,7 @@ function applyOps(res) {
       for (const nm of names) { const r = roomByName(nm); if (!r) continue; if (['stone-large', 'wood', 'tile-2ft', 'tile-1ft', 'terrazzo', 'stone', 'plain'].includes(op.finish)) r.finish = op.finish; r.floor = hexOk(op.color, r.floor); shell = true; n++; }
     } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
     else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
+    else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
   if (added.length) { const items = settleItems(added, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; }
@@ -258,7 +272,7 @@ $('pform').addEventListener('submit', async e => {
     clearInterval(iv);
     const { n, refurn } = applyOps(res);
     const summary = String(res?.summary || '').slice(0, 220) || (n ? 'Done.' : 'No changes were made.');
-    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text, summary }); project.edits = project.edits.slice(0, 50); }
+    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
     pstatus.innerHTML = `<span>${esc(summary)}</span>${n || refurn.length ? '<button type="button" id="undoNow">Undo</button>' : ''}`;
     $('undoNow')?.addEventListener('click', undoEdit);
     pinput.value = ''; renderPhist(); saveSoon();

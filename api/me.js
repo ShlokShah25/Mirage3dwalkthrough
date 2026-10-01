@@ -3,11 +3,11 @@
 import { requireUser } from './_lib/auth.js';
 import { route, body, json, HttpError } from './_lib/http.js';
 import { db } from './_lib/db.js';
-import { snapshot } from './_lib/entitle.js';
+import { snapshot, sharedHomes } from './_lib/entitle.js';
 
 export const GET = route(async req => {
   const user = await requireUser(req);
-  return json({ user, ...(await snapshot(user.id)) });
+  return json({ user, ...(await snapshot(user.id)), shared: await sharedHomes(user) });
 });
 
 export const POST = route(async req => {
