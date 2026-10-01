@@ -5330,8 +5330,9 @@ if (SITE) (() => {
       else if (what === 'topup') start = await S.api('/api/billing', { action: 'topup', homeId: project.id });
       else if (subOn()) { await S.api('/api/billing', { action: 'change', plan: what }); await S.refresh(); flash(`You're on ${what === 'max' ? 'Pro Max' : 'Pro'} now.`); return; }
       else start = await S.api('/api/billing', { action: 'subscribe', plan: what });
-      await loadRzp();
       const names = { pass: 'Home Pass', topup: '+15 changes', pro: 'Mirage Pro', max: 'Mirage Pro Max' };
+      if (S.cfg?.authMode === 'test') return testCheckout(start, what, names[what]);   // local test server: no Razorpay, no real money
+      await loadRzp();
       const rz = new window.Razorpay({
         key: start.keyId, name: 'Mirage', description: names[what],
         ...(start.orderId ? { order_id: start.orderId, amount: start.amount, currency: start.currency } : { subscription_id: start.subscriptionId }),
@@ -5351,6 +5352,20 @@ if (SITE) (() => {
     } catch (e) { flash(e.message || 'Could not start the payment.', true); }
   }
   S.buy = buy;
+  // Local testing only: a stand-in checkout that pays the fake Razorpay on :4002.
+  function testCheckout(start, what, name) {
+    const m = modal(`<div class="eyebrow">[ Test checkout ]</div><h2>${esc(name)}</h2><p class="lead">This is the local test server. No real money moves: the payment is simulated so you can try everything.</p>
+      <div class="mact"><button data-close>Cancel</button><button class="primary" id="tcPay">Pay (test)</button></div>`);
+    m.el.querySelector('#tcPay').onclick = async () => {
+      try {
+        const r = await (await fetch(`${location.protocol}//${location.hostname}:4002/test/pay`, { method: 'POST', body: JSON.stringify(start.orderId ? { orderId: start.orderId } : { subscriptionId: start.subscriptionId }) })).json();
+        m.close();
+        await S.api('/api/billing', { action: 'verify', orderId: start.orderId, subscriptionId: start.subscriptionId, paymentId: r.paymentId, signature: r.signature });
+        await S.refresh(); flash(what === 'topup' ? '15 changes added.' : `Welcome to ${name}. You're all set.`);
+        if (what !== 'topup' && layout.walls.length && project.status !== 'generated') setTimeout(() => requestGenerate(), 400);
+      } catch (e) { flash('Test payment failed: ' + e.message, true); }
+    };
+  }
 
   /* ---------- account ---------- */
   S.openAccount = async () => {
