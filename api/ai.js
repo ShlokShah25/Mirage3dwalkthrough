@@ -83,7 +83,7 @@ export const POST = route(async req => {
       } catch (e) {
         await plan.onFail?.().catch(() => { });
         if (!(e instanceof HttpError) && e?.name !== 'AbortError') console.error('ai stream', e);
-        send({ error: { code: e?.name === 'AbortError' ? 'cancelled' : (e.code || 'upstream_error'), message: e instanceof HttpError ? e.message : 'The design engine had a problem. Try again.' } });
+        send({ error: { code: e?.name === 'AbortError' ? 'cancelled' : (e.code || 'upstream_error'), message: e instanceof HttpError ? e.message : 'The design engine had a problem. Try again.' + (process.env.MIRAGE_DB === 'memory' ? ` (${e?.cause?.code || e?.message || e})` : '') } });
       } finally { clearInterval(ping); try { ctrl.close(); } catch { } }
     },
     cancel() { ac.abort(); },

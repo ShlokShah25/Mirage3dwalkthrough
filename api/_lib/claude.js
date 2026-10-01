@@ -43,8 +43,13 @@ export async function streamClaude({ model, prompt, images = [], maxTokens = 120
     console.error('claude error', r.status, t.slice(0, 500));
     if (r.status === 429 || r.status === 529) throw new HttpError(503, 'rate_limited', 'Mirage is busy right now. Try again in a minute.');
     if (r.status === 400 && /image/i.test(t)) throw new HttpError(400, 'image_rejected', 'That image could not be read. Try a clearer PNG or JPG.');
+    if (r.status === 401 || r.status === 403) throw new HttpError(502, 'upstream_error', 'The design engine could not sign in to Claude: the ANTHROPIC_API_KEY was rejected. Check the key and restart.');
+    if (/credit balance|billing/i.test(t)) throw new HttpError(502, 'upstream_error', 'The Anthropic account behind ANTHROPIC_API_KEY is out of credit. Add credit in the Anthropic Console, then try again.');
+    if (r.status === 404 || /model/i.test(t) && r.status === 400) throw new HttpError(502, 'upstream_error', `This API key can't use the model "${model}". Set MODEL_COMPLEX / MODEL_DEFAULT / MODEL_FAST to models your key can use.`);
     if (r.status === 400 && /too long|too large|max/i.test(t)) throw new HttpError(413, 'prompt_too_large', 'The request was too large. Try a smaller change.');
-    throw new HttpError(502, 'upstream_error', 'The design engine had a problem. Try again.');
+    // On the local test server, show the real reason so it can be fixed.
+    const detail = env('MIRAGE_DB') === 'memory' ? ` (Claude API ${r.status}: ${(() => { try { return JSON.parse(t).error.message; } catch { return t.slice(0, 200); } })()})` : '';
+    throw new HttpError(502, 'upstream_error', 'The design engine had a problem. Try again.' + detail);
   }
   const reader = r.body.getReader(), dec = new TextDecoder();
   let buf = '', text = '', stop = null; const usage = { in: 0, out: 0 };
@@ -59,7 +64,7 @@ export async function streamClaude({ model, prompt, images = [], maxTokens = 120
       if (ev.type === 'message_start') usage.in = ev.message?.usage?.input_tokens || 0;
       else if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') { text += ev.delta.text; onDelta?.(ev.delta.text); }
       else if (ev.type === 'message_delta') { usage.out = ev.usage?.output_tokens || usage.out; stop = ev.delta?.stop_reason || stop; }
-      else if (ev.type === 'error') { console.error('claude stream error', ev.error); throw new HttpError(502, ev.error?.type === 'overloaded_error' ? 'rate_limited' : 'upstream_error', 'The design engine had a problem. Try again.'); }
+      else if (ev.type === 'error') { console.error('claude stream error', ev.error); throw new HttpError(502, ev.error?.type === 'overloaded_error' ? 'rate_limited' : 'upstream_error', ev.error?.type === 'overloaded_error' ? 'Claude is overloaded right now. Try again in a minute.' : 'The design engine had a problem. Try again.' + (env('MIRAGE_DB') === 'memory' ? ` (${ev.error?.message || ev.error?.type || 'stream error'})` : '')); }
     }
   }
   if (stop === 'refusal') throw new HttpError(422, 'refused', 'That request was declined. Try rephrasing it.');
