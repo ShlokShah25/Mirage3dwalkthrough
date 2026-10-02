@@ -7,6 +7,7 @@ import { ownHome } from './_lib/entitle.js';
 export const POST = route(async req => {
   const user = await requireUser(req);
   const b = await body(req);
+  if (user.guest) return json({ ok: true });   // a guest's homes live only in their browser
   const h = await ownHome(user.id, b.id, { create: true, name: String(b.name || '').slice(0, 120) });
   if (b.name && b.name !== h.name) await db.update('homes', { id: h.id }, { name: String(b.name).slice(0, 120) });
   return json({ ok: true });

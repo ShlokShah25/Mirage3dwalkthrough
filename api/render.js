@@ -5,6 +5,7 @@ import { route, body, json, HttpError } from './_lib/http.js';
 import { allowRender, settleRender } from './_lib/entitle.js';
 import { falImage, nearestRatio } from './_lib/fal.js';
 import { env } from './_lib/env.js';
+import * as G from './_lib/guest.js';
 
 const clean = (s, n) => String(s || '').replace(/[\r\n<>{}]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 const TIMES = { dusk: 'dusk just after sunset, peach and lavender sky with a city skyline outside, every interior light on: warm 2700K cove lights, LED strips glowing under shelves and along wall panels, wall-washer downlights, pendants',  day: 'bright natural daylight', golden: 'warm late-afternoon golden-hour sunlight', night: 'evening with warm interior lamps and cove lights on, dark sky outside' };
@@ -27,11 +28,12 @@ export const POST = route(async req => {
   if (typeof b.image !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(b.image)) throw new HttpError(400, 'bad_request', 'Send the current view as an image.');
   if (b.image.length > 5_000_000) throw new HttpError(413, 'prompt_too_large', 'That view is too large. Try a smaller window.');
   if (!env('FAL_KEY')) throw new HttpError(503, 'renders_off', 'Photo-real renders are not switched on yet.');
-  const { tier, usageId } = await allowRender(user.id, b.homeId ? String(b.homeId).slice(0, 80) : null);
+  let tier = 'free', usageId = null;
+  if (user.guest) G.take(user.id, 'render'); else ({ tier, usageId } = await allowRender(user.id, b.homeId ? String(b.homeId).slice(0, 80) : null));
   const w = +b.w || 16, h = +b.h || 9;
   try {
     const image = await falImage({ prompt: renderPrompt(b), image_url: b.image, guidance_scale: 3.5, num_images: 1, output_format: 'jpeg', safety_tolerance: '2', aspect_ratio: nearestRatio(w / h), ...(Number.isInteger(b.seed) ? { seed: b.seed } : {}) });
-    await settleRender(usageId, true);
+    if (usageId) await settleRender(usageId, true);
     return json({ image, tier });
-  } catch (e) { await settleRender(usageId, false); throw e; }
+  } catch (e) { if (usageId) await settleRender(usageId, false); else G.giveBack(user.id, 'render'); throw e; }
 });

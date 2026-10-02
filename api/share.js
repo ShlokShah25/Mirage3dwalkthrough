@@ -2,7 +2,7 @@
 // POST /api/share { homeId, action: 'invite', email, role }   — owner invites someone (viewer | commenter | editor).
 // POST /api/share { homeId, action: 'role', email, role }     — owner changes someone's role.
 // POST /api/share { homeId, action: 'remove', email }         — owner removes someone; a member may remove themselves.
-import { requireUser } from './_lib/auth.js';
+import { requireAccount } from './_lib/auth.js';
 import { route, body, json, HttpError } from './_lib/http.js';
 import { db } from './_lib/db.js';
 import { ROLES, normEmail, needRole, homeRole } from './_lib/entitle.js';
@@ -11,14 +11,14 @@ const MAX_MEMBERS = 25;
 const list = async homeId => (await db.select('home_members', { home_id: homeId }, { order: 'created_at.asc' })).map(m => ({ email: m.email, role: m.role, joined: !!m.user_id, invited_at: m.created_at }));
 
 export const GET = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'share a home');
   const homeId = new URL(req.url).searchParams.get('home');
   const { home, role } = await homeRole(user, homeId);
   return json({ role, owner: home.owner_email || (role === 'owner' ? user.email : null), members: await list(homeId) });
 });
 
 export const POST = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'share a home');
   const b = await body(req, 20_000);
   const email = normEmail(b.email);
   if (b.action === 'remove' && email && email === normEmail(user.email)) {     // leaving a home someone shared with you

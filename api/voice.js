@@ -5,6 +5,7 @@ import { route, body, json, HttpError } from './_lib/http.js';
 import { allowVoice } from './_lib/entitle.js';
 import { falSpeech } from './_lib/fal.js';
 import { PRICING } from './_lib/env.js';
+import { take } from './_lib/guest.js';
 
 export const POST = route(async req => {
   const user = await requireUser(req);
@@ -12,6 +13,6 @@ export const POST = route(async req => {
   const text = String(b.text || '').replace(/[<>{}]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!text) throw new HttpError(400, 'bad_request', 'Nothing to say.');
   if (text.length > PRICING.voice.maxChars) throw new HttpError(413, 'prompt_too_large', 'That line is too long to speak.');
-  await allowVoice(user.id);
+  if (user.guest) take(user.id, 'voice'); else await allowVoice(user.id);
   return json({ url: await falSpeech(text) });
 });

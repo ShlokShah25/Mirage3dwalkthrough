@@ -5157,7 +5157,9 @@ if (SITE) (() => {
       <label for="siEmail" class="eyebrow" style="display:block;margin-bottom:6px">Email</label>
       <div style="display:flex;gap:8px"><input type="text" id="siEmail" inputmode="email" autocomplete="email" placeholder="you@example.com" style="flex:1;padding:11px 12px;font-size:14px" data-autofocus>
       <button class="primary" id="siGo">${test ? 'Continue' : 'Email me a link'}</button></div>
-      <p id="siMsg" class="lead" style="margin:12px 0 0;min-height:1.4em" aria-live="polite"></p>`);
+      <p id="siMsg" class="lead" style="margin:12px 0 0;min-height:1.4em" aria-live="polite"></p>
+      ${GUESTS() ? '<div class="or" style="text-align:center;color:var(--faint);font-size:12px;margin:6px 0 12px">or</div><button class="lg" id="siGuest" style="width:100%;justify-content:center">Continue as guest</button><p class="note" style="text-align:center;margin:8px 0 0">No account needed. Your homes stay in this browser.</p>' : ''}`);
+    m.el.querySelector('#siGuest')?.addEventListener('click', () => { S.noGuest = false; m.close(); setToken(guestToken()); });
     const msg = t => { m.el.querySelector('#siMsg').textContent = t; };
     m.el.querySelector('#siGoogle')?.addEventListener('click', async () => {
       const { error } = await supa.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
@@ -5564,6 +5566,11 @@ if (SITE) (() => {
   async function openShare() {
     if (!project || project.id === 'sample-home') return;
     await S.ensureAuth(); if (!S.me) await S.refresh();
+    if (isGuest()) {
+      const g = modal(`<div class="eyebrow">[ Share ]</div><h2>Sign in to share this home</h2><p class="lead">Sharing invites people by email, so it needs an account. Everything else works as a guest.</p><div class="mact"><button data-close>Not now</button><button class="primary" id="gSign2">Sign in</button></div>`);
+      g.el.querySelector('#gSign2').onclick = () => { g.close(); openSignIn(); };
+      return;
+    }
     if (!project.shared) { if (!project.plan?.image) { flash('Add a floor plan first, then share the home.', true); return; } try { await S.api('/api/homes', { id: project.id, name: project.name }); } catch (e) { flash(e.message, true); return; } }
     const link = `${location.origin}${location.pathname}?home=${encodeURIComponent(project.id)}`, owner = !project.shared;
     const m = modal(`<div class="eyebrow">[ Share ]</div><h2>${esc(project.name || 'This home')}</h2>

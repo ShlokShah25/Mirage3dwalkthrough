@@ -2,7 +2,7 @@
 // GET   /api/comments?home=<id>
 // POST  /api/comments { homeId, text, room?, x?, y?, z? }   — commenters, editors and the owner.
 // PATCH /api/comments { id, resolved }                      — the author, editors and the owner.
-import { requireUser } from './_lib/auth.js';
+import { requireAccount } from './_lib/auth.js';
 import { route, body, json, HttpError } from './_lib/http.js';
 import { db } from './_lib/db.js';
 import { homeRole, needRole, atLeast } from './_lib/entitle.js';
@@ -11,14 +11,14 @@ const shape = c => ({ id: c.id, author: c.author_email, room: c.room, x: c.x, y:
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(+v)) ? null : Math.round(+v * 100) / 100;
 
 export const GET = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'comment on a shared home');
   const homeId = new URL(req.url).searchParams.get('home');
   await homeRole(user, homeId);
   return json({ comments: (await db.select('home_comments', { home_id: homeId }, { order: 'created_at.asc' })).map(shape) });
 });
 
 export const POST = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'comment on a shared home');
   const b = await body(req, 20_000);
   const { home } = await needRole(user, b.homeId, 'commenter');
   const text = String(b.text || '').trim().slice(0, 1000);
@@ -29,7 +29,7 @@ export const POST = route(async req => {
 });
 
 export const PATCH = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'comment on a shared home');
   const b = await body(req, 5_000);
   const c = b.id ? await db.one('home_comments', { id: String(b.id) }) : null;
   if (!c) throw new HttpError(404, 'not_found', 'Comment not found.');

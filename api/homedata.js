@@ -1,7 +1,7 @@
 // The shared copy of a home's design, so collaborators see the same thing.
 // GET /api/homedata?home=<id>[&since=<version>] — the latest copy (or just { version } if nothing changed since).
 // PUT /api/homedata { homeId, version, data } — save; version must match the copy you started from, else 409.
-import { requireUser } from './_lib/auth.js';
+import { requireAccount } from './_lib/auth.js';
 import { route, body, json, HttpError } from './_lib/http.js';
 import { db } from './_lib/db.js';
 import { homeRole, needRole } from './_lib/entitle.js';
@@ -9,7 +9,7 @@ import { homeRole, needRole } from './_lib/entitle.js';
 const MAX = 8_000_000;
 
 export const GET = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'open or save a shared home');
   const q = new URL(req.url).searchParams, homeId = q.get('home');
   const { role } = await homeRole(user, homeId);
   const row = await db.one('home_data', { home_id: homeId });
@@ -20,7 +20,7 @@ export const GET = route(async req => {
 });
 
 export const PUT = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'open or save a shared home');
   const b = await body(req, MAX + 50_000);
   const { home } = await needRole(user, b.homeId, 'editor');
   if (!b.data || typeof b.data !== 'object' || !b.data.layout) throw new HttpError(400, 'bad_request', 'Nothing to save.');

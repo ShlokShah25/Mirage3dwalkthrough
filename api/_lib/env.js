@@ -30,7 +30,7 @@ export const freeMode = () => String(env('FREE_MODE', 'on')).toLowerCase() !== '
 export const FREE = { designsPerDay: 5, changesPerDay: 60, rendersPerDay: 10 };
 // Guest mode: no sign-in needed; the browser keeps a random guest key and the server gives it an account of its own.
 // On by default for now; set GUEST_MODE=off to require sign-in again. Site-wide daily caps stop a stranger running up the bill.
-export const guestMode = () => String(env('GUEST_MODE', 'on')).toLowerCase() !== 'off';
+export const guestMode = () => freeMode() && String(env('GUEST_MODE', 'on')).toLowerCase() !== 'off';   // guests exist only while everything is free
 export const GUEST = { siteDesignsPerDay: Number(env('SITE_DESIGNS_PER_DAY', 60)), sitePlanReadsPerDay: Number(env('SITE_PLAN_READS_PER_DAY', 120)) };
 
 export const MODELS = {

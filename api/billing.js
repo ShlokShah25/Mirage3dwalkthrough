@@ -5,7 +5,7 @@
 //   { action: 'verify', orderId|subscriptionId, paymentId, signature }
 //   { action: 'change', plan }                       → switch Pro ↔ Pro Max
 //   { action: 'cancel' }                             → cancel at the end of the paid period
-import { requireUser } from './_lib/auth.js';
+import { requireAccount } from './_lib/auth.js';
 import { route, body, json, HttpError } from './_lib/http.js';
 import { env, PRICING } from './_lib/env.js';
 import { db } from './_lib/db.js';
@@ -23,7 +23,7 @@ async function createOrder(user, kind, homeId, amount) {
 }
 
 export const POST = route(async req => {
-  const user = await requireUser(req);
+  const user = await requireAccount(req, 'buy a plan');
   const b = await body(req);
   switch (b.action) {
     case 'pass': {
