@@ -20,7 +20,7 @@ Work in this order: (1) read every printed room name and size; (2) trace the ext
 Rules:
 - labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08, 10'6" becomes 10.5; metres stay metres; 4200 x 3600 mm becomes 4.2 and 3.6 with units "m"). Read each number carefully, digit by digit. pos is the centre of the room's name text. bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
 - dimLines: every dimension line that has a printed length (usually outside the walls, with ticks or arrows at its ends). a and b are its two end ticks; value is the printed length as a decimal in the plan's units. Use [] if there are none.
-- walls: every wall as a straight centreline segment, running down the middle of the drawn wall. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates: an L corner or T junction ends on the other wall's centreline. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments. Do not trace furniture, kitchen counters, wardrobes, hatching, text or dimension lines as walls.
+- walls: every wall as a straight centreline segment, running down the middle of the drawn wall. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates: an L corner or T junction ends on the other wall's centreline. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments. Only trace walls you can see drawn: furniture, kitchen counters, wardrobes, railings, steps, hatching, text and dimension lines are not walls, and where two spaces meet with no wall drawn between them (open-plan living, dining, kitchen) there is no wall. Every gap in a wall is a door, window or opening and must be listed.
 - openings: a and b are the two jambs (the ends of the gap in the wall), on the wall centreline. type is "door" (hinged, usually drawn with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill, usually drawn as thin parallel lines across the wall) or "opening" (a gap or arch with no door). For doors: hinge is "a" or "b", the jamb the leaf is hinged on (where the swing arc is centred); into is a point about one door-width inside the room the leaf swings into (inside the arc).
 - rooms: every enclosed space, including toilets, balconies, terraces, utility areas and passages; skip ducts and shafts. poly follows the wall centrelines around the room, corner by corner. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room. Use the printed names.
 - fixtures: furniture and fixtures drawn on the plan: kind is one of bed, sofa, sectional, armchair, coffee-table, dining-table, tv-unit, wardrobe, dresser, desk, bookshelf, kitchen-counter, sink, hob, fridge, island, wc, basin, vanity, shower, bathtub, washing-machine, pooja, plant, other. bbox is its footprint in pixels. facing is the side its front faces on the image: "up", "down", "left" or "right" (a bed's front is its foot end; a sofa's front is the seat side; a counter's front is the side you stand at). Use [] if the plan shows no furniture.
@@ -189,7 +189,8 @@ function traceToLayout(tr, W, Hh, opt) {
     for (const o of w.openings) { const last = keep[keep.length - 1]; if (last && o.start < last.end - .2) { if (o.end - o.start > last.end - last.start) keep[keep.length - 1] = o; } else keep.push(o); }
     w.openings = keep;
   }
-  // door names & swings, main door, small bathroom windows
+  // door names & swings, main door, small bathroom windows; which rooms each opening joins
+  const links = [];
   const entrance = numOk(tr.entrance) ? P(tr.entrance) : null; let main = null, mainD = 1e9;
   const prio = r => r ? ({ bath: 6, walkin: 5, staff: 4, utility: 4, bedroom: 3, master: 3, study: 3, kitchen: 2 }[r.type] || 1) : 0;
   for (const w of walls) {
@@ -198,10 +199,11 @@ function traceToLayout(tr, W, Hh, opt) {
       const sm = (o.start + o.end) / 2, cx = w.a[0] + ux * sm, cz = w.a[1] + uz * sm, off = w.thickness / 2 + 1.3;
       const rp = roomAtIn(rooms, cx + nx * off, cz + nz * off), rm = roomAtIn(rooms, cx - nx * off, cz - nz * off);
       if (o.type === 'window' && o.end - o.start < 3 && [rp, rm].some(r => r?.type === 'bath')) { o.sill = 5.5; o.head = 7; }
+      if (o.type !== 'window') links.push([rp, rm]);
       if (o.type !== 'door') continue;
-      // the drawn swing wins; otherwise the door opens into the more private room
+      // doors open into the more private room, never out into a passage; the drawn swing only settles a tie
       let side = prio(rp) >= prio(rm) ? 1 : -1;
-      if (o._into) { const d = (o._into[0] - cx) * nx + (o._into[1] - cz) * nz; if (Math.abs(d) > .2) side = d > 0 ? 1 : -1; }
+      if (o._into && prio(rp) === prio(rm)) { const d = (o._into[0] - cx) * nx + (o._into[1] - cz) * nz; if (Math.abs(d) > .2) side = d > 0 ? 1 : -1; }
       const tgt = side > 0 ? rp : rm;
       o.name = (tgt ? tgt.name + ' door' : 'Door'); o.swing = { hinge: o._hinge || 'start', side, open: 90 };
       delete o._hinge; delete o._into;
@@ -218,6 +220,10 @@ function traceToLayout(tr, W, Hh, opt) {
     for (let i = 0; i < n; i++) {
       const a = r.polygon[i], b = r.polygon[(i + 1) % n], mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
       const walled = walls.some(w => segDist(mx, mz, w.a, w.b) < .8);
+      // an edge shared with another room is open floor, not a drop: no railing across it
+      const L2 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, px = -(b[1] - a[1]) / L2, pz = (b[0] - a[0]) / L2;
+      const shared = [-1, 1].some(sg => { const q = roomAtIn(rooms.filter(o => o !== r), mx + px * sg * 1.2, mz + pz * sg * 1.2); return !!q; });
+      if (!walled && shared) { run = null; continue; }
       if (!walled) { if (run && run[run.length - 1] === a) run.push(b); else { run = [a, b]; railings.push({ name: r.name + ' railing', style: 'glass', height: 3.5, points: run }); } } else run = null;
     }
   }
@@ -233,7 +239,20 @@ function traceToLayout(tr, W, Hh, opt) {
   applyStyleToRooms(L, st);
   const big = [...rooms].filter(r => r.kind === 'room').sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
   if (main) L.spawn = { position: [r2(main.cx + main.nx * 3), r2(main.cz + main.nz * 3)], lookAt: big ? centroid(big.polygon) : [main.cx + main.nx * 10, main.cz + main.nz * 10] };
-  else if (big) { const c = centroid(big.polygon); L.spawn = { position: c, lookAt: [c[0], c[1] - 10] }; }
+  // never start inside a cupboard-sized space or outside the home
+  const at = L.spawn && roomAtIn(rooms, L.spawn.position[0], L.spawn.position[1]);
+  if (big && (!at || polyArea(at.polygon) < 40 || at.kind !== 'room')) { const c = centroid(big.polygon); L.spawn = { position: pip(c, big.polygon) ? c : big.polygon[0].map((v, i) => (v + c[i]) / 2), lookAt: [c[0], c[1] - 10] }; }
+  // every room must be reachable through a door or an opening, or through open floor it shares with a neighbour
+  const adj = new Map(rooms.map(r => [r, new Set()])), join = (a, b) => { if (a && b && a !== b) { adj.get(a).add(b); adj.get(b).add(a); } };
+  for (const [a, b] of links) join(a, b);
+  for (const r of rooms) { const n = r.polygon.length; for (let i = 0; i < n; i++) { const a = r.polygon[i], b = r.polygon[(i + 1) % n], Lg = Math.hypot(b[0] - a[0], b[1] - a[1]); if (Lg < 2) continue;
+    const px = -(b[1] - a[1]) / Lg, pz = (b[0] - a[0]) / Lg;
+    for (let t = .2; t < .85; t += .15) { const mx = a[0] + (b[0] - a[0]) * t, mz = a[1] + (b[1] - a[1]) * t; if (walls.some(w => segDist(mx, mz, w.a, w.b) < .8)) continue;
+      for (const sg of [-1, 1]) join(r, roomAtIn(rooms.filter(o => o !== r), mx + px * sg * 1.2, mz + pz * sg * 1.2)); } } }
+  const start = L.spawn && roomAtIn(rooms, L.spawn.position[0], L.spawn.position[1]);
+  if (start) { const seen = new Set([start]), q = [start]; while (q.length) for (const n of adj.get(q.shift())) if (!seen.has(n)) { seen.add(n); q.push(n); }
+    const shut = rooms.filter(r => !seen.has(r) && r.kind === 'room' && polyArea(r.polygon) > 15);
+    if (shut.length) warns.push(`No way in was read for ${shut.map(r => r.name).join(', ')}. Check the plan for ${shut.length > 1 ? 'their doors' : 'its door'} and add ${shut.length > 1 ? 'them' : 'it'} in Fix the layout.`); }
   if (!walls.length) warns.push('No walls were found in the plan. Try a cleaner, higher-contrast image.');
   if (!rooms.length) warns.push('No rooms were found. Draw them in Plan check with the Room tool.');
   if (tr.notes) warns.push('Claude noted: ' + String(tr.notes).slice(0, 200));

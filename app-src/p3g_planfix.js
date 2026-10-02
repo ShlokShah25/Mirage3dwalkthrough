@@ -74,25 +74,56 @@ function refineTrace(tr, P) {
     for (const s of S) { if (!s || s.ax !== oax) continue; const [u, v] = proj(s, m), du = u < s.u0 ? s.u0 - u : u > s.u1 ? u - s.u1 : 0, d = Math.hypot(du, v - s.c); if (d < bd) { bd = d; best = s; } }
     return best && bd < Math.max(best.t * 2, 14) ? best : null; };
   for (const o of ops) { const s = opWall(o); if (!s) continue; const ua = proj(s, o.a)[0], ub = proj(s, o.b)[0]; s.ops.push({ o, s0: Math.min(ua, ub), s1: Math.max(ua, ub) }); }
-  // pass 1 finds the drawing style (solid fill vs two thin lines), pass 2 snaps with it
+  // pass 1 finds the drawing style (solid fill, two thin lines, or single lines), pass 2 snaps with it
   let style = null;
   for (let pass = 0; pass < 2; pass++) {
-    const tally = { filled: 0, double: 0 };
+    const tally = { filled: 0, double: 0, line: 0 };
     for (const s of S) {
-      if (!s) continue; const b = findWallBand(P, s.ax, s.u0, s.u1, s.c0, s.t, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style);
-      s.band = b; if (b && b.kind !== 'line') tally[b.kind] += s.u1 - s.u0;
+      if (!s) continue; const b = findWallBand(P, s.ax, s.u0, s.u1, s.c0, s.t, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style === 'line' ? null : style);
+      s.band = b; if (b) tally[b.kind] += s.u1 - s.u0;
     }
-    style = tally.filled >= tally.double ? 'filled' : 'double';
+    style = tally.line > (tally.filled + tally.double) * 1.5 ? 'line' : tally.filled >= tally.double ? 'filled' : 'double';
   }
   stats.style = style;
   const tMed = median(S.filter(s => s?.band && s.band.kind !== 'line').map(s => s.band.t)) || median(S.filter(Boolean).map(s => s.t)) || 8; stats.tMed = tMed;
-  for (const s of S) {
-    if (!s) continue; stats.walls++;
-    if (s.band) { s.c = s.band.c; s.t = s.band.kind === 'line' ? Math.min(s.t, tMed) : s.band.t; s.rows = s.band.rows; stats.snapped++; }
-    else { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v < s.c + s.t / 2; v++) s.rows.push(v); }
+  // the drawing decides: a wall exists only where a wall is drawn. Furniture, counters and dimension lines are thin lines,
+  // so on a plan whose walls are drawn thick, a thin line is not a wall.
+  const dropped = [];
+  // on a solid-wall plan, a band far thinner than the usual wall is an outline (balcony edge, counter, furniture), not a wall
+  // and on a two-line plan, two lines only make a wall when they are spaced like the other walls (a bed or counter outline is not)
+  const thin = b => b && ((b.kind === 'filled' && style === 'filled' && b.t < Math.max(3, tMed * .45)) || (b.kind === 'double' && style === 'double' && (b.t < tMed * .5 || b.t > tMed * 1.8)));
+  for (const s of S) if (s && thin(s.band)) s.band = { ...s.band, kind: 'line' };
+  for (let i = 0; i < S.length; i++) {
+    const s = S[i]; if (!s) continue; stats.walls++;
+    let b = s.band;
+    if (!b || (style !== 'line' && b.kind === 'line')) { const wide = findWallBand(P, s.ax, s.u0, s.u1, s.c0, Math.max(s.t, tMed) * 2, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style === 'line' ? null : style); if (wide && !thin(wide) && (style === 'line' || wide.kind !== 'line')) b = wide; }
+    const glazed = s.ops.reduce((a, q) => a + Math.max(0, Math.min(q.s1, s.u1) - Math.max(q.s0, s.u0)), 0) >= (s.u1 - s.u0) * .6;
+    if (!b || (style !== 'line' && b.kind === 'line')) { if (glazed && s.w.ext) { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v < s.c + s.t / 2; v++) s.rows.push(v); continue; } dropped.push(s); S[i] = null; continue; }
+    s.c = b.c; s.t = b.kind === 'line' ? tMed : b.t; s.rows = b.rows; stats.snapped++;
   }
-  // ends: meet the centreline of the wall they run into, or stop where the drawn wall stops
-  const live = S.filter(Boolean);
+  stats.dropped = dropped.length;
+  const live = S.filter(Boolean), added = [];
+  // along each wall: trim the ends to where the drawn wall stops, and wherever nothing is drawn across the wall
+  // (a gap the tracing has no door or window for) leave a way through instead of a solid wall
+  const minGap = Math.max(tMed * 2.5, 10);
+  for (const s of live) {
+    if (!s.band && !s.rows?.length) continue;
+    const lo = Math.round(s.u0), hi = Math.round(s.u1), f = [];
+    for (let u = lo; u <= hi; u++) f.push(fillAt(P, s, u));
+    const runs = []; let st = null;
+    f.forEach((v, i) => { const e = v < .15; if (e && st === null) st = i; if ((!e || i === f.length - 1) && st !== null) { runs.push([lo + st, lo + (e ? i + 1 : i)]); st = null; } });
+    for (const [a, b] of runs) {
+      if (b - a < minGap) continue;
+      const known = s.ops.some(q => Math.min(b, q.s1) - Math.max(a, q.s0) > (b - a) * .4);
+      if (a <= s.u0 + tMed) { if (!known) s.u0 = b; continue; }
+      if (b >= s.u1 - tMed) { if (!known) s.u1 = a; continue; }
+      if (known) continue;
+      const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], o = { type: s.w.ext ? 'window' : 'opening', a: at(a), b: at(b), auto: true };
+      added.push(o); s.ops.push({ o, s0: a, s1: b });
+    }
+  }
+  stats.added = added.length;
+  // ends: meet the centreline of the wall they run into
   for (const s of live) for (const end of ['u0', 'u1']) {
     const ue = s[end], tol = 6; let best = null, bd = 1e9;
     for (const o of live) {
@@ -101,17 +132,15 @@ function refineTrace(tr, P) {
       if (s.c < o.u0 - s.t - tol || s.c > o.u1 + s.t + tol) continue;
       if (d < bd) { bd = d; best = o; }
     }
-    if (best) { s[end] = best.c; continue; }
-    const dir = end === 'u0' ? -1 : 1, E = Math.round(s.t * 2 + 6); let u = Math.round(ue);
-    if (fillAt(P, s, u) >= .5) { for (let k = 0; k < E && fillAt(P, s, u + dir) >= .5; k++) u += dir; s[end] = u + (dir > 0 ? 1 : 0); }
-    else { for (let k = 0; k < E && fillAt(P, s, u) < .5; k++) u -= dir; s[end] = u + (dir > 0 ? 1 : 0); }
+    if (best) s[end] = best.c;
   }
-  // corners: a wall that ends short of a perpendicular wall's line gets extended to it (and the other way round)
   for (const s of live) { if (s.u1 - s.u0 < 1) s.u1 = s.u0 + 1; }
   for (const s of live) {
     const { w } = s; w.t = r1(s.t);
     if (s.ax === 'h') { w.a = [s.u0, s.c]; w.b = [s.u1, s.c]; } else { w.a = [s.c, s.u0]; w.b = [s.c, s.u1]; }
   }
+  // openings that sat on a dropped wall go with it
+  const lostOps = new Set(dropped.flatMap(s => s.ops.map(q => q.o)));
   // openings: jambs go to the edges of the gap in the drawn wall
   for (const s of live) for (const q of s.ops) {
     stats.openings++;
@@ -134,44 +163,12 @@ function refineTrace(tr, P) {
     return [x, y];
   };
   for (const r of tr.rooms || []) if (Array.isArray(r?.poly) && r.poly.every(numOk)) { r.poly = r.poly.map(snapPt); stats.rooms++; }
-  tr.walls = walls; tr.openings = ops; tr._px = { style, tMed };
-  return { tr, stats, hints: planHints(P, live, style, tMed) };
-}
-
-// Things the pixels show that the tracing doesn't explain; handed to Claude's second look.
-function planHints(P, S, style, tMed) {
-  const out = [];
-  // gaps in a drawn wall that no door or window accounts for
-  for (const s of S) {
-    if (!s.band || s.band.kind === 'line') continue;
-    let st = null; const cover = s.ops.map(q => [q.s0 - 3, q.s1 + 3]);
-    for (let u = Math.round(s.u0 + s.t); u <= s.u1 - s.t + 1; u++) {
-      const gap = u <= s.u1 - s.t && fillAt(P, s, u) < .3 && !cover.some(([a, b]) => u >= a && u <= b);
-      if (gap && st === null) st = u;
-      if (!gap && st !== null) { if (u - st >= tMed * 2.5) { const a = s.ax === 'h' ? [st, s.c] : [s.c, st], b = s.ax === 'h' ? [u, s.c] : [s.c, u]; out.push(`a gap in the wall from (${a.map(Math.round)}) to (${b.map(Math.round)}) has no door, window or opening`); } st = null; }
-    }
-  }
-  // thick wall-like ink that no traced wall covers (solid-wall drawings only)
-  if (style === 'filled' && tMed >= 4) {
-    const { W, H, ink } = P, k = Math.max(3, Math.round(tMed * .6)), solid = new Uint8Array(W * H);
-    const runH = new Uint16Array(W * H), runV = new Uint16Array(W * H);
-    for (let y = 0; y < H; y++) { let x = 0; while (x < W) { if (!ink[y * W + x]) { x++; continue; } let e = x; while (e < W && ink[y * W + e]) e++; for (let i = x; i < e; i++) runH[y * W + i] = e - x; x = e; } }
-    for (let x = 0; x < W; x++) { let y = 0; while (y < H) { if (!ink[y * W + x]) { y++; continue; } let e = y; while (e < H && ink[e * W + x]) e++; for (let i = y; i < e; i++) runV[i * W + x] = e - y; y = e; } }
-    for (let i = 0; i < W * H; i++) solid[i] = runH[i] >= k && runV[i] >= k ? 1 : 0;
-    for (const s of S) { const pad = s.t / 2 + 3; const [x0, x1, y0, y1] = s.ax === 'h' ? [s.u0 - pad, s.u1 + pad, s.c - pad, s.c + pad] : [s.c - pad, s.c + pad, s.u0 - pad, s.u1 + pad];
-      for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(H - 1, y1); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(W - 1, x1); x++) solid[y * W + x] = 0; }
-    const seen = new Uint8Array(W * H), blobs = [];
-    for (let i = 0; i < W * H; i++) {
-      if (!solid[i] || seen[i]) continue;
-      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, n = 0; const st = [i]; seen[i] = 1;
-      while (st.length) { const j = st.pop(), x = j % W, y = (j / W) | 0; n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-        for (const q of [j - 1, j + 1, j - W, j + W]) if (q >= 0 && q < W * H && solid[q] && !seen[q] && Math.abs((q % W) - x) <= 1) { seen[q] = 1; st.push(q); } }
-      const L = Math.max(x1 - x0, y1 - y0), Tn = Math.min(x1 - x0, y1 - y0) + 1;
-      if (L >= tMed * 3 && n >= tMed * tMed * 3 && Tn <= tMed * 2.5) blobs.push([x0, y0, x1, y1]);
-    }
-    blobs.slice(0, 12).forEach(b => out.push(`wall-like solid ink from (${b[0]},${b[1]}) to (${b[2]},${b[3]}) is not covered by any traced wall`));
-  }
-  return out.slice(0, 30);
+  const deadWalls = new Set(dropped.map(s => s.w));
+  tr.walls = walls.filter(w => !deadWalls.has(w)); tr.openings = [...ops.filter(o => !lostOps.has(o)), ...added]; tr._px = { style, tMed };
+  const R = p => p.map(Math.round);
+  const hints = dropped.map(s => `the traced wall from (${R(s.w.a)}) to (${R(s.w.b)}) has no wall drawn under it on the plan, so it was removed`)
+    .concat(added.map(o => `nothing is drawn across the wall from (${R(o.a)}) to (${R(o.b)}); it is now an ${o.type} (no door or window was traced there)`));
+  return { tr, stats, hints: hints.slice(0, 30) };
 }
 
 /* ---------- printed sizes: one scale for the drawing, then walls nudged so every room measures what it says ---------- */
@@ -282,8 +279,8 @@ Image 1 is the floor plan (${W}×${Hh} pixels). Image 2 is the same plan, faded,
 
 The current tracing (pixel coordinates, origin top-left, y down):
 ${JSON.stringify(compactTrace(tr))}
-${hints.length ? '\nThe pixel analysis found things the tracing may be missing (check each one against the plan; ignore any that are furniture, text, hatching or dimension lines):\n- ' + hints.join('\n- ') + '\n' : ''}
-Go over the plan methodically, room by room and wall by wall, and compare it with the overlay. Look for: walls that are missing, extra, too long or short, or in the wrong place; doors, windows and openings that are missing, misplaced, the wrong width or the wrong type; rooms that are missing, merged, mis-shaped, misnamed or of the wrong type; printed room sizes that were misread (re-read every number); door swings (hinge jamb and the room the leaf opens into); and furniture or fixtures drawn on the plan that are missing.
+${hints.length ? '\nThe pixel analysis of the drawing already corrected these (the drawing is the authority: do not put a removed wall back unless you can clearly see a wall drawn there; for each new opening decide whether it is a door, a window, a sliding door or an open doorway and give it that type):\n- ' + hints.join('\n- ') + '\n' : ''}
+Go over the plan methodically, room by room and wall by wall, and compare it with the overlay. Never add a wall where the plan shows no drawn wall: furniture, kitchen counters, wardrobes, railings, steps, floor patterns, text boxes and dimension lines are not walls, and an open-plan boundary between two rooms (for example living to dining or kitchen) with no wall drawn stays open. Every room must have its door or opening; a doorway drawn as a gap in a wall must never be closed. Look for: walls that are missing, extra, too long or short, or in the wrong place; doors, windows and openings that are missing, misplaced, the wrong width or the wrong type; rooms that are missing, merged, mis-shaped, misnamed or of the wrong type; printed room sizes that were misread (re-read every number); door swings (hinge jamb and the room the leaf opens into); and furniture or fixtures drawn on the plan that are missing.
 
 Reply with only the complete corrected tracing as one JSON object in exactly the same shape as above (every key, every item, including the ones that were already right). Keep correct coordinates unchanged. Add "changes": a short list of what you fixed.`;
 const compactTrace = tr => {

@@ -28,7 +28,8 @@ async function readPlan() {
     if (SITE) SITE.ctx = { kind: 'plan_read', homeId: project.id };
     const [first, P] = await Promise.all([ok.sample.json(PLAN_PROMPT(PW, PH, project.brief), { images: planBlob(), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop), planInk(project.plan.image)]);
     let tr = first; const r1 = refineTrace(tr, P);
-    stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms; ${r1.stats.snapped} walls matched to the drawing`);
+    const fixed1 = [r1.stats.dropped ? `${r1.stats.dropped} traced wall${r1.stats.dropped > 1 ? 's' : ''} not on the drawing removed` : '', r1.stats.added ? `${r1.stats.added} undrawn gap${r1.stats.added > 1 ? 's' : ''} opened` : ''].filter(Boolean).join(', ');
+    stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms; ${r1.stats.snapped} walls matched to the drawing${fixed1 ? '; ' + fixed1 : ''}`);
     // second look: Claude compares its tracing, drawn over the plan, with the plan itself
     stepSet('check', 'active');
     try {
@@ -39,7 +40,7 @@ async function readPlan() {
       const nw = (fixed?.walls || []).filter(w => numOk(w?.a) && numOk(w?.b)).length;
       if (nw >= Math.max(3, (tr.walls || []).length * .6) && (fixed.rooms || []).length) {
         const ch = (Array.isArray(fixed.changes) ? fixed.changes : []).map(String); delete fixed.changes;
-        tr = fixed; refineTrace(tr, P);
+        tr = fixed; const r2_ = refineTrace(tr, P); if (r2_.stats.dropped || r2_.stats.added) ch.push(`${r2_.stats.dropped} walls not on the drawing removed and ${r2_.stats.added} gaps opened after the check`);
         stepSet('check', 'done', ch.length ? `${ch.length} fix${ch.length > 1 ? 'es' : ''}: ${ch.slice(0, 3).join('; ')}` : 'The tracing matches the drawing');
       } else stepSet('check', 'done', 'Kept the first reading');
     } catch (e) { if (e?.code === 'cancelled') throw e; stepSet('check', 'error', errText(e) + ' Kept the first reading.'); }
