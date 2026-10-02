@@ -40,19 +40,20 @@ async function guestUser(secret) {
     // The database ties every row to an auth user, so the guest gets one. Works whether or not the auth server honours our id.
     const base = env('SUPABASE_URL').replace(/\/$/, ''), key = env('SUPABASE_SERVICE_ROLE_KEY');
     const hdr = { apikey: key, authorization: 'Bearer ' + key, 'content-type': 'application/json' };
-    const email = `guest-${h.slice(0, 24)}@guest.mirage.invalid`;
+    // No mail is ever sent to these addresses (they are created already confirmed). The second form is only tried if the
+    // auth server refuses the first for not being a deliverable domain.
+    const emails = [`guest-${h.slice(0, 24)}@guest.mirage.invalid`, `mirage.guest.${h.slice(0, 24)}@gmail.com`];
     try {
       if ((await fetch(`${base}/auth/v1/admin/users/${derived}`, { headers: hdr })).ok) id = derived;
-      if (!id) {
+      for (const email of emails) {
+        if (id) break;
         const r = await fetch(base + '/auth/v1/admin/users', { method: 'POST', headers: hdr, body: JSON.stringify({ id: derived, email, email_confirm: true, user_metadata: { guest: true } }) });
         const j = await r.json().catch(() => null);
-        if (r.ok && j?.id) id = j.id;
-        else {
-          const q = await fetch(`${base}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&per_page=5`, { headers: hdr });
-          const list = await q.json().catch(() => null);
-          id = (list?.users || []).find(u => u.email === email)?.id || null;
-          if (!id) console.error('guest account', r.status, JSON.stringify(j || {}).slice(0, 300));
-        }
+        if (r.ok && j?.id) { id = j.id; break; }
+        const q = await fetch(`${base}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&per_page=5`, { headers: hdr });
+        const list = await q.json().catch(() => null);
+        id = (list?.users || []).find(u => u.email === email)?.id || null;
+        if (!id) console.error('guest account', email.split('@')[1], r.status, JSON.stringify(j || {}).slice(0, 300));
       }
     } catch (e) { console.error('guest account', e); }
     if (!id) throw new HttpError(401, 'guest_unavailable', 'Guest access is not available right now. Sign in to continue.');
