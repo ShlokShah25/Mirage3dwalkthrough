@@ -26,15 +26,17 @@ export function extractJSON(text) {
 }
 
 // onDelta(text) is called for each chunk. Resolves { text, usage, stop }.
-export async function streamClaude({ model, prompt, images = [], maxTokens = 12000, onDelta, signal, think = false }) {
+// Current models (Opus 4.6+, Sonnet 4.6+) think adaptively and take an effort level; Haiku 4.5 and older models take neither.
+const adaptive = m => !/haiku|claude-(?:3|opus-4-[015]|sonnet-4-[05]|opus-4-2|sonnet-4-2)/.test(m || '');
+export async function streamClaude({ model, prompt, images = [], maxTokens = 16000, onDelta, signal, effort }) {
   const base = env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com').replace(/\/$/, '');
   const r = await fetch(base + '/v1/messages', {
     method: 'POST', signal,
     headers: { 'x-api-key': env('ANTHROPIC_API_KEY', ''), 'anthropic-version': '2023-06-01', 'content-type': 'application/json', ...(env('ANTHROPIC_WORKSPACE_ID') ? { 'anthropic-workspace-id': env('ANTHROPIC_WORKSPACE_ID') } : {}) },
     body: JSON.stringify({
       model, max_tokens: maxTokens, stream: true, system: SYSTEM,
-      // Newer models think by default and can spend the whole budget before writing any JSON; design calls turn it off.
-      ...(think ? {} : { thinking: { type: 'disabled' } }),
+      // Reading plans and placing furniture need real reasoning: think first, then answer. Effort sets how hard.
+      ...(adaptive(model) ? { thinking: { type: 'adaptive' }, output_config: { effort: effort || 'medium' } } : {}),
       messages: [{ role: 'user', content: [...images.map(imageBlock), { type: 'text', text: prompt }] }],
     }),
   });

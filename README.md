@@ -23,6 +23,16 @@ scripts/           local server and tests (not deployed)
 
 No npm packages are needed. Everything uses the built-in `fetch` and `crypto` in Node 20+.
 
+## How a plan becomes a home
+
+1. **Read** (`app-src/p3b_trace.js`): Claude traces walls, doors (with hinge and swing), windows, rooms, printed sizes, dimension lines and any furniture drawn on the plan, in image pixels. Plans are uploaded at up to 2560 px so small printed sizes stay legible.
+2. **Snap** (`app-src/p3g_planfix.js`): every traced wall is moved onto the wall actually drawn in the image (solid or double-line walls), its thickness measured, its ends joined to the walls it meets, and every door and window jamb moved to the edge of its gap.
+3. **Check**: the snapped tracing is drawn over the plan and Claude compares the two, with a list of wall-like ink and unexplained gaps the pixels found, and returns a corrected tracing, which is snapped again.
+4. **Fit to the printed sizes**: the scale comes from the printed room sizes (interior or centreline, whichever the plan uses), then a least-squares fit moves each wall line so every fully walled room measures what the plan says. Rooms whose drawing and printed size still disagree are flagged.
+5. **Furnish** (`app-src/p3i_furnish.js`): each room is described in its own frame: labelled walls, solid stretches, doors and where they lead and swing, windows and sills, keep-clear zones, and the architect's drawn furniture. Claude places each piece against a wall (`wall`, `along`, `off`), next to or on another piece, or at a room coordinate, and the code turns that into exact positions, builds chair, nightstand and stool groups, checks every piece against doors, windows, walls and other pieces, fixes what it can, and sends anything left back to Claude once.
+
+Plan reading and furnishing run on `MODEL_COMPLEX` / `MODEL_DESIGN` (Opus by default) with adaptive thinking. A designed home costs more in Claude usage than before (roughly 2 to 3 times), in exchange for layouts that follow the plan.
+
 ## Pricing and limits
 
 All set in `api/_lib/env.js` (server) and shown by the app from `/api/config`:
@@ -41,7 +51,7 @@ Loophole guards, all enforced on the server:
 - A Home Pass is locked to the floor plan image it was designed with. A different plan needs a new home.
 - Designs and changes that place nothing are refunded automatically.
 - Pro allowances reset each billing cycle and don't roll over. After a subscription ends, Pro homes become view-only.
-- A design run can make at most 32 Claude calls. A change can trigger at most 4 room redos.
+- A design run can make at most 80 Claude calls (one per room, plus one fix pass per room, plus style reads). A change can trigger at most 10 follow-up calls (about 5 room redos, each with its fix pass).
 - Every Claude call is logged in the `usage` table with token counts, so you can see cost per user.
 
 ## Go live: step by step

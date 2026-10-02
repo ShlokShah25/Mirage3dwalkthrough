@@ -2890,9 +2890,9 @@ $('openFile').addEventListener('change', async e => {
 
 /* ================= uploads ================= */
 function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That image could not be read.')); i.src = src; }); }
-async function prepImage(file, maxPx, q = .9) {
+async function prepImage(file, maxPx, q = .9, maxEdge = 1e9) {
   const url = URL.createObjectURL(file); try {
-    const im = await loadImg(url); const k = Math.min(1, Math.sqrt(maxPx / (im.naturalWidth * im.naturalHeight)));
+    const im = await loadImg(url); const k = Math.min(1, Math.sqrt(maxPx / (im.naturalWidth * im.naturalHeight)), maxEdge / Math.max(im.naturalWidth, im.naturalHeight));
     const w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k), c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h);
     return { image: c.toDataURL('image/jpeg', q), w, h };
@@ -2950,7 +2950,7 @@ function renderGenState() {
 }
 async function takePlan(file) {
   if (!file || !file.type.startsWith('image/')) { flash('Please choose an image file (PNG, JPG or WebP).', true); return; }
-  try { const r = await prepImage(file, 1.15e6); project.plan = { ...r, s: null, ox: 0, oy: 0 }; project.trace = null; if (!project.cover || !layout.walls.length) project.cover = r.image; renderUploads(); pv.fitted = false; saveSoon(); }
+  try { const r = await prepImage(file, 3.6e6, .92, 2560); project.plan = { ...r, s: null, ox: 0, oy: 0 }; project.trace = null; if (!project.cover || !layout.walls.length) project.cover = r.image; renderUploads(); pv.fitted = false; saveSoon(); }
   catch (e) { flash(e.message, true); }
 }
 async function takeInspo(files) {
@@ -2990,29 +2990,34 @@ function stepUI(list) { $('progress').innerHTML = list.map(s => `<li id="st-${s.
 function stepSet(id, state, note) { const li = $('st-' + id); if (!li) return; if (state) li.className = state; if (note != null) li.querySelector('small').textContent = note; }
 function ticker(id, verb) { const t0 = performance.now(); let chars = 0; const iv = setInterval(() => stepSet(id, null, `${verb}… ${Math.round((performance.now() - t0) / 1000)}s${chars ? ' · ' + (chars / 1000).toFixed(1) + 'k characters' : ''}`), 1000); return { onText: ({ text }) => { chars = text.length; }, stop: () => clearInterval(iv) }; }
 
-const PLAN_PROMPT = (W, Hh, brief) => `You are an architectural draftsperson converting a residential floor-plan image into vector data for a 3D model.
-The image is ${W}×${Hh} pixels. Use pixel coordinates: origin at the top-left corner, x to the right, y downward. Measure against the drawn lines; aim for ±3 px.
+const PLAN_PROMPT = (W, Hh, brief) => `You are an architectural draftsperson converting a residential floor-plan image into exact vector data for a 3D model. The model is built from your tracing, so every wall, door, window and room must be where the drawing puts it.
+The image is ${W}×${Hh} pixels and you see it at full resolution. Use pixel coordinates: origin at the top-left corner, x to the right, y downward. Read coordinates off the drawn lines themselves; aim for ±2 px.
 
 Reply with only one JSON object of this shape:
 {
  "units": "ft" or "m",
- "labels": [ {"room": "Master Bedroom", "dims": [13.08, 14.0], "bbox": [x0, y0, x1, y1]} ],
+ "labels": [ {"room": "Master Bedroom", "dims": [13.08, 14.0], "pos": [x, y], "bbox": [x0, y0, x1, y1]} ],
+ "dimLines": [ {"a": [x, y], "b": [x, y], "value": 30.5} ],
  "walls": [ {"a": [x, y], "b": [x, y], "t": thickness_px, "ext": true} ],
- "openings": [ {"type": "door", "a": [x, y], "b": [x, y]} ],
+ "openings": [ {"type": "door", "a": [x, y], "b": [x, y], "hinge": "a", "into": [x, y]} ],
  "rooms": [ {"name": "Living / Dining", "type": "living", "poly": [[x, y], ...]} ],
+ "fixtures": [ {"room": "Master Bedroom", "kind": "bed", "bbox": [x0, y0, x1, y1], "facing": "down"} ],
  "entrance": [x, y],
  "north": 0,
  "notes": "one short sentence on anything uncertain"
 }
 
+Work in this order: (1) read every printed room name and size; (2) trace the exterior walls all the way round; (3) trace every interior wall; (4) mark every door, sliding door, window and open archway on its wall; (5) outline every room; (6) list the furniture and fixtures drawn inside the rooms.
+
 Rules:
-- labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08; metres stay metres). bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
-- walls: every wall as a straight centreline segment. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments.
-- openings: a and b are the two jambs, on the wall centreline. type is "door" (hinged, usually with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill) or "opening" (a gap with no door).
-- rooms: every enclosed space, including toilets, balconies, terraces and utility areas; skip ducts and shafts. poly follows the wall centrelines. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room.
+- labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08, 10'6" becomes 10.5; metres stay metres; 4200 x 3600 mm becomes 4.2 and 3.6 with units "m"). Read each number carefully, digit by digit. pos is the centre of the room's name text. bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
+- dimLines: every dimension line that has a printed length (usually outside the walls, with ticks or arrows at its ends). a and b are its two end ticks; value is the printed length as a decimal in the plan's units. Use [] if there are none.
+- walls: every wall as a straight centreline segment, running down the middle of the drawn wall. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates: an L corner or T junction ends on the other wall's centreline. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments. Do not trace furniture, kitchen counters, wardrobes, hatching, text or dimension lines as walls.
+- openings: a and b are the two jambs (the ends of the gap in the wall), on the wall centreline. type is "door" (hinged, usually drawn with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill, usually drawn as thin parallel lines across the wall) or "opening" (a gap or arch with no door). For doors: hinge is "a" or "b", the jamb the leaf is hinged on (where the swing arc is centred); into is a point about one door-width inside the room the leaf swings into (inside the arc).
+- rooms: every enclosed space, including toilets, balconies, terraces, utility areas and passages; skip ducts and shafts. poly follows the wall centrelines around the room, corner by corner. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room. Use the printed names.
+- fixtures: furniture and fixtures drawn on the plan: kind is one of bed, sofa, sectional, armchair, coffee-table, dining-table, tv-unit, wardrobe, dresser, desk, bookshelf, kitchen-counter, sink, hob, fridge, island, wc, basin, vanity, shower, bathtub, washing-machine, pooja, plant, other. bbox is its footprint in pixels. facing is the side its front faces on the image: "up", "down", "left" or "right" (a bed's front is its foot end; a sofa's front is the seat side; a counter's front is the side you stand at). Use [] if the plan shows no furniture.
 - entrance: the main entrance door position, or null.
 - north: if the drawing has a north arrow or compass, the direction it points as degrees clockwise from straight up on the image (0 = up, 90 = right, 180 = down, 270 = left); otherwise null.
-- Ignore furniture drawings, hatching, text and dimension lines except to identify rooms.
 ${brief ? 'Homeowner notes (for context only): ' + brief.slice(0, 600) : ''}`;
 
 const STYLE_PROMPT = (brief, room) => `You are an interior designer. The image shows design inspiration (a mood board or photos) for ${room ? `one room of a home: the ${room.name} (a ${room.type}). Focus on what applies to that room, and fill the floors entry for its type` : 'a home'}. Extract a material and colour palette that a 3D renderer can apply to every room.
@@ -3091,6 +3096,8 @@ function fmtFtIn(v) { const ft = Math.floor(v + 1e-6), inch = Math.round((v - ft
 const numOk = v => Array.isArray(v) && v.length >= 2 && isFinite(+v[0]) && isFinite(+v[1]);
 function deriveScale(tr, W, Hh) {
   const unitK = tr.units === 'm' ? 3.28084 : 1, cands = [];
+  const dl = (tr.dimLines || []).filter(d => numOk(d?.a) && numOk(d?.b) && +d.value > 0).map(d => +d.value * unitK / Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1])).filter(v => isFinite(v) && v > 0);
+  if (dl.length >= 2) { dl.sort((a, b) => a - b); const med = dl[dl.length >> 1], good = dl.filter(c => Math.abs(c / med - 1) < .06); if (good.length >= 2) return { s: good.reduce((a, b) => a + b, 0) / good.length, method: `Scale set from ${good.length} printed dimension lines.`, sure: true }; }
   for (const l of tr.labels || []) {
     const d = (l.dims || []).map(Number).filter(v => v > 0), b = l.bbox; if (d.length < 2 || !Array.isArray(b) || b.length < 4) continue;
     const wp = Math.abs(b[2] - b[0]), hp = Math.abs(b[3] - b[1]); if (wp < 8 || hp < 8) continue;
@@ -3133,7 +3140,7 @@ function cleanWalls(walls, tol = .8) {
 const PRESET = { door: { type: 'door', sill: 0, head: 7 }, slider: { type: 'slider', sill: 0, head: 8 }, window: { type: 'window', sill: 2.5, head: 7 }, opening: { type: 'opening', sill: 0, head: 7.5 } };
 function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || polyArea(r.polygon) < polyArea(best.polygon)) best = r; } return best; }
 function traceToLayout(tr, W, Hh, opt) {
-  const warns = []; const sc = deriveScale(tr, W, Hh), s = sc.s;
+  const warns = []; const sc = opt.scale || deriveScale(tr, W, Hh), s = sc.s;
   if (!sc.sure) warns.push(sc.method);
   const P = p => [r2(+p[0] * s), r2(+p[1] * s)];
   let walls = (tr.walls || []).filter(w => numOk(w?.a) && numOk(w?.b)).map(w => ({ a: P(w.a), b: P(w.b), thickness: r2(clamp((+w.t || 8) * s, .3, 2.2)), kind: w.ext ? 'ext' : 'int', openings: [] }));
@@ -3160,7 +3167,13 @@ function traceToLayout(tr, W, Hh, opt) {
     const type = PRESET[o.type] ? o.type : 'door', min = { door: 2.4, slider: 3, window: 1.5, opening: 2.5 }[type];
     if (en - st < min) { const c = (st + en) / 2; st = c - min / 2; en = c + min / 2; }
     st = clamp(st, .1, L - .1); en = clamp(en, st + .5, L - .1); if (en - st < .8) { dropped++; continue; }
-    best.openings.push({ ...PRESET[type], start: r2(st), end: r2(en) });
+    const op = { ...PRESET[type], start: r2(st), end: r2(en) };
+    if (type === 'door') {
+      const sa = (a[0] - best.a[0]) * ux + (a[1] - best.a[1]) * uz, sb = (b[0] - best.a[0]) * ux + (b[1] - best.a[1]) * uz;
+      if (o.hinge === 'a' || o.hinge === 'b') op._hinge = (o.hinge === 'a' ? sa <= sb : sb < sa) ? 'start' : 'end';
+      if (numOk(o.into)) { const q = P(o.into); op._into = q; }
+    }
+    best.openings.push(op);
   }
   if (dropped) warns.push(`${dropped} door or window mark${dropped > 1 ? 's' : ''} could not be matched to a wall. Add them in Plan check if they matter.`);
   for (const w of walls) {
@@ -3178,13 +3191,18 @@ function traceToLayout(tr, W, Hh, opt) {
       const rp = roomAtIn(rooms, cx + nx * off, cz + nz * off), rm = roomAtIn(rooms, cx - nx * off, cz - nz * off);
       if (o.type === 'window' && o.end - o.start < 3 && [rp, rm].some(r => r?.type === 'bath')) { o.sill = 5.5; o.head = 7; }
       if (o.type !== 'door') continue;
-      const side = prio(rp) >= prio(rm) ? 1 : -1, tgt = side > 0 ? rp : rm;
-      o.name = (tgt ? tgt.name + ' door' : 'Door'); o.swing = { hinge: 'start', side, open: 90 };
+      // the drawn swing wins; otherwise the door opens into the more private room
+      let side = prio(rp) >= prio(rm) ? 1 : -1;
+      if (o._into) { const d = (o._into[0] - cx) * nx + (o._into[1] - cz) * nz; if (Math.abs(d) > .2) side = d > 0 ? 1 : -1; }
+      const tgt = side > 0 ? rp : rm;
+      o.name = (tgt ? tgt.name + ' door' : 'Door'); o.swing = { hinge: o._hinge || 'start', side, open: 90 };
+      delete o._hinge; delete o._into;
       const outside = !rp || !rm; const d = entrance ? Math.hypot(cx - entrance[0], cz - entrance[1]) : outside ? 0 : 1e8;
       if ((outside || entrance) && d < mainD) { mainD = d; main = { o, cx, cz, nx: rp ? nx : -nx, nz: rp ? nz : -nz }; }
     }
   }
-  if (main) { main.o.name = 'Main door'; main.o.swing = { hinge: 'start', side: 1, open: 0 }; }
+  for (const w of walls) for (const o of w.openings) { delete o._hinge; delete o._into; }
+  if (main) { main.o.name = 'Main door'; main.o.swing = { ...main.o.swing, open: 0 }; }
   // railings on open outdoor edges
   const railings = [];
   for (const r of rooms.filter(r => r.kind === 'outdoor')) {
@@ -3197,7 +3215,13 @@ function traceToLayout(tr, W, Hh, opt) {
   }
   const st = opt.style, settings = baseSettings(opt.ceiling, opt.view, st);
   if (tr.north !== null && tr.north !== undefined && tr.north !== '' && isFinite(+tr.north)) settings.north = (Math.round(+tr.north / 45) * 45 % 360 + 360) % 360;
-  const L = { name: opt.name, units: 'feet', settings, walls, rooms, railings, furniture: [] };
+  const FACE = { down: 0, right: 90, up: 180, left: -90 };
+  const planFurniture = (tr.fixtures || []).filter(f => Array.isArray(f?.bbox) && f.bbox.length >= 4 && f.bbox.every(v => isFinite(+v))).map(f => {
+    const a = P([Math.min(f.bbox[0], f.bbox[2]), Math.min(f.bbox[1], f.bbox[3])]), b = P([Math.max(f.bbox[0], f.bbox[2]), Math.max(f.bbox[1], f.bbox[3])]), c = [r2((a[0] + b[0]) / 2), r2((a[1] + b[1]) / 2)];
+    const r = roomAtIn(rooms, c[0], c[1]); if (!r) return null;
+    return { room: r.name, kind: String(f.kind || 'other').slice(0, 24), x0: a[0], z0: a[1], x1: b[0], z1: b[1], ...(f.facing in FACE ? { rot: FACE[f.facing] } : {}) };
+  }).filter(f => f && (f.x1 - f.x0) > .3 && (f.z1 - f.z0) > .3);
+  const L = { name: opt.name, units: 'feet', settings, walls, rooms, railings, furniture: [], planFurniture };
   applyStyleToRooms(L, st);
   const big = [...rooms].filter(r => r.kind === 'room').sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
   if (main) L.spawn = { position: [r2(main.cx + main.nx * 3), r2(main.cz + main.nz * 3)], lookAt: big ? centroid(big.polygon) : [main.cx + main.nx * 10, main.cz + main.nz * 10] };
@@ -3211,68 +3235,6 @@ function traceToLayout(tr, W, Hh, opt) {
 /* ================= furnishing ================= */
 const BACKED = new Set(['bed', 'sofa', 'wardrobe', 'console', 'desk', 'vanity', 'kitchen-counter', 'tall-unit', 'bookshelf', 'wc', 'panel-slats', 'panel-stone', 'panel-upholstered', 'tv', 'artwork', 'mirror', 'curtain', 'tv-wall', 'bed-luxe', 'sideboard-fluted', 'arch-niche', 'bar-unit', 'pooja-unit', 'sconce', 'wall-molding', 'kitchen-luxe', 'vanity-luxe', 'wall-panel-wood', 'feature-stone', 'kitchen-tall-luxe', 'shower-luxe', 'closet-lit', 'media-wall']);
 const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
-function roomFaces(r) {
-  const out = [], n = r.polygon.length;
-  for (let i = 0; i < n; i++) {
-    const a = r.polygon[i], b = r.polygon[(i + 1) % n], ex = b[0] - a[0], ez = b[1] - a[1], el = Math.hypot(ex, ez); if (el < .5) continue;
-    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-    for (const w of layout.walls) {
-      const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
-      if (Math.abs(ux * ex / el + uz * ez / el) < .95 || segDist(mx, mz, w.a, w.b) > .8) continue;
-      let s0 = (a[0] - w.a[0]) * ux + (a[1] - w.a[1]) * uz, s1 = (b[0] - w.a[0]) * ux + (b[1] - w.a[1]) * uz; if (s0 > s1) [s0, s1] = [s1, s0];
-      s0 = Math.max(s0, 0); s1 = Math.min(s1, L); if (s1 - s0 < .5) continue;
-      let nx = -uz, nz = ux; const t2 = w.thickness / 2; if (!pip([w.a[0] + ux * (s0 + s1) / 2 + nx * (t2 + .3), w.a[1] + uz * (s0 + s1) / 2 + nz * (t2 + .3)], r.polygon)) { nx = -nx; nz = -nz; }
-      const P = s => [w.a[0] + ux * s + nx * t2, w.a[1] + uz * s + nz * t2];
-      const ops = (w.openings || []).filter(o => o.end > s0 && o.start < s1).map(o => { const p = P(Math.max(o.start, s0)), q = P(Math.min(o.end, s1)); return `${o.type}${o.type === 'window' ? ' (sill ' + o.sill + ')' : ''} from (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])})`; });
-      const p = P(s0), q = P(s1);
-      out.push(`  - ${hasNorth() ? `the room's ${DIRNAME[dirOf(bearingOf(-nx, -nz))]} wall: ` : ''}wall face (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])}), facing into the room along (${f1(nx)},${f1(nz)})${ops.length ? '; openings: ' + ops.join('; ') : ''}`);
-    }
-  }
-  return [...new Set(out)];
-}
-function furnishPrompt(rooms, extra = '') {
-  const st = project.style, cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
-  const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', '), FR = hasNorth() ? homeFrame() : null, BRIEF = briefForFurnish();
-  const blocks = rooms.map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `ROOM "${r.name}" — type ${r.type}${r.size ? ', printed size ' + r.size : ''}, ${hasNorth() ? 'in the ' + DIRNAME[roomZone(r, FR)] + ' of the home, ' : ''}${r.kind === 'outdoor' ? 'outdoor, ' : ''}area ${Math.round(polyArea(r.polygon))} sq ft${project.roomStyles?.[r.name] ? `
-  ROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : ''}
-  floor polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}
-  bounds: x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))}
-${roomFaces(r).join('\n') || '  (no wall faces found; keep items inside the polygon)'}`; }).join('\n\n');
-  return `You are a senior interior designer at a luxury studio, designing a home that should look like it belongs in Architectural Digest, not a furniture catalogue. You place real pieces into a 3D model of the home. Units are feet. Plan coordinates: x increases to the right, z increases downward on the plan.
-
-STYLE: ${st.summary} Signature elements: ${(st.features || []).join(', ') || 'none given'}. Plants: ${st.plants}.
-FINISH TOKENS (use these so the style stays consistent): wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal. Also allowed: linen, linen-white, white-ceramic, black-metal, brass, felt, terracotta, concrete, plaster, teak, glass, glass-bronze, onyx, marble-green, marble-rosso, travertine-dark, velvet-emerald, velvet-rust, velvet-navy, velvet-blush, velvet-mustard, velvet-ink, or a "#rrggbb" hex (rugs and fabrics). Use one or two rich contrast materials per room (a velvet, a dark or veined stone, brass) against the calm base tokens.
-HOMEOWNER'S NOTES: ${(project.brief || 'none').slice(0, 1200)}${extra ? '\nREQUEST FOR THESE ROOMS (takes priority over the notes): ' + String(extra).slice(0, 600) : ''}
-CEILING HEIGHT: ${layout.settings.ceilingHeight} ft. The whole home has: ${others}.${BRIEF ? '\n' + BRIEF : ''}${FR ? '\nCOMPASS: ' + compassVecsText() : ''}
-
-ORIENTATION: rot is in degrees. An item's FRONT faces +z at rot 0, +x at rot 90, -z at rot 180, -x at rot -90. Its back is opposite its front. x,z is the item's centre. w is its width across the front, d its depth front-to-back, h its height, y its lift off the floor.
-Items listed as going against a wall (beds, sofas along walls, wardrobes, consoles, desks, vanities, counters, tall units, bookshelves, wc, TVs, mirrors, artwork, wall panels, curtains) must have their back touching the wall face: centre = point on the face + (d/2) along the face's inward direction, and rot chosen so the front faces into the room.
-
-CATALOG (type: default w×d×h — notes):
-${cat}
-
-${blocks}
-
-EVENING LUXE vocabulary (use generously in premium styles): wall-panel-wood (walnut with LED reveals) on the focal wall of bedrooms, dining and passages; feature-stone; media-wall; sectional + coffee-nest + lounge-leather; table-dining-long + dining-chair-luxe + pendant-linear or pendant-globes; bed-luxe with panel:"walnut"; plant-tree (big leafy trees) by the glass.
-
-DESIGN FIRST: before placing anything, decide for each room (silently) a one-line concept, its FOCAL WALL (the wall you face on entering, or the wall behind the bed/sofa), its hero piece, and its material story. Rooms must not repeat each other: vary the feature treatment, the rug, the accent colour and the lighting piece from room to room.
-
-RULES:
-- PREMIUM, NOT BASIC. Every living, dining and bedroom gets: (1) a feature wall treatment on its focal wall (tv-wall, panel-stone, panel-slats, panel-upholstered, wall-molding, or arch-niche, or bed-luxe whose headboard wall is the feature); (2) a ceiling-cove false ceiling; (3) at least three layers of light: a statement piece (chandelier, pendant-drum or pendants), a floor or table lamp, and sconces or LED; (4) one hero piece (sculptural coffee-plinth, lounge-chair, accent-barrel pair, bar-unit, jhoola, sideboard-fluted); (5) styling: decor-set clusters on consoles and sideboards, a floor-vase or large plant in a corner, artwork.
-- Prefer the premium types over their plain versions: bed-luxe over bed in master and guest bedrooms (no nightstands with it), tv-wall in the living room instead of a bare tv, coffee-plinth over a plain coffee table, sideboard-fluted over a plain console in dining.
-- If the style is Indian or the notes mention it, add Indian touches that feel luxe: a pooja-unit in a quiet corner of living/dining/foyer, brass accents, a jhoola on the balcony or living corner, jaali or wall-molding details.
-- Balconies: an outdoor lounge moment (lounge-chair or jhoola, planters, a floor-vase, a small table).
-- Furnish every room above fully for its type and the style: key furniture, rugs (layered, generous: the front legs of the seating sit on the rug), plants, art on walls, sheer curtains beside windows and sliders.
-- Every item stays fully inside its own room's polygon, clear of walls and of other items (rugs may sit under furniture; lamps and vases on tables use y).
-- Leave a 3 ft clear zone in front of every door and slider, and a 2.5 ft path from each door to the main areas. Do not block windows with tall items.
-- Bathrooms: vanity-luxe (brings its own lit mirror and stone wall), shower-luxe in a corner (or shower-glass across the shower zone), wc against a wall, a panel-stone or feature-stone on the remaining wall, a plant-pot; tub-freestanding only in a large master bath.
-- Kitchens: kitchen-luxe on the main wall (sink and hobAt offsets), kitchen-tall-luxe on a second wall when there is room, plain kitchen-counter for short runs, and an island-waterfall with bar stools and a pendant-linear above only if the kitchen or kitchen+foyer is at least 11 ft deep.
-- Walk-in closets and dressing rooms: closet-lit on every solid wall, a closet-island in the middle if 3 ft clear all round, a pouf-round, a pendant-globes or chandelier.
-- Lounges and dens: a media-wall, a sectional facing it, coffee-nest, lounge-leather, a plant-tree.
-- Pooja rooms: a pooja-unit centred on the east or west wall, a rug, sconces either side, a floor-vase; nothing else.
-- Honour the architect brief wherever it applies to these rooms.
-Reply with only JSON: {"items":[{"room":"<room name>","type":"<catalog type>","name":"<short label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token>","accent":"<token>"}]} — include any extra fields a type's note mentions.`;
-}
 function itemOBB(it) { const f = withDefaults(it), th = (it.rot || 0) * D2R; return { cx: it.x, cz: it.z, hx: f.w / 2, hz: f.d / 2, c: Math.cos(th), s: -Math.sin(th) }; }
 function sat(A, B) {
   const pr = (R, ax, az) => R.hx * Math.abs(R.c * ax + R.s * az) + R.hz * Math.abs(-R.s * ax + R.c * az);
@@ -3335,11 +3297,11 @@ function settleItems(raw, rooms) {
   for (const r of raw || []) {
     if (!r || !CAT[r.type]) continue;
     const def = CAT[r.type], it = { id: newId(), type: r.type, name: String(r.name || def.label).slice(0, 40), room: names.has(r.room) ? r.room : null };
-    for (const [k, v] of Object.entries(r)) if (!(k in it) && k !== 'id') it[k] = v;
+    for (const [k, v] of Object.entries(r)) if (!(k in it) && k !== 'id' && !k.startsWith('_')) it[k] = v;
     for (const k of ['x', 'z', 'rot', 'w', 'd', 'h', 'y']) { if (k in it) { const v = +it[k]; if (!isFinite(v) || (['w', 'd', 'h'].includes(k) && v <= 0)) delete it[k]; else it[k] = v; } }
     if (!isFinite(it.x) || !isFinite(it.z)) continue;
     const rm = roomAt(it.x, it.z); if (!rm) continue; it.room ||= rm.name;
-    if (BACKED.has(it.type)) snapBack(it);
+    if (BACKED.has(it.type) && !r._float) snapBack(it);   // pieces placed deliberately off a wall stay there
     out.push(it);
   }
   const solid = it => { const d = CAT[it.type]; return !d.nc && !WALLMOUNT.has(it.type) && !['rug', 'loft-platform', 'stair-curved'].includes(it.type) && (+withDefaults(it).y || 0) < 2; };
@@ -3359,6 +3321,634 @@ function settleItems(raw, rooms) {
   return out.filter(it => roomAt(it.x, it.z));
 }
 
+
+/* ================= plan accuracy: snap Claude's tracing to the drawn pixels, then to the printed sizes =================
+   Claude reads the plan (what is a wall, a door, a room); the pixels say exactly where each one is;
+   the printed room sizes say exactly how big each room is. All of this works in plan-image pixels,
+   before traceToLayout turns the tracing into feet. */
+
+async function planInk(src) {
+  const im = await loadImg(src), W = im.naturalWidth, H = im.naturalHeight;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0);
+  return inkFromRGBA(g.getImageData(0, 0, W, H).data, W, H);
+}
+// dark pixels = ink. The cut is Otsu's threshold on brightness, held in a sane range so grey hatching and pale text drop out.
+function inkFromRGBA(d, W, H) {
+  const n = W * H, lum = new Uint8Array(n), hist = new Float64Array(256);
+  for (let i = 0, j = 0; i < n; i++, j += 4) { const v = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000 | 0; lum[i] = v; hist[v]++; }
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let wB = 0, sB = 0, best = 0, T = 128;
+  for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; T = t; } }
+  T = clamp(T, 70, 165);
+  const ink = new Uint8Array(n); for (let i = 0; i < n; i++) ink[i] = lum[i] < T ? 1 : 0;
+  return { W, H, ink, T };
+}
+
+const axisOf = w => { const dx = Math.abs(w.b[0] - w.a[0]), dy = Math.abs(w.b[1] - w.a[1]); return dy <= dx * .08 ? 'h' : dx <= dy * .08 ? 'v' : null; };
+// u runs along the wall, v across it
+function inkUV(P, ax, u, v) { const x = ax === 'h' ? u : v, y = ax === 'h' ? v : u; if (x < 0 || y < 0 || x >= P.W || y >= P.H) return 0; return P.ink[(y | 0) * P.W + (x | 0)]; }
+const fillAt = (P, S, u) => { let k = 0; for (const v of S.rows) k += inkUV(P, S.ax, u, v); return k / S.rows.length; };
+const median = a => { const s = [...a].sort((p, q) => p - q); return s.length ? s[s.length >> 1] : 0; };
+
+// Where is this wall really drawn? Look across a window around Claude's line for bands of ink that run its length.
+function findWallBand(P, ax, u0, u1, c, t, skip, style) {
+  const len = u1 - u0, m = Math.min(len * .2, t * 1.5 + 4), R = Math.round(clamp(Math.max(8, t * 2.2, (P.W + P.H) * .006), 8, 60));
+  const us = []; for (let u = Math.round(u0 + m); u <= u1 - m; u++) if (!skip.some(([a, b]) => u >= a && u <= b)) us.push(u);
+  if (us.length < 6) return null;
+  const step = Math.max(1, Math.floor(us.length / 400)), cols = us.filter((_, i) => i % step === 0);
+  const v0 = Math.round(c - R), cov = [];
+  for (let v = v0; v <= c + R; v++) { let k = 0; for (const u of cols) k += inkUV(P, ax, u, v); cov.push(k / cols.length); }
+  const mx = Math.max(...cov); if (mx < .3) return null;
+  const th = Math.max(.45, mx * .6), bands = [];
+  cov.forEach((x, i) => { if (x >= th) { const b = bands[bands.length - 1]; if (b && b.hi === v0 + i - 1) b.hi++; else bands.push({ lo: v0 + i, hi: v0 + i }); } });
+  const cands = [];
+  for (const b of bands) {
+    const wdt = b.hi - b.lo + 1, rows = []; for (let v = b.lo; v <= b.hi; v++) rows.push(v);
+    cands.push({ c: (b.lo + b.hi + 1) / 2, t: wdt >= 3 ? wdt : t, rows, kind: wdt >= 3 ? 'filled' : 'line' });
+  }
+  for (let i = 0; i < bands.length; i++) for (let j = i + 1; j < bands.length; j++) {
+    const A = bands[i], B = bands[j], span = B.hi - A.lo + 1, wa = A.hi - A.lo + 1, wb = B.hi - B.lo + 1;
+    if (span > Math.max(3 * t, t + 12) || span < 4 || wa > Math.max(3, span * .35) || wb > Math.max(3, span * .35) || B.lo - A.hi < 2) continue;
+    const rows = []; for (let v = A.lo; v <= A.hi; v++) rows.push(v); for (let v = B.lo; v <= B.hi; v++) rows.push(v);
+    cands.push({ c: (A.lo + B.hi + 1) / 2, t: span, rows, kind: 'double' });
+  }
+  let best = null, bs = 1e9;
+  for (const k of cands) {
+    const d = Math.abs(k.c - c); if (d > R) continue;
+    const sc = d / R + .5 * Math.abs(Math.log(k.t / t)) + (k.kind === 'line' ? .6 : 0) + (style && k.kind !== style && k.kind !== 'line' ? .5 : 0);
+    if (sc < bs) { bs = sc; best = k; }
+  }
+  return best;
+}
+
+function refineTrace(tr, P) {
+  const stats = { walls: 0, snapped: 0, openings: 0, openSnapped: 0, rooms: 0, style: null, tMed: 0 };
+  const walls = (tr.walls || []).filter(w => numOk(w?.a) && numOk(w?.b));
+  const ops = (tr.openings || []).filter(o => numOk(o?.a) && numOk(o?.b));
+  // the frame each axis-aligned wall lives in
+  const S = walls.map(w => {
+    const ax = axisOf(w); if (!ax) return null;
+    const i = ax === 'h' ? 0 : 1, j = 1 - i, u0 = Math.min(w.a[i], w.b[i]), u1 = Math.max(w.a[i], w.b[i]);
+    return { w, ax, u0, u1, c: (w.a[j] + w.b[j]) / 2, c0: (w.a[j] + w.b[j]) / 2, t: clamp(+w.t || 8, 2, 80), ops: [] };
+  });
+  // openings belong to the nearest parallel wall
+  const proj = (s, p) => s.ax === 'h' ? [p[0], p[1]] : [p[1], p[0]];
+  const opWall = o => { const dx = Math.abs(o.b[0] - o.a[0]), dy = Math.abs(o.b[1] - o.a[1]), oax = dy <= dx ? 'h' : 'v'; let best = null, bd = 1e9; const m = [(o.a[0] + o.b[0]) / 2, (o.a[1] + o.b[1]) / 2];
+    for (const s of S) { if (!s || s.ax !== oax) continue; const [u, v] = proj(s, m), du = u < s.u0 ? s.u0 - u : u > s.u1 ? u - s.u1 : 0, d = Math.hypot(du, v - s.c); if (d < bd) { bd = d; best = s; } }
+    return best && bd < Math.max(best.t * 2, 14) ? best : null; };
+  for (const o of ops) { const s = opWall(o); if (!s) continue; const ua = proj(s, o.a)[0], ub = proj(s, o.b)[0]; s.ops.push({ o, s0: Math.min(ua, ub), s1: Math.max(ua, ub) }); }
+  // pass 1 finds the drawing style (solid fill vs two thin lines), pass 2 snaps with it
+  let style = null;
+  for (let pass = 0; pass < 2; pass++) {
+    const tally = { filled: 0, double: 0 };
+    for (const s of S) {
+      if (!s) continue; const b = findWallBand(P, s.ax, s.u0, s.u1, s.c0, s.t, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style);
+      s.band = b; if (b && b.kind !== 'line') tally[b.kind] += s.u1 - s.u0;
+    }
+    style = tally.filled >= tally.double ? 'filled' : 'double';
+  }
+  stats.style = style;
+  const tMed = median(S.filter(s => s?.band && s.band.kind !== 'line').map(s => s.band.t)) || median(S.filter(Boolean).map(s => s.t)) || 8; stats.tMed = tMed;
+  for (const s of S) {
+    if (!s) continue; stats.walls++;
+    if (s.band) { s.c = s.band.c; s.t = s.band.kind === 'line' ? Math.min(s.t, tMed) : s.band.t; s.rows = s.band.rows; stats.snapped++; }
+    else { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v < s.c + s.t / 2; v++) s.rows.push(v); }
+  }
+  // ends: meet the centreline of the wall they run into, or stop where the drawn wall stops
+  const live = S.filter(Boolean);
+  for (const s of live) for (const end of ['u0', 'u1']) {
+    const ue = s[end], tol = 6; let best = null, bd = 1e9;
+    for (const o of live) {
+      if (o === s || o.ax === s.ax) continue;
+      const d = Math.abs(ue - o.c); if (d > o.t / 2 + s.t + tol) continue;
+      if (s.c < o.u0 - s.t - tol || s.c > o.u1 + s.t + tol) continue;
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (best) { s[end] = best.c; continue; }
+    const dir = end === 'u0' ? -1 : 1, E = Math.round(s.t * 2 + 6); let u = Math.round(ue);
+    if (fillAt(P, s, u) >= .5) { for (let k = 0; k < E && fillAt(P, s, u + dir) >= .5; k++) u += dir; s[end] = u + (dir > 0 ? 1 : 0); }
+    else { for (let k = 0; k < E && fillAt(P, s, u) < .5; k++) u -= dir; s[end] = u + (dir > 0 ? 1 : 0); }
+  }
+  // corners: a wall that ends short of a perpendicular wall's line gets extended to it (and the other way round)
+  for (const s of live) { if (s.u1 - s.u0 < 1) s.u1 = s.u0 + 1; }
+  for (const s of live) {
+    const { w } = s; w.t = r1(s.t);
+    if (s.ax === 'h') { w.a = [s.u0, s.c]; w.b = [s.u1, s.c]; } else { w.a = [s.c, s.u0]; w.b = [s.c, s.u1]; }
+  }
+  // openings: jambs go to the edges of the gap in the drawn wall
+  for (const s of live) for (const q of s.ops) {
+    stats.openings++;
+    const wdt = q.s1 - q.s0, pad = Math.max(wdt * .6, 10), lo = Math.round(q.s0 - pad), hi = Math.round(q.s1 + pad), runs = [];
+    let st = null; for (let u = lo; u <= hi + 1; u++) { const gap = u <= hi && fillAt(P, s, u) < .55; if (gap && st === null) st = u; if (!gap && st !== null) { runs.push([st, u]); st = null; } }
+    let best = null, bo = 0; for (const [a, b] of runs) { const ov = Math.min(b, q.s1) - Math.max(a, q.s0); if (ov > bo) { bo = ov; best = [a, b]; } }
+    let s0 = q.s0, s1 = q.s1;
+    if (best && bo >= wdt * .3 && best[1] - best[0] >= wdt * .5 && best[1] - best[0] <= Math.max(wdt * 2, wdt + 20)) { s0 = best[0]; s1 = best[1]; stats.openSnapped++; }
+    s0 = clamp(s0, s.u0, s.u1); s1 = clamp(s1, s.u0, s.u1); if (s1 - s0 < 2) continue;
+    // keep a and b in Claude's order, so "hinge": "a" or "b" still names the right jamb
+    const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], aWasLow = proj(s, q.o.a)[0] <= proj(s, q.o.b)[0];
+    q.o.a = at(aWasLow ? s0 : s1); q.o.b = at(aWasLow ? s1 : s0);
+  }
+  // room outlines and drawn furniture follow the walls they sat on
+  const vs = live.filter(s => s.ax === 'v'), hs = live.filter(s => s.ax === 'h');
+  const snapPt = p => {
+    let x = p[0], y = p[1], bx = 1e9, by = 1e9;
+    for (const s of vs) { const d = Math.abs(p[0] - s.c0), tol = s.t + 8; if (d < tol && d < bx && p[1] >= s.u0 - tol && p[1] <= s.u1 + tol) { bx = d; x = s.c; } }
+    for (const s of hs) { const d = Math.abs(p[1] - s.c0), tol = s.t + 8; if (d < tol && d < by && p[0] >= s.u0 - tol && p[0] <= s.u1 + tol) { by = d; y = s.c; } }
+    return [x, y];
+  };
+  for (const r of tr.rooms || []) if (Array.isArray(r?.poly) && r.poly.every(numOk)) { r.poly = r.poly.map(snapPt); stats.rooms++; }
+  tr.walls = walls; tr.openings = ops; tr._px = { style, tMed };
+  return { tr, stats, hints: planHints(P, live, style, tMed) };
+}
+
+// Things the pixels show that the tracing doesn't explain; handed to Claude's second look.
+function planHints(P, S, style, tMed) {
+  const out = [];
+  // gaps in a drawn wall that no door or window accounts for
+  for (const s of S) {
+    if (!s.band || s.band.kind === 'line') continue;
+    let st = null; const cover = s.ops.map(q => [q.s0 - 3, q.s1 + 3]);
+    for (let u = Math.round(s.u0 + s.t); u <= s.u1 - s.t + 1; u++) {
+      const gap = u <= s.u1 - s.t && fillAt(P, s, u) < .3 && !cover.some(([a, b]) => u >= a && u <= b);
+      if (gap && st === null) st = u;
+      if (!gap && st !== null) { if (u - st >= tMed * 2.5) { const a = s.ax === 'h' ? [st, s.c] : [s.c, st], b = s.ax === 'h' ? [u, s.c] : [s.c, u]; out.push(`a gap in the wall from (${a.map(Math.round)}) to (${b.map(Math.round)}) has no door, window or opening`); } st = null; }
+    }
+  }
+  // thick wall-like ink that no traced wall covers (solid-wall drawings only)
+  if (style === 'filled' && tMed >= 4) {
+    const { W, H, ink } = P, k = Math.max(3, Math.round(tMed * .6)), solid = new Uint8Array(W * H);
+    const runH = new Uint16Array(W * H), runV = new Uint16Array(W * H);
+    for (let y = 0; y < H; y++) { let x = 0; while (x < W) { if (!ink[y * W + x]) { x++; continue; } let e = x; while (e < W && ink[y * W + e]) e++; for (let i = x; i < e; i++) runH[y * W + i] = e - x; x = e; } }
+    for (let x = 0; x < W; x++) { let y = 0; while (y < H) { if (!ink[y * W + x]) { y++; continue; } let e = y; while (e < H && ink[e * W + x]) e++; for (let i = y; i < e; i++) runV[i * W + x] = e - y; y = e; } }
+    for (let i = 0; i < W * H; i++) solid[i] = runH[i] >= k && runV[i] >= k ? 1 : 0;
+    for (const s of S) { const pad = s.t / 2 + 3; const [x0, x1, y0, y1] = s.ax === 'h' ? [s.u0 - pad, s.u1 + pad, s.c - pad, s.c + pad] : [s.c - pad, s.c + pad, s.u0 - pad, s.u1 + pad];
+      for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(H - 1, y1); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(W - 1, x1); x++) solid[y * W + x] = 0; }
+    const seen = new Uint8Array(W * H), blobs = [];
+    for (let i = 0; i < W * H; i++) {
+      if (!solid[i] || seen[i]) continue;
+      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, n = 0; const st = [i]; seen[i] = 1;
+      while (st.length) { const j = st.pop(), x = j % W, y = (j / W) | 0; n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (const q of [j - 1, j + 1, j - W, j + W]) if (q >= 0 && q < W * H && solid[q] && !seen[q] && Math.abs((q % W) - x) <= 1) { seen[q] = 1; st.push(q); } }
+      const L = Math.max(x1 - x0, y1 - y0), Tn = Math.min(x1 - x0, y1 - y0) + 1;
+      if (L >= tMed * 3 && n >= tMed * tMed * 3 && Tn <= tMed * 2.5) blobs.push([x0, y0, x1, y1]);
+    }
+    blobs.slice(0, 12).forEach(b => out.push(`wall-like solid ink from (${b[0]},${b[1]}) to (${b[2]},${b[3]}) is not covered by any traced wall`));
+  }
+  return out.slice(0, 30);
+}
+
+/* ---------- printed sizes: one scale for the drawing, then walls nudged so every room measures what it says ---------- */
+function fitToDims(tr) {
+  const unitK = tr.units === 'm' ? 3.28084 : 1, walls = (tr.walls || []).filter(w => numOk(w?.a) && numOk(w?.b));
+  const lines = { v: [], h: [] };
+  for (const w of walls) { const ax = axisOf(w); if (!ax) continue; const i = ax === 'h' ? 0 : 1, j = 1 - i; lines[ax === 'h' ? 'h' : 'v'].push({ pos: w.a[j], lo: Math.min(w.a[i], w.b[i]), hi: Math.max(w.a[i], w.b[i]), t: +w.t || 8 }); }
+  const clusters = ax => { const L = [...lines[ax]].sort((a, b) => a.pos - b.pos), out = []; for (const l of L) { const c = out[out.length - 1]; if (c && l.pos - c.pos < 2) { c.ls.push(l); c.pos = c.ls.reduce((s, q) => s + q.pos, 0) / c.ls.length; } else out.push({ pos: l.pos, ls: [l] }); } return out; };
+  const C = { v: clusters('v'), h: clusters('h') };
+  // the wall line bounding a room edge, and its thickness where it meets the room
+  const edgeLine = (ax, pos, lo, hi) => { let best = -1, bd = 1e9; C[ax].forEach((c, k) => { const d = Math.abs(c.pos - pos); if (d > 3 || d >= bd) return; const ov = c.ls.reduce((s, l) => s + Math.max(0, Math.min(hi, l.hi) - Math.max(lo, l.lo)), 0); if (ov < (hi - lo) * .3) return; bd = d; best = k; });
+    if (best < 0) return null; const c = C[ax][best], l = c.ls.reduce((a, q) => (Math.min(hi, q.hi) - Math.max(lo, q.lo)) > (Math.min(hi, a.hi) - Math.max(lo, a.lo)) ? q : a); return { k: best, t: l.t }; };
+  const nm = x => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const rooms = (tr.rooms || []).filter(r => Array.isArray(r?.poly) && r.poly.length >= 3 && r.poly.every(numOk));
+  const cons = { v: [], h: [] }, roomFit = [];
+  for (const l of tr.labels || []) {
+    const d = (l.dims || []).map(Number).filter(v => v > 0).map(v => v * unitK); if (d.length < 2) continue;
+    const r = rooms.find(r => nm(r.name) === nm(l.room)) || rooms.find(r => nm(r.name).includes(nm(l.room)) || nm(l.room).includes(nm(r.name))); if (!r) continue;
+    const rect = r.poly.every((p, i) => { const q = r.poly[(i + 1) % r.poly.length]; return Math.abs(p[0] - q[0]) < 2 || Math.abs(p[1] - q[1]) < 2; });
+    if (!rect) continue;
+    const xs = r.poly.map(p => p[0]), ys = r.poly.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    // L-shaped rooms: the printed size is usually the big rectangle, which the bbox only matches if the room is near-rectangular
+    if (polyArea(r.poly) < (x1 - x0) * (y1 - y0) * .85) continue;
+    const L = edgeLine('v', x0, y0, y1), R = edgeLine('v', x1, y0, y1), T = edgeLine('h', y0, x0, x1), B = edgeLine('h', y1, x0, x1);
+    const wp = x1 - x0, hp = y1 - y0, flip = Math.abs(Math.log((d[0] / wp) / (d[1] / hp))) > Math.abs(Math.log((d[1] / wp) / (d[0] / hp)));
+    const [dw, dh] = flip ? [d[1], d[0]] : [d[0], d[1]];
+    if (L && R) cons.v.push({ a: L.k, b: R.k, t: (L.t + R.t) / 2, D: dw, room: r.name });
+    if (T && B) cons.h.push({ a: T.k, b: B.k, t: (T.t + B.t) / 2, D: dh, room: r.name });
+    roomFit.push({ room: r.name, L, R, T, B, dw, dh, printed: l.dims });
+  }
+  const all = [...cons.v.map(c => ({ ...c, ax: 'v' })), ...cons.h.map(c => ({ ...c, ax: 'h' }))];
+  const spanPx = (c, conv) => C[c.ax][c.b].pos - C[c.ax][c.a].pos - (conv === 'interior' ? c.t : 0);
+  let pick = null;
+  for (const conv of ['interior', 'centre']) {
+    const ss = all.map(c => c.D / spanPx(c, conv)).filter(v => v > 0 && isFinite(v)); if (ss.length < 2) continue;
+    const m = median(ss), mad = median(ss.map(v => Math.abs(v / m - 1)));
+    if (!pick || mad < pick.mad) pick = { conv, s: m, mad };
+  }
+  if (!pick) return null;
+  const { conv } = pick;
+  // drop room sizes that disagree with the rest (a mislabelled room or a misread number)
+  const good = all.filter(c => Math.abs(c.D / spanPx(c, conv) / pick.s - 1) < .12);
+  if (good.length < 2) return null;
+  const s = good.reduce((a, c) => a + c.D / spanPx(c, conv), 0) / good.length;
+  // least squares per axis: printed sizes are firm, the drawing's positions are soft
+  const solve = ax => {
+    const n = C[ax].length; if (!n) return [];
+    const A = Array.from({ length: n }, () => new Float64Array(n)), b = new Float64Array(n), wA = 1, wD = 400;
+    C[ax].forEach((c, k) => { A[k][k] += wA; b[k] += wA * s * c.pos; });
+    for (const c of good.filter(c => c.ax === ax)) {
+      const off = conv === 'interior' ? c.t * s : 0, tgt = c.D + off;   // X_b - X_a = tgt
+      A[c.a][c.a] += wD; A[c.b][c.b] += wD; A[c.a][c.b] -= wD; A[c.b][c.a] -= wD; b[c.b] += wD * tgt; b[c.a] -= wD * tgt;
+    }
+    for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r; [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+      for (let r = i + 1; r < n; r++) { const f = A[r][i] / A[i][i]; if (!f) continue; for (let k = i; k < n; k++) A[r][k] -= f * A[i][k]; b[r] -= f * b[i]; } }
+    const X = new Array(n); for (let i = n - 1; i >= 0; i--) { let v = b[i]; for (let k = i + 1; k < n; k++) v -= A[i][k] * X[k]; X[i] = v / A[i][i]; }
+    return X;
+  };
+  const X = { v: solve('v'), h: solve('h') };
+  const mono = ax => X[ax].every((v, i) => !i || v > X[ax][i - 1]);
+  const warp = ax => {
+    const P0 = C[ax].map(c => c.pos), P1 = X[ax].map(v => v / s);
+    if (!P0.length || !mono(ax) || P1.some(v => !isFinite(v))) return p => p;
+    return p => { if (p <= P0[0]) return p + P1[0] - P0[0]; const n = P0.length; if (p >= P0[n - 1]) return p + P1[n - 1] - P0[n - 1];
+      let i = 1; while (P0[i] < p) i++; const f = (p - P0[i - 1]) / (P0[i] - P0[i - 1] || 1); return P1[i - 1] + f * (P1[i] - P1[i - 1]); };
+  };
+  const wx = warp('v'), wy = warp('h');
+  const report = roomFit.map(f => {
+    const meas = (ax, a, b) => a && b ? (X[ax][b.k] - X[ax][a.k]) - (conv === 'interior' ? (a.t + b.t) / 2 * s : 0) : null;
+    return { room: f.room, printed: [f.dw, f.dh], before: [f.L && f.R ? (C.v[f.R.k].pos - C.v[f.L.k].pos - (conv === 'interior' ? (f.L.t + f.R.t) / 2 : 0)) * s : null, f.T && f.B ? (C.h[f.B.k].pos - C.h[f.T.k].pos - (conv === 'interior' ? (f.T.t + f.B.t) / 2 : 0)) * s : null], after: [meas('v', f.L, f.R), meas('h', f.T, f.B)] };
+  });
+  return { s, conv, used: good.length, total: all.length, wx, wy, report };
+}
+// move every point of the tracing through the size fit
+function warpTrace(tr, wx, wy) {
+  const W = p => numOk(p) ? [wx(+p[0]), wy(+p[1])] : p;
+  for (const w of tr.walls || []) { w.a = W(w.a); w.b = W(w.b); }
+  for (const o of tr.openings || []) { o.a = W(o.a); o.b = W(o.b); if (numOk(o.into)) o.into = W(o.into); }
+  for (const r of tr.rooms || []) if (Array.isArray(r.poly)) r.poly = r.poly.map(W);
+  for (const f of tr.fixtures || []) if (Array.isArray(f.bbox) && f.bbox.length >= 4) { const a = W([f.bbox[0], f.bbox[1]]), b = W([f.bbox[2], f.bbox[3]]); f.bbox = [a[0], a[1], b[0], b[1]]; }
+  if (numOk(tr.entrance)) tr.entrance = W(tr.entrance);
+  return tr;
+}
+
+/* ---------- the overlay Claude checks its own tracing against ---------- */
+async function traceOverlay(src, tr) {
+  const im = await loadImg(src), W = im.naturalWidth, H = im.naturalHeight, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.globalAlpha = .4; g.drawImage(im, 0, 0); g.globalAlpha = 1;
+  const k = Math.max(1, (W + H) / 1800);
+  g.lineCap = 'butt';
+  for (const r of tr.rooms || []) if (Array.isArray(r.poly) && r.poly.every(numOk)) {
+    g.beginPath(); r.poly.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath();
+    g.fillStyle = 'rgba(150,60,220,.08)'; g.fill(); g.setLineDash([6 * k, 4 * k]); g.strokeStyle = 'rgba(150,60,220,.9)'; g.lineWidth = 1.5 * k; g.stroke(); g.setLineDash([]);
+  }
+  for (const w of tr.walls || []) if (numOk(w.a) && numOk(w.b)) { g.strokeStyle = w.ext ? 'rgba(220,20,20,.75)' : 'rgba(255,110,0,.75)'; g.lineWidth = Math.max(2, +w.t || 6); g.beginPath(); g.moveTo(w.a[0], w.a[1]); g.lineTo(w.b[0], w.b[1]); g.stroke(); }
+  const col = { door: '#00a651', slider: '#00b5d8', window: '#1e4dff', opening: '#ff00b4' };
+  for (const o of tr.openings || []) if (numOk(o.a) && numOk(o.b)) { g.strokeStyle = col[o.type] || '#00a651'; g.lineWidth = Math.max(4, 6 * k); g.beginPath(); g.moveTo(o.a[0], o.a[1]); g.lineTo(o.b[0], o.b[1]); g.stroke(); }
+  g.font = `bold ${Math.round(12 * k)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const r of tr.rooms || []) if (Array.isArray(r.poly) && r.poly.every(numOk)) { const [x, y] = centroid(r.poly); const t = `${r.name} [${r.type}]`; g.fillStyle = 'rgba(255,255,255,.85)'; const tw = g.measureText(t).width; g.fillRect(x - tw / 2 - 3, y + 14 * k, tw + 6, 16 * k); g.fillStyle = '#7a1fd0'; g.fillText(t, x, y + 22 * k); }
+  return c.toDataURL('image/jpeg', .9);
+}
+
+const PLAN_CHECK_PROMPT = (W, Hh, tr, hints) => `You are checking a tracing of a residential floor plan before it becomes a 3D model. Accuracy matters more than speed.
+Image 1 is the floor plan (${W}×${Hh} pixels). Image 2 is the same plan, faded, with the current tracing drawn over it in the same pixel coordinates:
+- red lines = exterior walls, orange = interior walls (line width = traced thickness)
+- green = doors, cyan = sliding doors, blue = windows, magenta = openings with no door
+- dashed purple outlines = rooms, labelled "name [type]"
+
+The current tracing (pixel coordinates, origin top-left, y down):
+${JSON.stringify(compactTrace(tr))}
+${hints.length ? '\nThe pixel analysis found things the tracing may be missing (check each one against the plan; ignore any that are furniture, text, hatching or dimension lines):\n- ' + hints.join('\n- ') + '\n' : ''}
+Go over the plan methodically, room by room and wall by wall, and compare it with the overlay. Look for: walls that are missing, extra, too long or short, or in the wrong place; doors, windows and openings that are missing, misplaced, the wrong width or the wrong type; rooms that are missing, merged, mis-shaped, misnamed or of the wrong type; printed room sizes that were misread (re-read every number); door swings (hinge jamb and the room the leaf opens into); and furniture or fixtures drawn on the plan that are missing.
+
+Reply with only the complete corrected tracing as one JSON object in exactly the same shape as above (every key, every item, including the ones that were already right). Keep correct coordinates unchanged. Add "changes": a short list of what you fixed.`;
+const compactTrace = tr => {
+  const R = p => numOk(p) ? [Math.round(+p[0]), Math.round(+p[1])] : p;
+  return { units: tr.units, labels: tr.labels, dimLines: tr.dimLines, walls: (tr.walls || []).map(w => ({ a: R(w.a), b: R(w.b), t: w.t, ext: !!w.ext })), openings: (tr.openings || []).map(o => ({ type: o.type, a: R(o.a), b: R(o.b), ...(o.hinge ? { hinge: o.hinge } : {}), ...(numOk(o.into) ? { into: R(o.into) } : {}) })),
+    rooms: (tr.rooms || []).map(r => ({ name: r.name, type: r.type, poly: (r.poly || []).map(R) })), fixtures: tr.fixtures || [], entrance: tr.entrance ?? null, north: tr.north ?? null };
+};
+
+/* ================= furnishing by design: each room in its own frame, every piece anchored to a wall or a piece =================
+   Claude decides what goes where in the room's terms (which wall, how far along, how far out, beside what);
+   the code turns that into exact coordinates, checks it against doors, windows, walls and the other pieces,
+   fixes what it can, and sends what it can't back to Claude once. */
+
+const RESIZABLE = new Set(['wardrobe', 'closet-lit', 'kitchen-counter', 'kitchen-luxe', 'kitchen-tall-luxe', 'console', 'sideboard-fluted', 'bookshelf', 'panel-slats', 'panel-stone', 'panel-upholstered', 'wall-panel-wood', 'media-wall', 'tv-wall', 'wall-molding', 'feature-stone', 'bar-unit', 'planter-flowers', 'desk', 'vanity', 'vanity-luxe', 'curtain']);
+const SEATING = /sofa|sectional|armchair|lounge|chair|barrel|bench|pouf|stool|jhoola/;
+const NOT_SOLID = new Set(['rug', 'rug-round', 'loft-platform', 'stair-curved', 'ceiling-cove']);
+const isSolid = it => { const d = CAT[it.type]; return !!d && !d.nc && !WALLMOUNT.has(it.type) && !NOT_SOLID.has(it.type) && (+withDefaults(it).y || 0) < 2; };
+const ftIn = v => fmtFtIn(Math.max(0, v));
+const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
+
+// the room's walls as faces seen from inside: interior corner, run direction, inward normal, openings, solid stretches
+function roomFrame(r) {
+  let poly = r.polygon.map(p => [+p[0], +p[1]]);
+  // drop repeated and collinear corners
+  for (let k = 0; k < 2; k++) poly = poly.filter((p, i) => { const a = poly[(i - 1 + poly.length) % poly.length], b = poly[(i + 1) % poly.length]; const e1 = [p[0] - a[0], p[1] - a[1]], e2 = [b[0] - p[0], b[1] - p[1]], l1 = Math.hypot(...e1), l2 = Math.hypot(...e2); if (l1 < .05) return false; return !(Math.abs(e1[0] * e2[1] - e1[1] * e2[0]) / (l1 * l2 || 1) < .02 && dot2(e1, e2) > 0); });
+  if (poly.length < 3) poly = r.polygon;
+  const n = poly.length, edges = [];
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < .05) continue;
+    const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; let nn = [-u[1], u[0]];
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; if (!pip([m[0] + nn[0] * .3, m[1] + nn[1] * .3], poly)) nn = [-nn[0], -nn[1]];
+    // walls lying along this edge
+    const cover = [];
+    for (const w of layout.walls) {
+      const WL = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]); if (WL < .1) continue; const wu = [(w.b[0] - w.a[0]) / WL, (w.b[1] - w.a[1]) / WL];
+      if (Math.abs(dot2(wu, u)) < .98) continue;
+      const dist = Math.abs((m[0] - w.a[0]) * -wu[1] + (m[1] - w.a[1]) * wu[0]); if (dist > Math.max(.9, w.thickness)) continue;
+      let s0 = dot2([w.a[0] - a[0], w.a[1] - a[1]], u), s1 = dot2([w.b[0] - a[0], w.b[1] - a[1]], u); if (s0 > s1) [s0, s1] = [s1, s0];
+      s0 = Math.max(0, s0); s1 = Math.min(L, s1); if (s1 - s0 < .3) continue;
+      cover.push({ w, s0, s1, wu });
+    }
+    const covered = cover.reduce((s, c) => s + c.s1 - c.s0, 0);
+    edges.push({ a, b, L, u, n: nn, cover, off: covered >= L * .4 ? Math.max(...cover.map(c => c.w.thickness / 2)) : 0 });
+  }
+  // interior outline: each edge pushed in by half its wall, corners where neighbours meet
+  const inner = edges.map((e, i) => {
+    const p = edges[(i - 1 + edges.length) % edges.length], A = [e.a[0] + e.n[0] * e.off, e.a[1] + e.n[1] * e.off], B = [p.a[0] + p.n[0] * p.off, p.a[1] + p.n[1] * p.off];
+    const den = p.u[0] * e.u[1] - p.u[1] * e.u[0]; if (Math.abs(den) < 1e-6) return A;
+    const t = ((A[0] - B[0]) * e.u[1] - (A[1] - B[1]) * e.u[0]) / den; return [B[0] + p.u[0] * t, B[1] + p.u[1] * t];
+  });
+  const xs = inner.map(p => p[0]), zs = inner.map(p => p[1]), ox = Math.min(...xs), oz = Math.min(...zs);
+  const N = hasNorth(), faces = [];
+  edges.forEach((e, i) => {
+    let S = inner[i], E = inner[(i + 1) % inner.length], u = e.u;
+    // along runs left→right on top/bottom walls and top→bottom on side walls
+    if (Math.abs(u[0]) >= Math.abs(u[1]) ? u[0] < 0 : u[1] < 0) { [S, E] = [E, S]; u = [-u[0], -u[1]]; }
+    const len = Math.hypot(E[0] - S[0], E[1] - S[1]); if (len < .4) return;
+    const side = Math.abs(e.n[1]) >= Math.abs(e.n[0]) * 1.5 ? (e.n[1] > 0 ? 'top' : 'bottom') : Math.abs(e.n[0]) >= Math.abs(e.n[1]) * 1.5 ? (e.n[0] > 0 ? 'left' : 'right') : `${e.n[1] > 0 ? 'top' : 'bottom'}-${e.n[0] > 0 ? 'left' : 'right'} (angled)`;
+    const along = p => dot2([p[0] - S[0], p[1] - S[1]], u);
+    const ops = [], walled = [];
+    for (const c of e.cover) {
+      const ca = along([e.a[0] + e.u[0] * c.s0, e.a[1] + e.u[1] * c.s0]), cb = along([e.a[0] + e.u[0] * c.s1, e.a[1] + e.u[1] * c.s1]);
+      walled.push([Math.max(0, Math.min(ca, cb)), Math.min(len, Math.max(ca, cb))]);
+      const w = c.w, WL = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+      for (const o of w.openings || []) {
+        const P0 = [w.a[0] + c.wu[0] * o.start, w.a[1] + c.wu[1] * o.start], P1 = [w.a[0] + c.wu[0] * o.end, w.a[1] + c.wu[1] * o.end];
+        let a0 = along(P0), a1 = along(P1); if (a0 > a1) [a0, a1] = [a1, a0]; if (a1 < -.2 || a0 > len + .2) continue;
+        const mid = [(P0[0] + P1[0]) / 2, (P0[1] + P1[1]) / 2], other = roomAt(mid[0] - e.n[0] * (w.thickness / 2 + 1.2), mid[1] - e.n[1] * (w.thickness / 2 + 1.2));
+        let swingsIn = false; if (o.type === 'door' && (o.swing?.open ?? 90) !== 0 || /main/i.test(o.name || '')) { const sd = o.swing?.side || 1, wn = [-c.wu[1] * sd, c.wu[0] * sd]; swingsIn = dot2(wn, e.n) > 0; }
+        if (o.type === 'door' && o.swing && o.swing.open === 0 && !/main/i.test(o.name || '')) swingsIn = false;
+        ops.push({ type: o.type, a0: clamp(a0, 0, len), a1: clamp(a1, 0, len), sill: o.sill || 0, head: o.head || 7, to: other && other !== r ? other.name : (other ? null : 'outside'), main: /main/i.test(o.name || ''), swingsIn });
+      }
+    }
+    ops.sort((p, q) => p.a0 - q.a0);
+    // open stretches (no wall) and the solid stretches that furniture can stand against
+    const wl = walled.sort((p, q) => p[0] - q[0]), open = []; let cur = 0;
+    for (const [p, q] of wl) { if (p > cur + .3) open.push([cur, p]); cur = Math.max(cur, q); } if (cur < len - .3) open.push([cur, len]);
+    const blocks = [...ops.filter(o => o.type !== 'window').map(o => [o.a0 - .15, o.a1 + .15]), ...open].sort((p, q) => p[0] - q[0]);
+    const solid = []; cur = 0; for (const [p, q] of blocks) { if (p - cur >= 1) solid.push([cur, p]); cur = Math.max(cur, q); } if (len - cur >= 1) solid.push([cur, len]);
+    const wins = ops.filter(o => o.type === 'window');
+    faces.push({ id: 'W' + (faces.length + 1), S, E, u, n: e.n, len, side, dir: N ? DIRNAME[dirOf(bearingOf(-e.n[0], -e.n[1]))] : null, ops, open, solid: solid.map(([p, q]) => [Math.max(0, p), Math.min(len, q)]), clearSolid: solid.map(([p, q]) => [Math.max(0, p), Math.min(len, q)]).flatMap(([p, q]) => { const out = []; let c = p; for (const w of wins) { if (w.a1 <= c || w.a0 >= q) continue; if (w.a0 - c >= 1) out.push([c, w.a0]); c = Math.max(c, w.a1); } if (q - c >= 1) out.push([c, q]); return out; }), thick: e.off * 2 });
+  });
+  const rect = inner.length === 4 && faces.length === 4 && faces.every(f => Math.abs(f.u[0]) > .999 || Math.abs(f.u[1]) > .999);
+  // keep-clear zones: in front of every door, slider and opening, as deep as the door is wide (min 3 ft)
+  const clear = [];
+  for (const f of faces) for (const o of f.ops) {
+    if (o.type === 'window') continue;
+    // doors keep their swing and a step beyond it clear; wide sliders and archways only the walkway through their middle
+    const wd = o.type === 'door' ? o.a1 - o.a0 : Math.min(o.a1 - o.a0, o.type === 'slider' ? 5 : 6), depth = o.type === 'door' && o.swingsIn ? Math.max(3, wd + .3) : o.type === 'door' ? 3 : 2.5, m = (o.a0 + o.a1) / 2;
+    const c = [f.S[0] + f.u[0] * m + f.n[0] * depth / 2, f.S[1] + f.u[1] * m + f.n[1] * depth / 2];
+    clear.push({ cx: c[0], cz: c[1], hx: wd / 2 + .2, hz: depth / 2, c: f.u[0], s: f.u[1], face: f.id, o });
+  }
+  return { r, faces, inner, ox, oz, w: Math.max(...xs) - ox, d: Math.max(...zs) - oz, rect, clear };
+}
+const toLoc = (F, p) => [p[0] - F.ox, p[1] - F.oz];
+const L1 = v => f1(v).replace(/\.0$/, '');
+const ptL = (F, p) => { const q = toLoc(F, p); return `(${L1(q[0])},${L1(q[1])})`; };
+
+function describeRoom(F, withHints = true) {
+  const r = F.r, lines = [];
+  lines.push(`ROOM "${r.name}" — ${r.type}${r.kind === 'outdoor' ? ', outdoor' : ''}${r.size ? `, printed size ${r.size}` : ''}${hasNorth() ? `, in the ${DIRNAME[roomZone(r)]} of the home` : ''}.`);
+  lines.push(F.rect ? `Clear floor ${ftIn(F.w)} × ${ftIn(F.d)} (${L1(F.w)} × ${L1(F.d)} ft), ${Math.round(F.w * F.d)} sq ft. Room coordinates: X 0–${L1(F.w)} left to right, Z 0–${L1(F.d)} top to bottom; (0,0) is the top-left inside corner.`
+    : `Clear floor outline (room coordinates, X right, Z down): ${F.inner.map(p => ptL(F, p)).join(' ')}. Bounding box ${L1(F.w)} × ${L1(F.d)} ft, floor area ${Math.round(polyArea(F.inner))} sq ft.`);
+  lines.push('Walls (along = feet along the wall face from its left end for top/bottom walls, from its top end for side walls):');
+  for (const f of F.faces) {
+    const ops = f.ops.map(o => o.type === 'window' ? `window ${L1(o.a0)}–${L1(o.a1)} (sill ${L1(o.sill)} ft)` : `${o.main ? 'MAIN ENTRANCE door' : o.type === 'opening' ? 'open doorway' : o.type} ${L1(o.a0)}–${L1(o.a1)}${o.to ? ' to ' + o.to : ''}${o.type === 'door' ? (o.swingsIn ? ', swings into this room' : ', swings outward') : ''}`);
+    const open = f.open.map(([p, q]) => `no wall ${L1(p)}–${L1(q)}${(() => { const m = (p + q) / 2, x = f.S[0] + f.u[0] * m - f.n[0] * 1.2, z = f.S[1] + f.u[1] * m - f.n[1] * 1.2, o = roomAt(x, z); return o && o !== F.r ? ' (open to ' + o.name + ')' : ''; })()}`);
+    lines.push(` ${f.id}: ${f.side} wall${f.dir ? ` (${f.dir} side)` : ''}, ${L1(f.len)} ft from ${ptL(F, f.S)} to ${ptL(F, f.E)}, faces into the room toward (${f1(f.n[0])},${f1(f.n[1])}).${ops.length || open.length ? ' ' + [...ops, ...open].join('; ') + '.' : ''} Solid: ${f.solid.length ? f.solid.map(([p, q]) => `${L1(p)}–${L1(q)}`).join(', ') : 'none'}${f.clearSolid.length !== f.solid.length || f.clearSolid.some((s, i) => s[0] !== f.solid[i]?.[0] || s[1] !== f.solid[i]?.[1]) ? ` (without windows: ${f.clearSolid.map(([p, q]) => `${L1(p)}–${L1(q)}`).join(', ') || 'none'})` : ''}.`);
+  }
+  if (F.clear.length) lines.push('Keep clear (door swings and walkways): ' + F.clear.map(z => { const f = F.faces.find(q => q.id === z.face), m = dot2([z.cx - f.S[0], z.cz - f.S[1]], f.u); return `${f.id} ${L1(m - z.hx)}–${L1(m + z.hx)} along, ${L1(z.hz * 2)} ft out`; }).join('; ') + '.');
+  const drawn = withHints ? (layout.planFurniture || []).filter(p => p.room === r.name) : [];
+  if (drawn.length) {
+    const fw = { 0: 'down (+Z)', 90: 'right (+X)', 180: 'up (-Z)', '-90': 'left (-X)' };
+    lines.push("THE ARCHITECT'S PLAN SHOWS THIS FURNITURE (follow it: same piece, same place, same orientation, same size, unless the homeowner's notes say otherwise):");
+    for (const p of drawn) lines.push(` - ${p.kind}: ${L1(p.x1 - p.x0)} × ${L1(p.z1 - p.z0)} ft, X ${L1(p.x0 - F.ox)}–${L1(p.x1 - F.ox)}, Z ${L1(p.z0 - F.oz)}–${L1(p.z1 - F.oz)}${p.rot != null ? `, front facing ${fw[p.rot]}` : ''}${(() => { const f = nearFace(F, [(p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2], Math.max(p.x1 - p.x0, p.z1 - p.z0)); return f ? `, against ${f.id}` : ''; })()}`);
+  }
+  return lines.join('\n');
+}
+function nearFace(F, c, size) { let best = null, bd = 1e9; for (const f of F.faces) { const d = dot2([c[0] - f.S[0], c[1] - f.S[1]], f.n), a = dot2([c[0] - f.S[0], c[1] - f.S[1]], f.u); if (a < -.5 || a > f.len + .5 || d < 0) continue; if (d < bd) { bd = d; best = f; } } return best && bd < size * .6 + .6 ? best : null; }
+
+const DESIGN_RULES = `HOW A GOOD DESIGNER LAYS OUT A ROOM (follow these; they are what make a room feel planned rather than filled):
+1. Circulation first. From every door draw the path a person walks: at least 3 ft wide (2.5 ft in small rooms and bathrooms) to the bed sides, the sofa, the wardrobe, the counter, the next door. Nothing stands in a "Keep clear" zone or across a path.
+2. Anchor the big piece on the right wall. Beds: headboard centred on a solid wall stretch (not a wall with a door, ideally not under a window), usually the wall facing or beside the entrance but not directly in line with the door; at least 2 ft clear on each side of a double bed and 3 ft at its foot. Sofas: facing the focal wall (TV or feature), 8–12 ft from a TV, back to a wall or floating with a console behind it; never with its back to the entrance door if avoidable. Dining tables: centred in the dining zone with 3 ft from the table edge to any wall or piece on every side with chairs. Wardrobes and tall units: on long solid stretches with 3 ft in front for the doors, never across a window.
+3. Kitchens: counters along solid walls in an L, U, parallel or straight run as the room allows; the sink under the window if there is one; the hob on a solid wall away from the door and not under a window; the fridge (tall-unit "fridge") at the end of a run; 3.5–4 ft between parallel counters or counter and island. Follow the counters drawn on the plan exactly.
+4. Bathrooms: the shower in the far corner from the door; the WC on a side wall, not facing the door if avoidable, with 1.3 ft each side; the vanity near the door; keep 2 ft clear in front of each.
+5. Centre and align. Centre the hero piece on its wall stretch or on the window; line pieces up with each other; mirror pairs (nightstands, lamps, armchairs, sconces) exactly; equal gaps.
+6. Scale to the room. Choose sizes (w, d) that fit the clear floor with the paths above: a queen bed (5 × 6.7 ft) in rooms under 11 ft wide, a king (6.4 × 7.4) only from 12 ft; a 3-seat sofa (7 ft) unless the wall is long; rugs sized so the front legs of every seat sit on them, 1–1.5 ft inside the walls.
+7. Windows and light: don't block windows with anything taller than the sill; curtains go on the window wall beside each window; a reading chair or desk goes by the window.
+8. Every room must be fully furnished for how it will be used, and every piece must have a reason to be where it is.`;
+
+const PLACE_SCHEMA = `PLACING PIECES — use the room coordinates and wall ids above, never whole-home coordinates. Each item is one of:
+ a) Against a wall: {"id":"bed1","type":"bed-luxe","wall":"W3","along":7.7,"off":0, ...} — the item's back is "off" feet from that wall face (0 = touching), its centre is "along" feet along it, and its front faces into the room. Use this for everything that stands against or hangs on a wall (beds, sofas on a wall, wardrobes, counters, consoles, desks, vanities, WCs, TVs, art, mirrors, sconces, wall panels, curtains) and for pieces that face away from a wall from further out (a floating sofa: off = distance from the wall behind it).
+ b) Next to another piece: {"id":"ct1","type":"coffee-plinth","rel":"sofa1","side":"front","gap":1.5} — side is "front", "back", "left" or "right" (the piece's own left/right, as if sitting on it), gap is the clear distance between them, "shift" slides it sideways; it faces the other piece unless "face" or "turn" says otherwise. "side":"both" places a mirrored pair left and right.
+ c) On top of a piece: {"type":"lamp-table","on":"ns1"} (lamps, vases, decor) or above one: {"type":"pendant-linear","over":"table1"} (pendants, chandeliers).
+ d) At a point: {"id":"rug1","type":"rug","at":[9.2,7.6],"rot":0,"w":9,"d":12} — X,Z in room coordinates; rot in degrees: front faces +Z (down) at 0, +X (right) at 90, -Z (up) at 180, -X (left) at -90.
+ Optional on any item: "face":"W2" (turn its front toward that wall) or "face":"<id>" (toward that piece); "turn": extra degrees; w, d, h, y (lift off the floor), finish, accent, name, and any extra fields the catalog note gives.
+ Groups the code builds for you: on a dining table "chairs": 6 and "chair": "dining-chair-luxe"; on a bed "nightstands": true (two matched nightstands at the headboard, "lamps": true puts a lamp on each); on an island "stools": 3. A "ceiling-cove" with no position fills the room's ceiling.
+ Give "id" to any piece another piece refers to; refer only to ids defined earlier in the list.`;
+
+function furnishPrompt(rooms, extra = '') {
+  const st = project.style, cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
+  const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', '), BRIEF = briefForFurnish();
+  const blocks = rooms.map(r => { const F = roomFrame(r); return describeRoom(F) + (project.roomStyles?.[r.name] ? `\nROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : ''); }).join('\n\n');
+  return `You are a senior interior designer at a luxury studio, placing furniture into a 3D model of a real home built from its architect's floor plan. The homeowner will walk through it, so the layout must be one a professional would sign off: right pieces, right sizes, in the right places, with a reason for each. Units are feet.
+
+STYLE: ${st.summary} Signature elements: ${(st.features || []).join(', ') || 'none given'}. Plants: ${st.plants}.
+FINISH TOKENS (use these so the style stays consistent): wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal. Also allowed: linen, linen-white, white-ceramic, black-metal, brass, felt, terracotta, concrete, plaster, teak, glass, glass-bronze, onyx, marble-green, marble-rosso, travertine-dark, velvet-emerald, velvet-rust, velvet-navy, velvet-blush, velvet-mustard, velvet-ink, or a "#rrggbb" hex (rugs and fabrics). Use one or two rich contrast materials per room against the calm base tokens.
+HOMEOWNER'S NOTES: ${(project.brief || 'none').slice(0, 1200)}${extra ? '\nREQUEST FOR THESE ROOMS (takes priority over the notes): ' + String(extra).slice(0, 600) : ''}
+CEILING HEIGHT: ${layout.settings.ceilingHeight} ft. The whole home has: ${others}.${BRIEF ? '\n' + BRIEF : ''}
+
+${blocks}
+
+${DESIGN_RULES}
+
+CATALOG (type: default w×d×h — notes):
+${cat}
+
+FINISHING (after the layout works): living, dining and bedrooms get a feature treatment on the focal wall (tv-wall, media-wall, panel-stone, panel-slats, panel-upholstered, wall-panel-wood, wall-molding, arch-niche, or bed-luxe whose headboard wall is the feature), a ceiling-cove, three layers of light (a statement pendant or chandelier, a floor or table lamp, sconces), one hero piece, a rug, art, a plant, and sheer curtains at the windows — scaled to the budget. Bathrooms: vanity-luxe, shower-luxe in the far corner, wc, a plant. Walk-ins: closet-lit on the solid walls. Balconies: an outdoor seat, planters, a small table. Pooja rooms: a pooja-unit centred on the east or west wall. Rooms must not repeat each other's feature, rug or accent colour.
+
+${PLACE_SCHEMA}
+
+Think it through before answering: for each room decide its entrance path, its focal wall, the hero piece's wall and position, then fit everything else around the paths. Check every piece against the wall lengths, solid stretches and keep-clear zones above.
+Reply with only JSON: {"items":[{"room":"<room name>","type":"<catalog type>","name":"<short label>", ...placement..., "finish":"<token>","accent":"<token>"}]}`;
+}
+
+/* ---------- from room terms to coordinates ---------- */
+const rotOf = v => r2(((Math.atan2(v[0], v[1]) / D2R) + 540) % 360 - 180);
+const fwd = rot => [Math.sin((rot || 0) * D2R), Math.cos((rot || 0) * D2R)];
+function resolveItems(raw, frames, roomsByName) {
+  const out = [], byId = {}, notes = [];
+  const list = (Array.isArray(raw) ? raw : []).filter(x => x && typeof x === 'object' && CAT[x.type]);
+  const pending = [...list];
+  for (let pass = 0; pass < 3 && pending.length; pass++) {
+    for (let i = 0; i < pending.length; i++) {
+      const src = pending[i], ref = src.rel ?? src.on ?? src.over;
+      if (ref != null && !byId[ref]) { if (pass < 2) continue; notes.push(`${src.type}${src.id ? ' "' + src.id + '"' : ''} refers to "${ref}", which was not placed`); pending.splice(i--, 1); continue; }
+      pending.splice(i--, 1);
+      const r = roomsByName[src.room] || (ref != null ? roomsByName[byId[ref]?.room] : null) || (isFinite(+src.x) && isFinite(+src.z) ? roomAt(+src.x, +src.z) : null) || (frames.length === 1 ? frames[0].r : null); if (!r) { notes.push(`${src.type} has no room`); continue; }
+      const F = frames.find(f => f.r === r) || roomFrame(r);
+      const it = { type: src.type, name: String(src.name || CAT[src.type].label).slice(0, 40), room: r.name };
+      for (const [k, v] of Object.entries(src)) if (!['id', 'type', 'name', 'room', 'wall', 'along', 'off', 'at', 'rel', 'side', 'gap', 'shift', 'on', 'over', 'face', 'turn', 'chairs', 'chair', 'nightstands', 'lamps', 'stools', 'x', 'z'].includes(k)) it[k] = v;
+      for (const k of ['rot', 'w', 'd', 'h', 'y']) if (k in it) { const v = +it[k]; if (!isFinite(v) || (['w', 'd', 'h'].includes(k) && v <= 0)) delete it[k]; else it[k] = v; }
+      const f = () => withDefaults(it);
+      let anchor = null;
+      const face = F.faces.find(q => q.id === String(src.wall || '').toUpperCase());
+      if (face) {
+        const fw = f().w, raw = isFinite(+src.along) ? +src.along : face.len / 2, along = face.len >= fw ? clamp(raw, fw / 2, face.len - fw / 2) : clamp(raw, 0, face.len), off = Math.max(0, +src.off || 0), d = f().d;
+        it.x = face.S[0] + face.u[0] * along + face.n[0] * (off + d / 2); it.z = face.S[1] + face.u[1] * along + face.n[1] * (off + d / 2);
+        it.rot = rotOf(face.n); anchor = { face: face.id, along, off };
+      } else if (ref != null) {
+        const R = byId[ref], RF = withDefaults(R), fr = fwd(R.rot), right = [-fr[1], fr[0]], left = [fr[1], -fr[0]], sh = +src.shift || 0;
+        if (src.on != null || src.over != null) {
+          it.x = R.x + right[0] * sh; it.z = R.z + right[1] * sh; it.rot = R.rot || 0;
+          if (src.on != null && !('y' in src)) it.y = r2((+RF.y || 0) + (+RF.h || 0));
+          anchor = { on: src.on ?? null, over: src.over ?? null }; it._ref = R;
+        } else {
+          const side = String(src.side || 'front').toLowerCase(), gap = +src.gap || 0;
+          const place = sd => {
+            const v = sd === 'front' ? fr : sd === 'back' ? [-fr[0], -fr[1]] : sd === 'left' ? left : right;
+            const depthR = sd === 'front' || sd === 'back' ? RF.d / 2 : RF.w / 2;
+            const lateral = sd === 'front' || sd === 'back' ? right : fr;
+            const c = { ...it };
+            // seats placed across from a piece face it; tables, rugs and the rest line up with it
+            const across = sd === 'front' || sd === 'back';
+            c.rot = across && SEATING.test(c.type) ? rotOf([-v[0], -v[1]]) : (R.rot || 0);
+            const myDepth = across ? withDefaults(c).d / 2 : withDefaults(c).w / 2;
+            c.x = R.x + v[0] * (depthR + gap + myDepth) + lateral[0] * sh; c.z = R.z + v[1] * (depthR + gap + myDepth) + lateral[1] * sh;
+            return c;
+          };
+          if (side === 'both') { const a = place('left'), b = place('right'); Object.assign(it, a); const twin = { ...b, name: it.name }; twin._anchor = { rel: ref, side: 'right' }; finishItem(twin, src, F, byId); out.push(twin); anchor = { rel: ref, side: 'left' }; }
+          else { Object.assign(it, place(side)); anchor = { rel: ref, side }; }
+        }
+      } else if (numOk(src.at)) {
+        it.x = F.ox + +src.at[0]; it.z = F.oz + +src.at[1]; it.rot = +src.rot || 0; anchor = { at: true };
+      } else if (src.type === 'ceiling-cove') {
+        const xs = F.inner.map(p => p[0]), zs = F.inner.map(p => p[1]);
+        it.x = (Math.min(...xs) + Math.max(...xs)) / 2; it.z = (Math.min(...zs) + Math.max(...zs)) / 2; it.rot = 0; it.w ??= r2(F.w - .3); it.d ??= r2(F.d - .3); it.y ??= r2(layout.settings.ceilingHeight - .6); anchor = { at: true };
+      } else if (isFinite(+src.x) && isFinite(+src.z)) { it.x = +src.x; it.z = +src.z; it.rot = +src.rot || 0; anchor = { global: true }; }
+      else { notes.push(`${src.type} "${it.name}" in ${r.name} has no position`); continue; }
+      it._anchor = anchor;
+      finishItem(it, src, F, byId, frames);
+      if (src.id != null) byId[src.id] = it;
+      out.push(it);
+      // groups
+      if (+src.chairs > 0 && /table|pool-table/.test(src.type)) out.push(...chairsFor(it, Math.min(14, Math.round(+src.chairs)), CAT[src.chair] ? src.chair : 'dining-chair-luxe', src));
+      if (src.nightstands && /bed/.test(src.type)) out.push(...nightstandsFor(it, !!src.lamps));
+      if (+src.stools > 0 && /island/.test(src.type)) out.push(...stoolsFor(it, Math.min(6, Math.round(+src.stools))));
+    }
+  }
+  for (const it of out) { it.x = r2(it.x); it.z = r2(it.z); it.rot = r2(((it.rot || 0) + 540) % 360 - 180); }
+  return { items: out, notes };
+}
+function finishItem(it, src, F, byId) {
+  if (src.face != null) {
+    const f = F.faces.find(q => q.id === String(src.face).toUpperCase()), R = byId[src.face];
+    if (f) it.rot = rotOf([-f.n[0], -f.n[1]]); else if (R) it.rot = rotOf([R.x - it.x, R.z - it.z]);
+  }
+  if (isFinite(+src.turn)) it.rot = (it.rot || 0) + +src.turn;
+}
+function chairsFor(T, n, type, src) {
+  const t = withDefaults(T), c = withDefaults({ type }), fr = fwd(T.rot), ax = [fr[1], -fr[0]], out = [];
+  const mk = (x, z, rot) => ({ type, name: CAT[type].label, room: T.room, x, z, rot, finish: src.chairFinish || c.finish, accent: c.accent, _anchor: { group: true }, _group: T });
+  if (T.type === 'table-round' || Math.abs(t.w - t.d) < .3 && t.w < 5) {
+    const R = t.w / 2 + c.d / 2 - .35; for (let i = 0; i < n; i++) { const a = i / n * 2 * Math.PI, v = [Math.sin(a), Math.cos(a)]; out.push(mk(T.x + v[0] * R, T.z + v[1] * R, rotOf([-v[0], -v[1]]))); }
+    return out;
+  }
+  // long sides run along the table's width, as many chairs as fit with elbow room; the rest go to the ends
+  const cap = Math.max(1, Math.floor((t.w - .2) / (c.w + .3))), per = Math.min(cap, Math.floor(n / 2)), ends = Math.min(2, n - 2 * per), pitch = t.w / per;
+  for (const sg of [1, -1]) for (let i = 0; i < per; i++) {
+    const s = -t.w / 2 + pitch * (i + .5), off = t.d / 2 + c.d / 2 - .4;
+    out.push(mk(T.x + ax[0] * s + fr[0] * sg * off, T.z + ax[1] * s + fr[1] * sg * off, rotOf([-fr[0] * sg, -fr[1] * sg])));
+  }
+  for (let e = 0; e < ends; e++) { const sg = e ? -1 : 1, off = t.w / 2 + c.d / 2 - .3; out.push(mk(T.x + ax[0] * sg * off, T.z + ax[1] * sg * off, rotOf([-ax[0] * sg, -ax[1] * sg]))); }
+  return out;
+}
+function nightstandsFor(B, lamps) {
+  const b = withDefaults(B), ns = withDefaults({ type: 'nightstand' }), fr = fwd(B.rot), ax = [fr[1], -fr[0]], out = [];
+  for (const sg of [-1, 1]) {
+    const back = b.d / 2 - ns.d / 2, side = b.w / 2 + .15 + ns.w / 2;
+    const it = { type: 'nightstand', name: 'Nightstand', room: B.room, x: B.x - fr[0] * back + ax[0] * sg * side, z: B.z - fr[1] * back + ax[1] * sg * side, rot: B.rot, _anchor: B._anchor?.face ? { face: B._anchor.face, off: B._anchor.off } : { group: true } };
+    out.push(it);
+    if (lamps) out.push({ type: 'lamp-table', name: 'Bedside lamp', room: B.room, x: it.x, z: it.z, rot: B.rot, y: r2(ns.h), _anchor: { on: true }, _ref: it });
+  }
+  return out;
+}
+function stoolsFor(I, n) {
+  const t = withDefaults(I), s = withDefaults({ type: 'bar-stool' }), fr = fwd(I.rot), ax = [fr[1], -fr[0]], out = [], span = t.w - s.w;
+  for (let i = 0; i < n; i++) { const p = n > 1 ? -span / 2 + span * i / (n - 1) : 0, off = t.d / 2 + s.d / 2 - .1; out.push({ type: 'bar-stool', name: 'Counter stool', room: I.room, x: I.x + ax[0] * p + fr[0] * off, z: I.z + ax[1] * p + fr[1] * off, rot: rotOf([-fr[0], -fr[1]]), _anchor: { group: true }, _group: I }); }
+  return out;
+}
+
+/* ---------- check the room as built; fix what code can, list the rest ---------- */
+function obbCorners(it) { const f = withDefaults(it), th = (it.rot || 0) * D2R, c = Math.cos(th), s = Math.sin(th), hx = f.w / 2, hz = f.d / 2; return [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]].map(([a, b]) => [it.x + a * c + b * s, it.z - a * s + b * c]); }
+function insideRoom(it, F, slack = .08) { return obbCorners(it).every(p => pip(p, F.inner) || F.inner.some((q, i) => segDist(p[0], p[1], q, F.inner[(i + 1) % F.inner.length]) < slack)); }
+function faceSpan(it, f) { const wd = withDefaults(it).w, a = dot2([it.x - f.S[0], it.z - f.S[1]], f.u); return [a - wd / 2, a + wd / 2, a]; }
+function auditRoom(items, F) {
+  const issues = [], label = it => `${it.type} "${it.name}" at ${ptL(F, [it.x, it.z])}`;
+  const mine = items.filter(it => it.room === F.r.name);
+  const shift = (it, dx, dz) => { it.x += dx; it.z += dz; for (const o of mine) if (o._ref === it) shift(o, dx, dz); };
+  // wall pieces: keep them off doors (and tall ones off windows), sliding along the wall to the nearest stretch that fits
+  for (const it of mine) {
+    const A = it._anchor; if (!A?.face) continue; const f = F.faces.find(q => q.id === A.face); if (!f) continue;
+    if (A.off > .3 || it.type === 'curtain') continue;
+    const df = withDefaults(it), wall = WALLMOUNT.has(it.type) || BACKED.has(it.type);
+    // tall wall pieces may not cover a window; beds, sofas and low pieces may sit under one
+    const tall = wall && (+df.y || 0) + (+df.h || 0) > 3.2 && !['bed', 'bed-luxe', 'sofa', 'sectional', 'outdoor-sofa', 'wc'].includes(it.type);
+    const stretches = (tall ? f.clearSolid : f.solid).filter(([p, q]) => q > p);
+    let [a0, a1, mid] = faceSpan(it, f); const w = a1 - a0;
+    const fits = stretches.find(([p, q]) => a0 >= p - .05 && a1 <= q + .05);
+    if (fits) continue;
+    let best = null, bd = 1e9;
+    for (const [p, q] of stretches) { if (q - p < w - .01) continue; const m = clamp(mid, p + w / 2, q - w / 2), d = Math.abs(m - mid); if (d < bd) { bd = d; best = m; } }
+    if (best != null && bd <= Math.max(3, w)) { const dm = best - mid; shift(it, f.u[0] * dm, f.u[1] * dm); A.along = best; continue; }
+    // long joinery may give up a little length to fit (never more than a third of it)
+    if (RESIZABLE.has(it.type)) {
+      const big = stretches.filter(s => s[1] - s[0] >= Math.max(2, w * .67)).sort((p, q) => Math.abs((p[0] + p[1]) / 2 - mid) - Math.abs((q[0] + q[1]) / 2 - mid))[0];
+      if (big) { const nw = r2(Math.min(w, big[1] - big[0])), m = clamp(mid, big[0] + nw / 2, big[1] - nw / 2), dm = m - mid; it.w = nw; shift(it, f.u[0] * dm, f.u[1] * dm); A.along = m; continue; }
+    }
+    issues.push(`${label(it)} on ${f.id} spans ${L1(a0)}–${L1(a1)} along it, which covers ${tall ? 'a door or window' : 'a door or open side'}; the wall's ${tall ? 'stretches without openings' : 'solid stretches'} are ${stretches.map(([p, q]) => `${L1(p)}–${L1(q)}`).join(', ') || 'none'}`);
+  }
+  // inside the room
+  for (const it of mine) {
+    if (WALLMOUNT.has(it.type) || it._anchor?.on || (+withDefaults(it).y || 0) > 6) continue;
+    if (!insideRoom(it, F, it.type === 'rug' || it.type === 'rug-round' ? .5 : .12)) {
+      // a piece just over the line steps back in
+      const cen = centroid(F.inner), x0 = it.x, z0 = it.z;
+      for (let k = 1; k <= 12 && !insideRoom(it, F); k++) { const v = [cen[0] - it.x, cen[1] - it.z], L = Math.hypot(...v) || 1; shift(it, v[0] / L * .1, v[1] / L * .1); }
+      if (!insideRoom(it, F, .15)) { shift(it, x0 - it.x, z0 - it.z); issues.push(`${label(it)} (${L1(withDefaults(it).w)} × ${L1(withDefaults(it).d)} ft) sticks out of the room`); }
+    }
+  }
+  // doors and walkways
+  for (const it of mine) {
+    if (!isSolid(it) || it._anchor?.on) continue;
+    for (const z of F.clear) { const m = sat(itemOBB(it), z); if (m && m.ov > .2) issues.push(`${label(it)} stands in the clear zone of the ${z.o.main ? 'main entrance' : z.o.type}${z.o.to ? ' to ' + z.o.to : ''} on ${z.face} (${L1(z.o.a0)}–${L1(z.o.a1)} along, keep ${L1(z.hz * 2)} ft out clear)`); }
+  }
+  // pieces running into each other
+  const solid = mine.filter(it => isSolid(it) && !it._anchor?.on);
+  for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) {
+    const A = solid[i], B = solid[j]; if (A._group === B || B._group === A || (A._group && A._group === B._group)) continue;
+    const m = sat(itemOBB(A), itemOBB(B)); if (m && m.ov > .25) issues.push(`${label(A)} overlaps ${label(B)} by ${L1(m.ov)} ft`);
+  }
+  return [...new Set(issues)];
+}
+
+async function furnishOne(sample, rooms, extra, signal, repairOK) {
+  const frames = rooms.map(roomFrame), byName = Object.fromEntries(layout.rooms.map(r => [r.name, r]));
+  const prompt = furnishPrompt(rooms, extra);
+  let res = await sample.json(prompt, { modelTier: 'default', signal });
+  let raw = Array.isArray(res) ? res : res?.items, { items, notes } = resolveItems(raw, frames, byName);
+  let issues = [...notes, ...frames.flatMap(F => auditRoom(items, F))];
+  if (issues.length && repairOK) {
+    const fixPrompt = `${prompt}\n\nYOUR FIRST ANSWER:\n${JSON.stringify({ items: raw })}\n\nWHEN IT WAS BUILT, THESE PROBLEMS CAME UP:\n- ${issues.slice(0, 40).join('\n- ')}\n\nFix every problem without breaking anything that worked (move, resize, swap or drop pieces as a designer would; keep the design intent). Reply with only the complete corrected JSON in the same shape: {"items":[...]}.`;
+    try {
+      const res2 = await sample.json(fixPrompt, { modelTier: 'default', signal });
+      const raw2 = Array.isArray(res2) ? res2 : res2?.items;
+      if (Array.isArray(raw2) && raw2.length >= Math.min(3, (raw || []).length * .5)) { const r2_ = resolveItems(raw2, frames, byName), iss2 = [...r2_.notes, ...frames.flatMap(F => auditRoom(r2_.items, F))]; if (iss2.length <= issues.length) { items = r2_.items; issues = iss2; raw = raw2; } }
+    } catch (e) { if (e?.code === 'cancelled') throw e; }
+  }
+  for (const it of items) { if (it._anchor && !it._anchor.global && !(it._anchor.face && (it._anchor.off || 0) <= .3)) it._float = true; delete it._anchor; delete it._group; delete it._ref; }
+  return { items: settleItems(items, rooms), issues };
+}
 
 
 /* ================= step 1: read the plan (free) ================= */
@@ -3382,22 +3972,45 @@ async function readPlan() {
   running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
   if (innerWidth < 860) document.body.classList.remove('side-hidden');
   project.brief = $('brief').value; const ceiling = clamp(parseFloat($('ceilH').value) || 10, 7, 20), view = $('seaSide').value;
-  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'shell', label: 'Building walls, doors and windows' }]);
+  const PW = project.plan.w, PH = project.plan.h, planBlob = () => dataURLtoBlob(project.plan.image);
+  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'check', label: 'Checking the tracing against the drawing' }, { id: 'shell', label: 'Fitting walls to the printed sizes' }]);
   let done = false;
   try {
     const tp = ticker('plan', 'Tracing walls and rooms');
     if (SITE) SITE.ctx = { kind: 'plan_read', homeId: project.id };
-    const tr = await ok.sample.json(PLAN_PROMPT(project.plan.w, project.plan.h, project.brief), { images: dataURLtoBlob(project.plan.image), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop);
-    project.trace = tr; stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms`);
+    const [first, P] = await Promise.all([ok.sample.json(PLAN_PROMPT(PW, PH, project.brief), { images: planBlob(), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop), planInk(project.plan.image)]);
+    let tr = first; const r1 = refineTrace(tr, P);
+    stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms; ${r1.stats.snapped} walls matched to the drawing`);
+    // second look: Claude compares its tracing, drawn over the plan, with the plan itself
+    stepSet('check', 'active');
+    try {
+      const tc = ticker('check', 'Comparing the tracing with the plan');
+      if (SITE) SITE.ctx = { kind: 'plan_check', homeId: project.id };
+      const overlay = await traceOverlay(project.plan.image, tr);
+      const fixed = await ok.sample.json(PLAN_CHECK_PROMPT(PW, PH, tr, r1.hints), { images: [planBlob(), dataURLtoBlob(overlay)], modelTier: 'complex', signal, onText: tc.onText }).finally(tc.stop);
+      const nw = (fixed?.walls || []).filter(w => numOk(w?.a) && numOk(w?.b)).length;
+      if (nw >= Math.max(3, (tr.walls || []).length * .6) && (fixed.rooms || []).length) {
+        const ch = (Array.isArray(fixed.changes) ? fixed.changes : []).map(String); delete fixed.changes;
+        tr = fixed; refineTrace(tr, P);
+        stepSet('check', 'done', ch.length ? `${ch.length} fix${ch.length > 1 ? 'es' : ''}: ${ch.slice(0, 3).join('; ')}` : 'The tracing matches the drawing');
+      } else stepSet('check', 'done', 'Kept the first reading');
+    } catch (e) { if (e?.code === 'cancelled') throw e; stepSet('check', 'error', errText(e) + ' Kept the first reading.'); }
+    project.trace = structuredClone(tr);
     stepSet('shell', 'active');
-    const res = traceToLayout(tr, project.plan.w, project.plan.h, { ceiling, view, style: project.style, name: project.name });
+    // the printed sizes set the scale and then pull each wall to where the sizes say it is
+    const fit = fitToDims(tr); let scale = null;
+    if (fit) { warpTrace(tr, fit.wx, fit.wy); scale = { s: fit.s, method: `Scale and room sizes set from ${fit.used} printed measurements.`, sure: true }; }
+    const res = traceToLayout(tr, PW, PH, { ceiling, view, style: project.style, name: project.name, scale });
     if (!res.layout.walls.length) { stepSet('shell', 'error', 'No walls could be traced.'); res.warns.forEach(w => flash(w, true)); flash('The plan could not be traced. Try a cleaner image with walls, doors and windows only.', true); return; }
-    project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0;
+    const off = (fit?.report || []).filter(r => r.after.some((v, i) => v != null && Math.abs(v - r.printed[i]) > .17));
+    if (off.length) res.warns.push(`${off.map(r => r.room).join(', ')}: the drawing and its printed size disagree; check ${off.length > 1 ? 'them' : 'it'} in Fix the layout.`);
+    project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0; project.plan.fit = fit ? { conv: fit.conv, used: fit.used, total: fit.total } : null;
     const keep = new Set(res.layout.rooms.map(r => r.name));
     for (const k of Object.keys(project.roomInspo || {})) if (!keep.has(k)) { delete project.roomInspo[k]; delete project.roomStyles?.[k]; }
     project.layout = layout = res.layout; project.status = 'traced'; for (const k in MC) delete MC[k];
     $('empty3d').hidden = true; $('pbar').hidden = false; buildAll(); placeSpawn(); setMode('walk'); showView('3d'); pv.fitted = false;
-    stepSet('shell', 'done', `${res.method} ${layout.walls.length} walls, ${layout.rooms.length} rooms.`);
+    const exact = fit ? fit.report.filter(r => r.after.every((v, i) => v == null || Math.abs(v - r.printed[i]) <= .17)).length : 0;
+    stepSet('shell', 'done', `${res.method} ${layout.walls.length} walls, ${layout.rooms.length} rooms${fit ? `, ${exact} of ${fit.report.length} sized rooms within 2 inches of the plan` : ''}.`);
     res.warns.forEach(w => flash(w, true)); done = true; saveSoon();
   } catch (e) { if (e?.code === 'cancelled') flash('Stopped.', true); else flash(errText(e), true); }
   finally { running = false; renderUploads(); if (done) (SITE ? SITE.afterPlanRead?.() : askRoomInspo()); }
@@ -3484,25 +4097,25 @@ async function runGenerate(ok) {
 }
 async function furnishRooms(rooms, signal, stepId = 'furn', extra = '') {
   const sample = await getSample(); if (!sample) return { placed: 0 };
-  const chunks = []; let cur = [], area = 0;
-  for (const r of [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))) { const a = polyArea(r.polygon); if (cur.length && (cur.length >= 3 || area + a > 650)) { chunks.push(cur); cur = []; area = 0; } cur.push(r); area += a; }
-  if (cur.length) chunks.push(cur);
-  let done = 0, placed = 0, failed = 0; stepSet(stepId, 'active', `0 of ${rooms.length} rooms`);
+  // one room per call: Claude gets the whole room to reason about, and a second pass to fix what didn't fit
+  const queue = [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon)).map(r => [r]);
+  const repairOK = !SITE || ['design', 'edit_followup'].includes(SITE.ctx?.kind);
+  let done = 0, placed = 0, failed = 0, open = 0; stepSet(stepId, 'active', `0 of ${rooms.length} rooms`);
   const t0 = performance.now(), iv = setInterval(() => stepSet(stepId, null, `${done} of ${rooms.length} rooms · ${placed} pieces · ${Math.round((performance.now() - t0) / 1000)}s`), 1000);
   const worker = async () => {
-    while (chunks.length) {
-      const ch = chunks.shift(); if (signal?.aborted) return;
+    while (queue.length) {
+      const ch = queue.shift(); if (signal?.aborted) return;
       try {
-        const res = await sample.json(furnishPrompt(ch, extra), { modelTier: 'default', signal });
-        const items = settleItems(Array.isArray(res) ? res : res?.items, ch);
+        const { items, issues } = await furnishOne(sample, ch, extra, signal, repairOK);
+        if (issues.length) { open += issues.length; console.info(`[furnish] ${ch.map(r => r.name).join(', ')}: ${issues.length} open issue(s)`, issues); }
         layout.furniture.push(...items); addItemsLive(items); placed += items.length; updateMeta(); saveSoon();
       } catch (e) { if (e?.code === 'cancelled') throw e; failed += ch.length; flash(`${ch.map(r => r.name).join(', ')}: ${errText(e)}`, true); }
       done += ch.length;
     }
   };
-  try { await Promise.all([worker(), worker()]); }
+  try { await Promise.all([worker(), worker(), worker(), worker()]); }
   finally { clearInterval(iv); stepSet(stepId, failed === rooms.length ? 'error' : 'done', `${placed} pieces in ${rooms.length - failed} of ${rooms.length} rooms · ${Math.round((performance.now() - t0) / 1000)}s`); }
-  return { placed, failed };
+  return { placed, failed, open };
 }
 async function refurnishRoom(r, extra = '', bill = true) {
   if (running) return;
@@ -3545,7 +4158,7 @@ function editPrompt(text) {
   let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
   const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
-  const detail = focus.map(r => `ROOM "${r.name}" polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}\n${roomFaces(r).join('\n')}`).join('\n\n');
+  const detail = focus.map(r => { const F = roomFrame(r); return `${describeRoom(F, false)}\nThis room's coordinates start at whole-home (${f1(F.ox)},${f1(F.oz)}).`; }).join('\n\n');
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
@@ -3568,7 +4181,7 @@ ${cat}
 
 Reply with only JSON: {"summary":"one short sentence saying what you changed","ops":[ ... ]}. Operations:
 {"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, or a type's extra fields }}
-{"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}}
+{"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>", ...placement..., "w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}} — placement is either whole-home "x","z","rot", or, for a room described in detail above, its room terms: "wall":"W2","along":ft,"off":ft (against that wall, facing into the room) or "at":[X,Z] with "rot" (room coordinates). Prefer the wall form for anything that stands against or hangs on a wall.
 {"op":"remove","id":"<id>"}
 {"op":"style","token":"wood-light|wood-dark|stone|marble|stone-dark|fabric-main|fabric-second|fabric-accent|metal","value":"#hex"} (for stone, marble, stone-dark the value may be {"look":"travertine|marble|limestone|concrete|terrazzo","color":"#hex"}; for metal "brass|black|chrome"). This changes the material everywhere it is used.
 {"op":"floor","rooms":["<room>"],"finish":"stone-large|wood|tile-2ft|tile-1ft|terrazzo|stone","color":"#hex"}
@@ -3606,7 +4219,11 @@ function applyOps(res) {
     else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
-  if (added.length) { const items = settleItems(added, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; }
+  if (added.length) {
+    const byName = Object.fromEntries(layout.rooms.map(r => [r.name, r])), frames = [...new Set(added.map(a => byName[a.room]).filter(Boolean))].map(roomFrame);
+    const { items: placedNew } = resolveItems(added.map(a => ({ ...a })), frames, byName); placedNew.forEach(it => { if (it._anchor && !it._anchor.global && !(it._anchor.face && (it._anchor.off || 0) <= .3)) it._float = true; delete it._anchor; delete it._group; delete it._ref; });
+    const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length;
+  }
   if (mats) for (const k in MC) delete MC[k];
   if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
   saveSoon();
@@ -5116,7 +5733,7 @@ setupPost(); renderCredits();
   showHome();
 })();
 tick();
-window.__studio = { clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
+window.__studio = { clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
 
 /* ================= website: accounts, plans, paywall, meter (website build only) ================= */
 if (SITE) (() => {

@@ -20,22 +20,45 @@ async function readPlan() {
   running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
   if (innerWidth < 860) document.body.classList.remove('side-hidden');
   project.brief = $('brief').value; const ceiling = clamp(parseFloat($('ceilH').value) || 10, 7, 20), view = $('seaSide').value;
-  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'shell', label: 'Building walls, doors and windows' }]);
+  const PW = project.plan.w, PH = project.plan.h, planBlob = () => dataURLtoBlob(project.plan.image);
+  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'check', label: 'Checking the tracing against the drawing' }, { id: 'shell', label: 'Fitting walls to the printed sizes' }]);
   let done = false;
   try {
     const tp = ticker('plan', 'Tracing walls and rooms');
     if (SITE) SITE.ctx = { kind: 'plan_read', homeId: project.id };
-    const tr = await ok.sample.json(PLAN_PROMPT(project.plan.w, project.plan.h, project.brief), { images: dataURLtoBlob(project.plan.image), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop);
-    project.trace = tr; stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms`);
+    const [first, P] = await Promise.all([ok.sample.json(PLAN_PROMPT(PW, PH, project.brief), { images: planBlob(), modelTier: 'complex', signal, onText: tp.onText }).finally(tp.stop), planInk(project.plan.image)]);
+    let tr = first; const r1 = refineTrace(tr, P);
+    stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms; ${r1.stats.snapped} walls matched to the drawing`);
+    // second look: Claude compares its tracing, drawn over the plan, with the plan itself
+    stepSet('check', 'active');
+    try {
+      const tc = ticker('check', 'Comparing the tracing with the plan');
+      if (SITE) SITE.ctx = { kind: 'plan_check', homeId: project.id };
+      const overlay = await traceOverlay(project.plan.image, tr);
+      const fixed = await ok.sample.json(PLAN_CHECK_PROMPT(PW, PH, tr, r1.hints), { images: [planBlob(), dataURLtoBlob(overlay)], modelTier: 'complex', signal, onText: tc.onText }).finally(tc.stop);
+      const nw = (fixed?.walls || []).filter(w => numOk(w?.a) && numOk(w?.b)).length;
+      if (nw >= Math.max(3, (tr.walls || []).length * .6) && (fixed.rooms || []).length) {
+        const ch = (Array.isArray(fixed.changes) ? fixed.changes : []).map(String); delete fixed.changes;
+        tr = fixed; refineTrace(tr, P);
+        stepSet('check', 'done', ch.length ? `${ch.length} fix${ch.length > 1 ? 'es' : ''}: ${ch.slice(0, 3).join('; ')}` : 'The tracing matches the drawing');
+      } else stepSet('check', 'done', 'Kept the first reading');
+    } catch (e) { if (e?.code === 'cancelled') throw e; stepSet('check', 'error', errText(e) + ' Kept the first reading.'); }
+    project.trace = structuredClone(tr);
     stepSet('shell', 'active');
-    const res = traceToLayout(tr, project.plan.w, project.plan.h, { ceiling, view, style: project.style, name: project.name });
+    // the printed sizes set the scale and then pull each wall to where the sizes say it is
+    const fit = fitToDims(tr); let scale = null;
+    if (fit) { warpTrace(tr, fit.wx, fit.wy); scale = { s: fit.s, method: `Scale and room sizes set from ${fit.used} printed measurements.`, sure: true }; }
+    const res = traceToLayout(tr, PW, PH, { ceiling, view, style: project.style, name: project.name, scale });
     if (!res.layout.walls.length) { stepSet('shell', 'error', 'No walls could be traced.'); res.warns.forEach(w => flash(w, true)); flash('The plan could not be traced. Try a cleaner image with walls, doors and windows only.', true); return; }
-    project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0;
+    const off = (fit?.report || []).filter(r => r.after.some((v, i) => v != null && Math.abs(v - r.printed[i]) > .17));
+    if (off.length) res.warns.push(`${off.map(r => r.room).join(', ')}: the drawing and its printed size disagree; check ${off.length > 1 ? 'them' : 'it'} in Fix the layout.`);
+    project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0; project.plan.fit = fit ? { conv: fit.conv, used: fit.used, total: fit.total } : null;
     const keep = new Set(res.layout.rooms.map(r => r.name));
     for (const k of Object.keys(project.roomInspo || {})) if (!keep.has(k)) { delete project.roomInspo[k]; delete project.roomStyles?.[k]; }
     project.layout = layout = res.layout; project.status = 'traced'; for (const k in MC) delete MC[k];
     $('empty3d').hidden = true; $('pbar').hidden = false; buildAll(); placeSpawn(); setMode('walk'); showView('3d'); pv.fitted = false;
-    stepSet('shell', 'done', `${res.method} ${layout.walls.length} walls, ${layout.rooms.length} rooms.`);
+    const exact = fit ? fit.report.filter(r => r.after.every((v, i) => v == null || Math.abs(v - r.printed[i]) <= .17)).length : 0;
+    stepSet('shell', 'done', `${res.method} ${layout.walls.length} walls, ${layout.rooms.length} rooms${fit ? `, ${exact} of ${fit.report.length} sized rooms within 2 inches of the plan` : ''}.`);
     res.warns.forEach(w => flash(w, true)); done = true; saveSoon();
   } catch (e) { if (e?.code === 'cancelled') flash('Stopped.', true); else flash(errText(e), true); }
   finally { running = false; renderUploads(); if (done) (SITE ? SITE.afterPlanRead?.() : askRoomInspo()); }
@@ -122,25 +145,25 @@ async function runGenerate(ok) {
 }
 async function furnishRooms(rooms, signal, stepId = 'furn', extra = '') {
   const sample = await getSample(); if (!sample) return { placed: 0 };
-  const chunks = []; let cur = [], area = 0;
-  for (const r of [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))) { const a = polyArea(r.polygon); if (cur.length && (cur.length >= 3 || area + a > 650)) { chunks.push(cur); cur = []; area = 0; } cur.push(r); area += a; }
-  if (cur.length) chunks.push(cur);
-  let done = 0, placed = 0, failed = 0; stepSet(stepId, 'active', `0 of ${rooms.length} rooms`);
+  // one room per call: Claude gets the whole room to reason about, and a second pass to fix what didn't fit
+  const queue = [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon)).map(r => [r]);
+  const repairOK = !SITE || ['design', 'edit_followup'].includes(SITE.ctx?.kind);
+  let done = 0, placed = 0, failed = 0, open = 0; stepSet(stepId, 'active', `0 of ${rooms.length} rooms`);
   const t0 = performance.now(), iv = setInterval(() => stepSet(stepId, null, `${done} of ${rooms.length} rooms · ${placed} pieces · ${Math.round((performance.now() - t0) / 1000)}s`), 1000);
   const worker = async () => {
-    while (chunks.length) {
-      const ch = chunks.shift(); if (signal?.aborted) return;
+    while (queue.length) {
+      const ch = queue.shift(); if (signal?.aborted) return;
       try {
-        const res = await sample.json(furnishPrompt(ch, extra), { modelTier: 'default', signal });
-        const items = settleItems(Array.isArray(res) ? res : res?.items, ch);
+        const { items, issues } = await furnishOne(sample, ch, extra, signal, repairOK);
+        if (issues.length) { open += issues.length; console.info(`[furnish] ${ch.map(r => r.name).join(', ')}: ${issues.length} open issue(s)`, issues); }
         layout.furniture.push(...items); addItemsLive(items); placed += items.length; updateMeta(); saveSoon();
       } catch (e) { if (e?.code === 'cancelled') throw e; failed += ch.length; flash(`${ch.map(r => r.name).join(', ')}: ${errText(e)}`, true); }
       done += ch.length;
     }
   };
-  try { await Promise.all([worker(), worker()]); }
+  try { await Promise.all([worker(), worker(), worker(), worker()]); }
   finally { clearInterval(iv); stepSet(stepId, failed === rooms.length ? 'error' : 'done', `${placed} pieces in ${rooms.length - failed} of ${rooms.length} rooms · ${Math.round((performance.now() - t0) / 1000)}s`); }
-  return { placed, failed };
+  return { placed, failed, open };
 }
 async function refurnishRoom(r, extra = '', bill = true) {
   if (running) return;
@@ -183,7 +206,7 @@ function editPrompt(text) {
   let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
   const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
-  const detail = focus.map(r => `ROOM "${r.name}" polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}\n${roomFaces(r).join('\n')}`).join('\n\n');
+  const detail = focus.map(r => { const F = roomFrame(r); return `${describeRoom(F, false)}\nThis room's coordinates start at whole-home (${f1(F.ox)},${f1(F.oz)}).`; }).join('\n\n');
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
@@ -206,7 +229,7 @@ ${cat}
 
 Reply with only JSON: {"summary":"one short sentence saying what you changed","ops":[ ... ]}. Operations:
 {"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, or a type's extra fields }}
-{"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}}
+{"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>", ...placement..., "w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}} — placement is either whole-home "x","z","rot", or, for a room described in detail above, its room terms: "wall":"W2","along":ft,"off":ft (against that wall, facing into the room) or "at":[X,Z] with "rot" (room coordinates). Prefer the wall form for anything that stands against or hangs on a wall.
 {"op":"remove","id":"<id>"}
 {"op":"style","token":"wood-light|wood-dark|stone|marble|stone-dark|fabric-main|fabric-second|fabric-accent|metal","value":"#hex"} (for stone, marble, stone-dark the value may be {"look":"travertine|marble|limestone|concrete|terrazzo","color":"#hex"}; for metal "brass|black|chrome"). This changes the material everywhere it is used.
 {"op":"floor","rooms":["<room>"],"finish":"stone-large|wood|tile-2ft|tile-1ft|terrazzo|stone","color":"#hex"}
@@ -244,7 +267,11 @@ function applyOps(res) {
     else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
-  if (added.length) { const items = settleItems(added, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; }
+  if (added.length) {
+    const byName = Object.fromEntries(layout.rooms.map(r => [r.name, r])), frames = [...new Set(added.map(a => byName[a.room]).filter(Boolean))].map(roomFrame);
+    const { items: placedNew } = resolveItems(added.map(a => ({ ...a })), frames, byName); placedNew.forEach(it => { if (it._anchor && !it._anchor.global && !(it._anchor.face && (it._anchor.off || 0) <= .3)) it._float = true; delete it._anchor; delete it._group; delete it._ref; });
+    const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length;
+  }
   if (mats) for (const k in MC) delete MC[k];
   if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
   saveSoon();

@@ -11,7 +11,7 @@ export const PRICING = {
   },
   upgradeWindowDays: 7,       // Home Pass buyers who go Pro within this window get RAZORPAY_OFFER_UPGRADE applied
   free: { planReadsPerDay: 10, teasersPerDay: 3 },
-  budgets: { designCalls: 32, editFollowups: 4, generationMinutes: 45 },
+  budgets: { designCalls: 80, editFollowups: 10, generationMinutes: 60 },
   // Photo-real renders (fal.ai, about ₹3–4 each). Free: a few a day to feel the wow. Paid: per home or per rolling 30 days.
   guide: { freePerDay: 40, paidPerDay: 400 },
   voice: { freePerDay: 60, paidPerDay: 600, maxChars: 420 },   // Mira's premium voice: one line of speech per call
@@ -36,10 +36,12 @@ export const GUEST = { siteDesignsPerDay: Number(env('SITE_DESIGNS_PER_DAY', 60)
 export const MODELS = {
   complex: () => env('MODEL_COMPLEX', 'claude-opus-5-5'),
   default: () => env('MODEL_DEFAULT', 'claude-sonnet-5'),
+  // placing furniture is spatial reasoning over a whole room; it gets the strongest model unless MODEL_DESIGN says otherwise
+  design: () => env('MODEL_DESIGN', env('MODEL_COMPLEX', 'claude-opus-5-5')),
   fast: () => env('MODEL_FAST', 'claude-haiku-4-5-20251001'),
 };
 
-export const LIMITS = { promptChars: 160000, images: 8, imageChars: 3_000_000 };
+export const LIMITS = { promptChars: 200000, images: 8, imageChars: 5_000_000 };
 
 export function publicConfig(launch) {
   return {

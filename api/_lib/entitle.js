@@ -97,6 +97,14 @@ export async function allowPlanRead(uid, homeId, hash) {
   return home;
 }
 
+// a second look at the plan just read: same home, same image
+export async function allowPlanCheck(uid, homeId, hash) {
+  const home = await ownHome(uid, homeId);
+  if (home.plan_hash !== hash) throw new HttpError(409, 'no_plan', 'Read the floor plan first.');
+  if (await dailyCount(uid, 'plan_check') >= PRICING.free.planReadsPerDay * 2) throw new HttpError(429, 'rate_limited', 'You have read a lot of plans today. Try again tomorrow.');
+  return home;
+}
+
 export async function allowTeaser(uid, homeId) {
   const home = await ownHome(uid, homeId);
   if (!home.plan_hash) throw new HttpError(409, 'no_plan', 'Read the floor plan first.');

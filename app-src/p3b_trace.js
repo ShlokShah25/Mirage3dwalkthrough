@@ -1,26 +1,31 @@
-const PLAN_PROMPT = (W, Hh, brief) => `You are an architectural draftsperson converting a residential floor-plan image into vector data for a 3D model.
-The image is ${W}×${Hh} pixels. Use pixel coordinates: origin at the top-left corner, x to the right, y downward. Measure against the drawn lines; aim for ±3 px.
+const PLAN_PROMPT = (W, Hh, brief) => `You are an architectural draftsperson converting a residential floor-plan image into exact vector data for a 3D model. The model is built from your tracing, so every wall, door, window and room must be where the drawing puts it.
+The image is ${W}×${Hh} pixels and you see it at full resolution. Use pixel coordinates: origin at the top-left corner, x to the right, y downward. Read coordinates off the drawn lines themselves; aim for ±2 px.
 
 Reply with only one JSON object of this shape:
 {
  "units": "ft" or "m",
- "labels": [ {"room": "Master Bedroom", "dims": [13.08, 14.0], "bbox": [x0, y0, x1, y1]} ],
+ "labels": [ {"room": "Master Bedroom", "dims": [13.08, 14.0], "pos": [x, y], "bbox": [x0, y0, x1, y1]} ],
+ "dimLines": [ {"a": [x, y], "b": [x, y], "value": 30.5} ],
  "walls": [ {"a": [x, y], "b": [x, y], "t": thickness_px, "ext": true} ],
- "openings": [ {"type": "door", "a": [x, y], "b": [x, y]} ],
+ "openings": [ {"type": "door", "a": [x, y], "b": [x, y], "hinge": "a", "into": [x, y]} ],
  "rooms": [ {"name": "Living / Dining", "type": "living", "poly": [[x, y], ...]} ],
+ "fixtures": [ {"room": "Master Bedroom", "kind": "bed", "bbox": [x0, y0, x1, y1], "facing": "down"} ],
  "entrance": [x, y],
  "north": 0,
  "notes": "one short sentence on anything uncertain"
 }
 
+Work in this order: (1) read every printed room name and size; (2) trace the exterior walls all the way round; (3) trace every interior wall; (4) mark every door, sliding door, window and open archway on its wall; (5) outline every room; (6) list the furniture and fixtures drawn inside the rooms.
+
 Rules:
-- labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08; metres stay metres). bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
-- walls: every wall as a straight centreline segment. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments.
-- openings: a and b are the two jambs, on the wall centreline. type is "door" (hinged, usually with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill) or "opening" (a gap with no door).
-- rooms: every enclosed space, including toilets, balconies, terraces and utility areas; skip ducts and shafts. poly follows the wall centrelines. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room.
+- labels: one entry for every room with a printed size. dims are the printed numbers as decimals in the order printed (13'1" becomes 13.08, 10'6" becomes 10.5; metres stay metres; 4200 x 3600 mm becomes 4.2 and 3.6 with units "m"). Read each number carefully, digit by digit. pos is the centre of the room's name text. bbox is that room's clear interior rectangle in pixels, between the inner faces of its walls.
+- dimLines: every dimension line that has a printed length (usually outside the walls, with ticks or arrows at its ends). a and b are its two end ticks; value is the printed length as a decimal in the plan's units. Use [] if there are none.
+- walls: every wall as a straight centreline segment, running down the middle of the drawn wall. t is the drawn thickness in pixels. ext=true for exterior walls. Keep a wall continuous through its doors and windows (openings are listed separately). Walls that meet must share exactly the same endpoint coordinates: an L corner or T junction ends on the other wall's centreline. Walls that look horizontal or vertical must be exactly horizontal or vertical. Curved walls become 2-4 straight segments. Do not trace furniture, kitchen counters, wardrobes, hatching, text or dimension lines as walls.
+- openings: a and b are the two jambs (the ends of the gap in the wall), on the wall centreline. type is "door" (hinged, usually drawn with a swing arc), "slider" (full-height glazed sliding door, usually onto a balcony or terrace), "window" (glazing with a sill, usually drawn as thin parallel lines across the wall) or "opening" (a gap or arch with no door). For doors: hinge is "a" or "b", the jamb the leaf is hinged on (where the swing arc is centred); into is a point about one door-width inside the room the leaf swings into (inside the arc).
+- rooms: every enclosed space, including toilets, balconies, terraces, utility areas and passages; skip ducts and shafts. poly follows the wall centrelines around the room, corner by corner. type is one of living, dining, kitchen, bedroom, master, bath, foyer, passage, study, walkin, utility, staff, pooja, balcony, terrace, other. A combined space such as Living / Dining is one room. Use the printed names.
+- fixtures: furniture and fixtures drawn on the plan: kind is one of bed, sofa, sectional, armchair, coffee-table, dining-table, tv-unit, wardrobe, dresser, desk, bookshelf, kitchen-counter, sink, hob, fridge, island, wc, basin, vanity, shower, bathtub, washing-machine, pooja, plant, other. bbox is its footprint in pixels. facing is the side its front faces on the image: "up", "down", "left" or "right" (a bed's front is its foot end; a sofa's front is the seat side; a counter's front is the side you stand at). Use [] if the plan shows no furniture.
 - entrance: the main entrance door position, or null.
 - north: if the drawing has a north arrow or compass, the direction it points as degrees clockwise from straight up on the image (0 = up, 90 = right, 180 = down, 270 = left); otherwise null.
-- Ignore furniture drawings, hatching, text and dimension lines except to identify rooms.
 ${brief ? 'Homeowner notes (for context only): ' + brief.slice(0, 600) : ''}`;
 
 const STYLE_PROMPT = (brief, room) => `You are an interior designer. The image shows design inspiration (a mood board or photos) for ${room ? `one room of a home: the ${room.name} (a ${room.type}). Focus on what applies to that room, and fill the floors entry for its type` : 'a home'}. Extract a material and colour palette that a 3D renderer can apply to every room.
@@ -99,6 +104,8 @@ function fmtFtIn(v) { const ft = Math.floor(v + 1e-6), inch = Math.round((v - ft
 const numOk = v => Array.isArray(v) && v.length >= 2 && isFinite(+v[0]) && isFinite(+v[1]);
 function deriveScale(tr, W, Hh) {
   const unitK = tr.units === 'm' ? 3.28084 : 1, cands = [];
+  const dl = (tr.dimLines || []).filter(d => numOk(d?.a) && numOk(d?.b) && +d.value > 0).map(d => +d.value * unitK / Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1])).filter(v => isFinite(v) && v > 0);
+  if (dl.length >= 2) { dl.sort((a, b) => a - b); const med = dl[dl.length >> 1], good = dl.filter(c => Math.abs(c / med - 1) < .06); if (good.length >= 2) return { s: good.reduce((a, b) => a + b, 0) / good.length, method: `Scale set from ${good.length} printed dimension lines.`, sure: true }; }
   for (const l of tr.labels || []) {
     const d = (l.dims || []).map(Number).filter(v => v > 0), b = l.bbox; if (d.length < 2 || !Array.isArray(b) || b.length < 4) continue;
     const wp = Math.abs(b[2] - b[0]), hp = Math.abs(b[3] - b[1]); if (wp < 8 || hp < 8) continue;
@@ -141,7 +148,7 @@ function cleanWalls(walls, tol = .8) {
 const PRESET = { door: { type: 'door', sill: 0, head: 7 }, slider: { type: 'slider', sill: 0, head: 8 }, window: { type: 'window', sill: 2.5, head: 7 }, opening: { type: 'opening', sill: 0, head: 7.5 } };
 function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || polyArea(r.polygon) < polyArea(best.polygon)) best = r; } return best; }
 function traceToLayout(tr, W, Hh, opt) {
-  const warns = []; const sc = deriveScale(tr, W, Hh), s = sc.s;
+  const warns = []; const sc = opt.scale || deriveScale(tr, W, Hh), s = sc.s;
   if (!sc.sure) warns.push(sc.method);
   const P = p => [r2(+p[0] * s), r2(+p[1] * s)];
   let walls = (tr.walls || []).filter(w => numOk(w?.a) && numOk(w?.b)).map(w => ({ a: P(w.a), b: P(w.b), thickness: r2(clamp((+w.t || 8) * s, .3, 2.2)), kind: w.ext ? 'ext' : 'int', openings: [] }));
@@ -168,7 +175,13 @@ function traceToLayout(tr, W, Hh, opt) {
     const type = PRESET[o.type] ? o.type : 'door', min = { door: 2.4, slider: 3, window: 1.5, opening: 2.5 }[type];
     if (en - st < min) { const c = (st + en) / 2; st = c - min / 2; en = c + min / 2; }
     st = clamp(st, .1, L - .1); en = clamp(en, st + .5, L - .1); if (en - st < .8) { dropped++; continue; }
-    best.openings.push({ ...PRESET[type], start: r2(st), end: r2(en) });
+    const op = { ...PRESET[type], start: r2(st), end: r2(en) };
+    if (type === 'door') {
+      const sa = (a[0] - best.a[0]) * ux + (a[1] - best.a[1]) * uz, sb = (b[0] - best.a[0]) * ux + (b[1] - best.a[1]) * uz;
+      if (o.hinge === 'a' || o.hinge === 'b') op._hinge = (o.hinge === 'a' ? sa <= sb : sb < sa) ? 'start' : 'end';
+      if (numOk(o.into)) { const q = P(o.into); op._into = q; }
+    }
+    best.openings.push(op);
   }
   if (dropped) warns.push(`${dropped} door or window mark${dropped > 1 ? 's' : ''} could not be matched to a wall. Add them in Plan check if they matter.`);
   for (const w of walls) {
@@ -186,13 +199,18 @@ function traceToLayout(tr, W, Hh, opt) {
       const rp = roomAtIn(rooms, cx + nx * off, cz + nz * off), rm = roomAtIn(rooms, cx - nx * off, cz - nz * off);
       if (o.type === 'window' && o.end - o.start < 3 && [rp, rm].some(r => r?.type === 'bath')) { o.sill = 5.5; o.head = 7; }
       if (o.type !== 'door') continue;
-      const side = prio(rp) >= prio(rm) ? 1 : -1, tgt = side > 0 ? rp : rm;
-      o.name = (tgt ? tgt.name + ' door' : 'Door'); o.swing = { hinge: 'start', side, open: 90 };
+      // the drawn swing wins; otherwise the door opens into the more private room
+      let side = prio(rp) >= prio(rm) ? 1 : -1;
+      if (o._into) { const d = (o._into[0] - cx) * nx + (o._into[1] - cz) * nz; if (Math.abs(d) > .2) side = d > 0 ? 1 : -1; }
+      const tgt = side > 0 ? rp : rm;
+      o.name = (tgt ? tgt.name + ' door' : 'Door'); o.swing = { hinge: o._hinge || 'start', side, open: 90 };
+      delete o._hinge; delete o._into;
       const outside = !rp || !rm; const d = entrance ? Math.hypot(cx - entrance[0], cz - entrance[1]) : outside ? 0 : 1e8;
       if ((outside || entrance) && d < mainD) { mainD = d; main = { o, cx, cz, nx: rp ? nx : -nx, nz: rp ? nz : -nz }; }
     }
   }
-  if (main) { main.o.name = 'Main door'; main.o.swing = { hinge: 'start', side: 1, open: 0 }; }
+  for (const w of walls) for (const o of w.openings) { delete o._hinge; delete o._into; }
+  if (main) { main.o.name = 'Main door'; main.o.swing = { ...main.o.swing, open: 0 }; }
   // railings on open outdoor edges
   const railings = [];
   for (const r of rooms.filter(r => r.kind === 'outdoor')) {
@@ -205,7 +223,13 @@ function traceToLayout(tr, W, Hh, opt) {
   }
   const st = opt.style, settings = baseSettings(opt.ceiling, opt.view, st);
   if (tr.north !== null && tr.north !== undefined && tr.north !== '' && isFinite(+tr.north)) settings.north = (Math.round(+tr.north / 45) * 45 % 360 + 360) % 360;
-  const L = { name: opt.name, units: 'feet', settings, walls, rooms, railings, furniture: [] };
+  const FACE = { down: 0, right: 90, up: 180, left: -90 };
+  const planFurniture = (tr.fixtures || []).filter(f => Array.isArray(f?.bbox) && f.bbox.length >= 4 && f.bbox.every(v => isFinite(+v))).map(f => {
+    const a = P([Math.min(f.bbox[0], f.bbox[2]), Math.min(f.bbox[1], f.bbox[3])]), b = P([Math.max(f.bbox[0], f.bbox[2]), Math.max(f.bbox[1], f.bbox[3])]), c = [r2((a[0] + b[0]) / 2), r2((a[1] + b[1]) / 2)];
+    const r = roomAtIn(rooms, c[0], c[1]); if (!r) return null;
+    return { room: r.name, kind: String(f.kind || 'other').slice(0, 24), x0: a[0], z0: a[1], x1: b[0], z1: b[1], ...(f.facing in FACE ? { rot: FACE[f.facing] } : {}) };
+  }).filter(f => f && (f.x1 - f.x0) > .3 && (f.z1 - f.z0) > .3);
+  const L = { name: opt.name, units: 'feet', settings, walls, rooms, railings, furniture: [], planFurniture };
   applyStyleToRooms(L, st);
   const big = [...rooms].filter(r => r.kind === 'room').sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
   if (main) L.spawn = { position: [r2(main.cx + main.nx * 3), r2(main.cz + main.nz * 3)], lookAt: big ? centroid(big.polygon) : [main.cx + main.nx * 10, main.cz + main.nz * 10] };
@@ -219,68 +243,6 @@ function traceToLayout(tr, W, Hh, opt) {
 /* ================= furnishing ================= */
 const BACKED = new Set(['bed', 'sofa', 'wardrobe', 'console', 'desk', 'vanity', 'kitchen-counter', 'tall-unit', 'bookshelf', 'wc', 'panel-slats', 'panel-stone', 'panel-upholstered', 'tv', 'artwork', 'mirror', 'curtain', 'tv-wall', 'bed-luxe', 'sideboard-fluted', 'arch-niche', 'bar-unit', 'pooja-unit', 'sconce', 'wall-molding', 'kitchen-luxe', 'vanity-luxe', 'wall-panel-wood', 'feature-stone', 'kitchen-tall-luxe', 'shower-luxe', 'closet-lit', 'media-wall']);
 const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
-function roomFaces(r) {
-  const out = [], n = r.polygon.length;
-  for (let i = 0; i < n; i++) {
-    const a = r.polygon[i], b = r.polygon[(i + 1) % n], ex = b[0] - a[0], ez = b[1] - a[1], el = Math.hypot(ex, ez); if (el < .5) continue;
-    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-    for (const w of layout.walls) {
-      const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
-      if (Math.abs(ux * ex / el + uz * ez / el) < .95 || segDist(mx, mz, w.a, w.b) > .8) continue;
-      let s0 = (a[0] - w.a[0]) * ux + (a[1] - w.a[1]) * uz, s1 = (b[0] - w.a[0]) * ux + (b[1] - w.a[1]) * uz; if (s0 > s1) [s0, s1] = [s1, s0];
-      s0 = Math.max(s0, 0); s1 = Math.min(s1, L); if (s1 - s0 < .5) continue;
-      let nx = -uz, nz = ux; const t2 = w.thickness / 2; if (!pip([w.a[0] + ux * (s0 + s1) / 2 + nx * (t2 + .3), w.a[1] + uz * (s0 + s1) / 2 + nz * (t2 + .3)], r.polygon)) { nx = -nx; nz = -nz; }
-      const P = s => [w.a[0] + ux * s + nx * t2, w.a[1] + uz * s + nz * t2];
-      const ops = (w.openings || []).filter(o => o.end > s0 && o.start < s1).map(o => { const p = P(Math.max(o.start, s0)), q = P(Math.min(o.end, s1)); return `${o.type}${o.type === 'window' ? ' (sill ' + o.sill + ')' : ''} from (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])})`; });
-      const p = P(s0), q = P(s1);
-      out.push(`  - ${hasNorth() ? `the room's ${DIRNAME[dirOf(bearingOf(-nx, -nz))]} wall: ` : ''}wall face (${f1(p[0])},${f1(p[1])}) to (${f1(q[0])},${f1(q[1])}), facing into the room along (${f1(nx)},${f1(nz)})${ops.length ? '; openings: ' + ops.join('; ') : ''}`);
-    }
-  }
-  return [...new Set(out)];
-}
-function furnishPrompt(rooms, extra = '') {
-  const st = project.style, cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
-  const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', '), FR = hasNorth() ? homeFrame() : null, BRIEF = briefForFurnish();
-  const blocks = rooms.map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `ROOM "${r.name}" — type ${r.type}${r.size ? ', printed size ' + r.size : ''}, ${hasNorth() ? 'in the ' + DIRNAME[roomZone(r, FR)] + ' of the home, ' : ''}${r.kind === 'outdoor' ? 'outdoor, ' : ''}area ${Math.round(polyArea(r.polygon))} sq ft${project.roomStyles?.[r.name] ? `
-  ROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : ''}
-  floor polygon: ${r.polygon.map(p => `(${f1(p[0])},${f1(p[1])})`).join(' ')}
-  bounds: x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))}
-${roomFaces(r).join('\n') || '  (no wall faces found; keep items inside the polygon)'}`; }).join('\n\n');
-  return `You are a senior interior designer at a luxury studio, designing a home that should look like it belongs in Architectural Digest, not a furniture catalogue. You place real pieces into a 3D model of the home. Units are feet. Plan coordinates: x increases to the right, z increases downward on the plan.
-
-STYLE: ${st.summary} Signature elements: ${(st.features || []).join(', ') || 'none given'}. Plants: ${st.plants}.
-FINISH TOKENS (use these so the style stays consistent): wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal. Also allowed: linen, linen-white, white-ceramic, black-metal, brass, felt, terracotta, concrete, plaster, teak, glass, glass-bronze, onyx, marble-green, marble-rosso, travertine-dark, velvet-emerald, velvet-rust, velvet-navy, velvet-blush, velvet-mustard, velvet-ink, or a "#rrggbb" hex (rugs and fabrics). Use one or two rich contrast materials per room (a velvet, a dark or veined stone, brass) against the calm base tokens.
-HOMEOWNER'S NOTES: ${(project.brief || 'none').slice(0, 1200)}${extra ? '\nREQUEST FOR THESE ROOMS (takes priority over the notes): ' + String(extra).slice(0, 600) : ''}
-CEILING HEIGHT: ${layout.settings.ceilingHeight} ft. The whole home has: ${others}.${BRIEF ? '\n' + BRIEF : ''}${FR ? '\nCOMPASS: ' + compassVecsText() : ''}
-
-ORIENTATION: rot is in degrees. An item's FRONT faces +z at rot 0, +x at rot 90, -z at rot 180, -x at rot -90. Its back is opposite its front. x,z is the item's centre. w is its width across the front, d its depth front-to-back, h its height, y its lift off the floor.
-Items listed as going against a wall (beds, sofas along walls, wardrobes, consoles, desks, vanities, counters, tall units, bookshelves, wc, TVs, mirrors, artwork, wall panels, curtains) must have their back touching the wall face: centre = point on the face + (d/2) along the face's inward direction, and rot chosen so the front faces into the room.
-
-CATALOG (type: default w×d×h — notes):
-${cat}
-
-${blocks}
-
-EVENING LUXE vocabulary (use generously in premium styles): wall-panel-wood (walnut with LED reveals) on the focal wall of bedrooms, dining and passages; feature-stone; media-wall; sectional + coffee-nest + lounge-leather; table-dining-long + dining-chair-luxe + pendant-linear or pendant-globes; bed-luxe with panel:"walnut"; plant-tree (big leafy trees) by the glass.
-
-DESIGN FIRST: before placing anything, decide for each room (silently) a one-line concept, its FOCAL WALL (the wall you face on entering, or the wall behind the bed/sofa), its hero piece, and its material story. Rooms must not repeat each other: vary the feature treatment, the rug, the accent colour and the lighting piece from room to room.
-
-RULES:
-- PREMIUM, NOT BASIC. Every living, dining and bedroom gets: (1) a feature wall treatment on its focal wall (tv-wall, panel-stone, panel-slats, panel-upholstered, wall-molding, or arch-niche, or bed-luxe whose headboard wall is the feature); (2) a ceiling-cove false ceiling; (3) at least three layers of light: a statement piece (chandelier, pendant-drum or pendants), a floor or table lamp, and sconces or LED; (4) one hero piece (sculptural coffee-plinth, lounge-chair, accent-barrel pair, bar-unit, jhoola, sideboard-fluted); (5) styling: decor-set clusters on consoles and sideboards, a floor-vase or large plant in a corner, artwork.
-- Prefer the premium types over their plain versions: bed-luxe over bed in master and guest bedrooms (no nightstands with it), tv-wall in the living room instead of a bare tv, coffee-plinth over a plain coffee table, sideboard-fluted over a plain console in dining.
-- If the style is Indian or the notes mention it, add Indian touches that feel luxe: a pooja-unit in a quiet corner of living/dining/foyer, brass accents, a jhoola on the balcony or living corner, jaali or wall-molding details.
-- Balconies: an outdoor lounge moment (lounge-chair or jhoola, planters, a floor-vase, a small table).
-- Furnish every room above fully for its type and the style: key furniture, rugs (layered, generous: the front legs of the seating sit on the rug), plants, art on walls, sheer curtains beside windows and sliders.
-- Every item stays fully inside its own room's polygon, clear of walls and of other items (rugs may sit under furniture; lamps and vases on tables use y).
-- Leave a 3 ft clear zone in front of every door and slider, and a 2.5 ft path from each door to the main areas. Do not block windows with tall items.
-- Bathrooms: vanity-luxe (brings its own lit mirror and stone wall), shower-luxe in a corner (or shower-glass across the shower zone), wc against a wall, a panel-stone or feature-stone on the remaining wall, a plant-pot; tub-freestanding only in a large master bath.
-- Kitchens: kitchen-luxe on the main wall (sink and hobAt offsets), kitchen-tall-luxe on a second wall when there is room, plain kitchen-counter for short runs, and an island-waterfall with bar stools and a pendant-linear above only if the kitchen or kitchen+foyer is at least 11 ft deep.
-- Walk-in closets and dressing rooms: closet-lit on every solid wall, a closet-island in the middle if 3 ft clear all round, a pouf-round, a pendant-globes or chandelier.
-- Lounges and dens: a media-wall, a sectional facing it, coffee-nest, lounge-leather, a plant-tree.
-- Pooja rooms: a pooja-unit centred on the east or west wall, a rug, sconces either side, a floor-vase; nothing else.
-- Honour the architect brief wherever it applies to these rooms.
-Reply with only JSON: {"items":[{"room":"<room name>","type":"<catalog type>","name":"<short label>","x":0,"z":0,"rot":0,"w":0,"d":0,"h":0,"y":0,"finish":"<token>","accent":"<token>"}]} — include any extra fields a type's note mentions.`;
-}
 function itemOBB(it) { const f = withDefaults(it), th = (it.rot || 0) * D2R; return { cx: it.x, cz: it.z, hx: f.w / 2, hz: f.d / 2, c: Math.cos(th), s: -Math.sin(th) }; }
 function sat(A, B) {
   const pr = (R, ax, az) => R.hx * Math.abs(R.c * ax + R.s * az) + R.hz * Math.abs(-R.s * ax + R.c * az);
@@ -343,11 +305,11 @@ function settleItems(raw, rooms) {
   for (const r of raw || []) {
     if (!r || !CAT[r.type]) continue;
     const def = CAT[r.type], it = { id: newId(), type: r.type, name: String(r.name || def.label).slice(0, 40), room: names.has(r.room) ? r.room : null };
-    for (const [k, v] of Object.entries(r)) if (!(k in it) && k !== 'id') it[k] = v;
+    for (const [k, v] of Object.entries(r)) if (!(k in it) && k !== 'id' && !k.startsWith('_')) it[k] = v;
     for (const k of ['x', 'z', 'rot', 'w', 'd', 'h', 'y']) { if (k in it) { const v = +it[k]; if (!isFinite(v) || (['w', 'd', 'h'].includes(k) && v <= 0)) delete it[k]; else it[k] = v; } }
     if (!isFinite(it.x) || !isFinite(it.z)) continue;
     const rm = roomAt(it.x, it.z); if (!rm) continue; it.room ||= rm.name;
-    if (BACKED.has(it.type)) snapBack(it);
+    if (BACKED.has(it.type) && !r._float) snapBack(it);   // pieces placed deliberately off a wall stay there
     out.push(it);
   }
   const solid = it => { const d = CAT[it.type]; return !d.nc && !WALLMOUNT.has(it.type) && !['rug', 'loft-platform', 'stair-curved'].includes(it.type) && (+withDefaults(it).y || 0) < 2; };

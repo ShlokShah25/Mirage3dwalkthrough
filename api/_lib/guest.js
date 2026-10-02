@@ -13,6 +13,7 @@ const bump = k => counts.set(k, used(k) + 1);
 
 const CAPS = () => ({
   plan_read: [PRICING.free.planReadsPerDay, GUEST.sitePlanReadsPerDay, 'plans read'],
+  plan_check: [PRICING.free.planReadsPerDay * 2, GUEST.sitePlanReadsPerDay * 2, 'plans read'],
   design: [FREE.designsPerDay, GUEST.siteDesignsPerDay, 'designs'],
   edit: [FREE.changesPerDay, GUEST.siteDesignsPerDay * 20, 'changes'],
   guide: [PRICING.guide.paidPerDay, 20000, 'messages to Mira'],
@@ -45,27 +46,30 @@ export function authorizeGuest(user, b) {
   switch (b.kind) {
     case 'plan_read':
       if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
-      take(uid, 'plan_read'); return { homeId, model: MODELS.complex(), maxTokens: 32000, think: true, onFail: () => giveBack(uid, 'plan_read') };
-    case 'teaser': take(uid, 'edit'); return { homeId, model: MODELS.default() };
+      take(uid, 'plan_read'); return { homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high', onFail: () => giveBack(uid, 'plan_read') };
+    case 'plan_check':
+      if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
+      take(uid, 'plan_check'); return { homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high', onFail: () => giveBack(uid, 'plan_check') };
+    case 'teaser': take(uid, 'edit'); return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
     case 'style': case 'design': {
       const g = gens.get(b.genId);
       if (!g || g.uid !== uid || g.until < Date.now()) throw new HttpError(409, 'generation_closed', 'This design run has finished. Start a new one.');
       if (g.calls-- <= 0) throw new HttpError(429, 'rate_limited', 'This design run used its full budget.');
-      return { homeId, model: MODELS.default(), after: b.kind === 'design' ? j => { g.items += items(j); } : null };
+      return b.kind === 'design' ? { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', after: j => { g.items += items(j); } } : { homeId, model: MODELS.default(), effort: 'low' };
     }
     case 'edit': {
       take(uid, 'edit'); sweep(edits);
       const id = 'e_' + randomUUID(); edits.set(id, { uid, left: PRICING.budgets.editFollowups, until: Date.now() + 30 * 60e3 });
       const back = () => { giveBack(uid, 'edit'); edits.delete(id); };
-      return { homeId, model: MODELS.default(), meta: { editId: id }, after: j => { if (!(Array.isArray(j?.ops) && j.ops.length)) back(); }, onFail: back };
+      return { homeId, model: MODELS.default(), maxTokens: 24000, effort: 'medium', meta: { editId: id }, after: j => { if (!(Array.isArray(j?.ops) && j.ops.length)) back(); }, onFail: back };
     }
     case 'edit_followup': {
       const e = edits.get(b.editId);
       if (!e || e.uid !== uid) throw new HttpError(404, 'not_found', 'Change not found.');
       if (e.left-- <= 0) throw new HttpError(429, 'rate_limited', 'That change has used its room redos.');
-      return { homeId, model: MODELS.default() };
+      return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
     }
-    case 'refurnish': take(uid, 'edit'); return { homeId, model: MODELS.default(), after: j => { if (!items(j)) giveBack(uid, 'edit'); }, onFail: () => giveBack(uid, 'edit') };
+    case 'refurnish': take(uid, 'edit'); return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', after: j => { if (!items(j)) giveBack(uid, 'edit'); }, onFail: () => giveBack(uid, 'edit') };
     case 'guide': take(uid, 'guide'); return { homeId, model: MODELS.fast(), maxTokens: 3000 };
   }
 }

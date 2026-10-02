@@ -161,9 +161,9 @@ $('openFile').addEventListener('change', async e => {
 
 /* ================= uploads ================= */
 function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That image could not be read.')); i.src = src; }); }
-async function prepImage(file, maxPx, q = .9) {
+async function prepImage(file, maxPx, q = .9, maxEdge = 1e9) {
   const url = URL.createObjectURL(file); try {
-    const im = await loadImg(url); const k = Math.min(1, Math.sqrt(maxPx / (im.naturalWidth * im.naturalHeight)));
+    const im = await loadImg(url); const k = Math.min(1, Math.sqrt(maxPx / (im.naturalWidth * im.naturalHeight)), maxEdge / Math.max(im.naturalWidth, im.naturalHeight));
     const w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k), c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h);
     return { image: c.toDataURL('image/jpeg', q), w, h };
@@ -221,7 +221,7 @@ function renderGenState() {
 }
 async function takePlan(file) {
   if (!file || !file.type.startsWith('image/')) { flash('Please choose an image file (PNG, JPG or WebP).', true); return; }
-  try { const r = await prepImage(file, 1.15e6); project.plan = { ...r, s: null, ox: 0, oy: 0 }; project.trace = null; if (!project.cover || !layout.walls.length) project.cover = r.image; renderUploads(); pv.fitted = false; saveSoon(); }
+  try { const r = await prepImage(file, 3.6e6, .92, 2560); project.plan = { ...r, s: null, ox: 0, oy: 0 }; project.trace = null; if (!project.cover || !layout.walls.length) project.cover = r.image; renderUploads(); pv.fitted = false; saveSoon(); }
   catch (e) { flash(e.message, true); }
 }
 async function takeInspo(files) {

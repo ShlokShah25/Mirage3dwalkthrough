@@ -1,6 +1,7 @@
 // End-to-end API test against the fake Claude and Razorpay. Run: node scripts/test-api.mjs
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { PRICING } from '../api/_lib/env.js';
 
 Object.assign(process.env, {
   MIRAGE_DB: 'memory', PORT: '3100', FREE_MODE: 'off', ANTHROPIC_BASE_URL: 'http://localhost:4001', RAZORPAY_BASE_URL: 'http://localhost:4002', FAL_URL: 'http://localhost:4003', FAL_KEY: 'fal_test',
@@ -69,7 +70,7 @@ r = await call(A, '/api/generate', { action: 'start', homeId: 'h1' }); assert.eq
 let gen = r.body.genId;
 r = await ai(A, { kind: 'style', genId: gen, prompt: 'You are an interior designer. The image', images: [IMG] }); assert.ok(r.done);
 r = await ai(A, { kind: 'design', genId: gen, prompt: FURNISH }); assert.ok(r.json.items.length > 0);
-assert.equal(calls.at(-1).model, 'claude-sonnet-5');
+assert.equal(calls.at(-1).model, 'claude-opus-5-5'); ok('furniture placement runs on the design model');
 r = await call(A, '/api/generate', { action: 'finish', genId: gen }); assert.equal(r.body.status, 'done');
 h = (await me(A)).homes.h1; assert.equal(h.designs_left, 3); assert.equal(h.locked, true); ok('design run uses one design and locks the plan');
 
@@ -77,6 +78,10 @@ r = await ai(A, { kind: 'plan_read', homeId: 'h1', prompt: 'You are an architect
 assert.equal(r.status, 409); assert.equal(r.error.code, 'plan_locked'); ok('a different floor plan cannot reuse the pass');
 r = await ai(A, { kind: 'plan_read', homeId: 'h1', prompt: 'You are an architectural draftsperson', images: [IMG] });
 assert.ok(r.done); ok('re-reading the same plan is allowed');
+r = await ai(A, { kind: 'plan_check', homeId: 'h1', prompt: 'You are checking a tracing', images: [IMG, IMG2] });
+assert.ok(r.done && r.json.walls.length > 0); ok('a second look at the plan just read is allowed');
+r = await ai(A, { kind: 'plan_check', homeId: 'h1', prompt: 'You are checking a tracing', images: [IMG2, IMG] });
+assert.equal(r.status, 409); ok('a second look needs the same plan image');
 
 r = await ai(A, { kind: 'edit', homeId: 'h1', prompt: 'You are editing: make it night' });
 assert.ok(r.done); assert.ok(r.meta.editId);
@@ -84,8 +89,8 @@ const editId = r.meta.editId;
 assert.equal((await me(A)).homes.h1.changes_left, 29); ok('a change uses one of 30');
 r = await ai(A, { kind: 'edit', homeId: 'h1', prompt: 'You are editing NOOP' });
 assert.equal((await me(A)).homes.h1.changes_left, 29); ok('a change that does nothing is refunded');
-for (let i = 0; i < 4; i++) { r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.ok(r.done); }
-r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.equal(r.status, 429); ok('room redos after a change are capped at 4');
+for (let i = 0; i < PRICING.budgets.editFollowups; i++) { r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.ok(r.done); }
+r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.equal(r.status, 429); ok(`room redos after a change are capped at ${PRICING.budgets.editFollowups} calls`);
 r = await ai(A, { kind: 'refurnish', homeId: 'h1', prompt: FURNISH }); assert.ok(r.done);
 assert.equal((await me(A)).homes.h1.changes_left, 28); ok('"redo this room" uses a change');
 r = await ai(A, { kind: 'refurnish', homeId: 'h1', prompt: FURNISH + ' EMPTYROOM' });
