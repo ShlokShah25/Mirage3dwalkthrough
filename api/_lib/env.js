@@ -28,6 +28,10 @@ export const PRICING = {
 // On by default for now; set FREE_MODE=off to bring back the Home Pass and Pro paywall.
 export const freeMode = () => String(env('FREE_MODE', 'on')).toLowerCase() !== 'off';
 export const FREE = { designsPerDay: 5, changesPerDay: 60, rendersPerDay: 10 };
+// Guest mode: no sign-in needed; the browser keeps a random guest key and the server gives it an account of its own.
+// On by default for now; set GUEST_MODE=off to require sign-in again. Site-wide daily caps stop a stranger running up the bill.
+export const guestMode = () => String(env('GUEST_MODE', 'on')).toLowerCase() !== 'off';
+export const GUEST = { siteDesignsPerDay: Number(env('SITE_DESIGNS_PER_DAY', 60)), sitePlanReadsPerDay: Number(env('SITE_PLAN_READS_PER_DAY', 120)) };
 
 export const MODELS = {
   complex: () => env('MODEL_COMPLEX', 'claude-opus-5-5'),
@@ -39,7 +43,7 @@ export const LIMITS = { promptChars: 160000, images: 8, imageChars: 3_000_000 };
 
 export function publicConfig(launch) {
   return {
-    launch, free: freeMode(),
+    launch, free: freeMode(), guest: guestMode(),
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

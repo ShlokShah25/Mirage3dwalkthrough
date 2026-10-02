@@ -1,6 +1,6 @@
 // Who may do what, and what it costs them. All checks run on the server.
 import { db, cas } from './db.js';
-import { PRICING, FREE, freeMode } from './env.js';
+import { PRICING, FREE, GUEST, freeMode, guestMode } from './env.js';
 import { HttpError } from './http.js';
 
 const now = () => new Date();
@@ -93,6 +93,7 @@ export async function allowPlanRead(uid, homeId, hash) {
   const home = await ownHome(uid, homeId, { create: true });
   if (home.locked_hash && hash !== home.locked_hash) throw new HttpError(409, 'plan_locked', 'This home is already designed for a different floor plan. Start a new home for a new plan.');
   if (await dailyCount(uid, 'plan_read') >= PRICING.free.planReadsPerDay) throw new HttpError(429, 'rate_limited', 'You have read a lot of plans today. Try again tomorrow.');
+  if (guestMode() && await db.count('usage', { kind: 'plan_read', created_at: { gte: iso(startOfDay()) } }) >= GUEST.sitePlanReadsPerDay) throw new HttpError(429, 'rate_limited', 'Mirage has read a lot of plans today and is resting. Try again tomorrow.');
   await db.update('homes', { id: homeId }, { plan_hash: hash });
   return home;
 }
@@ -116,6 +117,7 @@ export async function startGeneration(uid, homeId) {
   if (freeMode()) {
     const today = await db.count('generations', { user_id: uid, status: { neq: 'refunded' }, created_at: { gte: iso(startOfDay()) } });
     if (today >= FREE.designsPerDay) throw new HttpError(429, 'rate_limited', `That is ${FREE.designsPerDay} designs today, which is the daily limit while Mirage is free. Come back tomorrow.`);
+    if (guestMode() && await db.count('generations', { status: { neq: 'refunded' }, created_at: { gte: iso(startOfDay()) } }) >= GUEST.siteDesignsPerDay) throw new HttpError(429, 'rate_limited', 'Mirage has designed a lot of homes today and is resting. Try again tomorrow.');
     source = 'free';
   } else if (home.access === 'pass') {
     const acc = await editAccess(uid, home);

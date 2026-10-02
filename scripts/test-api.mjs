@@ -217,6 +217,18 @@ r = await ai(G, { kind: 'edit', homeId: 'g1', prompt: 'You are editing NOOP' });
 for (let i = 0; i < 4; i++) { const x = await call(G, '/api/generate', { action: 'start', homeId: 'g1' }); assert.equal(x.status, 200); await ai(G, { kind: 'design', genId: x.body.genId, prompt: FURNISH }); await call(G, '/api/generate', { action: 'finish', genId: x.body.genId }); }
 r = await call(G, '/api/generate', { action: 'start', homeId: 'g1' }); assert.equal(r.status, 429); ok('free mode: designs are capped at 5 a day per account');
 r = await ai(A, { kind: 'plan_read', homeId: 'h1', prompt: 'You are an architectural draftsperson', images: [IMG] }); assert.ok(r.done); ok('free mode leaves existing paid homes working');
+// --- guest mode: no sign-in ---
+const gcall = async (secret, path, data) => { const r = await fetch(B + path, { method: data ? 'POST' : 'GET', headers: { authorization: 'Bearer guest:' + secret, 'content-type': 'application/json' }, body: data ? JSON.stringify(data) : undefined }); return { status: r.status, body: await r.json() }; };
+const S1 = 'guestsecret_AAAAAAAAAAAAAAAAAAAA', S2 = 'guestsecret_BBBBBBBBBBBBBBBBBBBB';
+assert.equal((await (await fetch(B + '/api/config', { cache: 'no-store' })).json()).guest, true);
+r = await gcall(S1, '/api/me'); assert.equal(r.status, 200); assert.equal(r.body.user.guest, true); const gid1 = r.body.user.id;
+assert.match(gid1, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/); assert.notEqual((await gcall(S2, '/api/me')).body.user.id, gid1); ok('guests get their own account with no sign-in');
+assert.equal((await gcall('short', '/api/me')).status, 401); ok('a weak guest key is refused');
+r = await fetch(B + '/api/ai', { method: 'POST', headers: { authorization: 'Bearer guest:' + S1, 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'plan_read', homeId: 'guest-home', prompt: 'You are an architectural draftsperson', images: ['data:image/png;base64,' + Buffer.from('guest-plan').toString('base64')] }) }); assert.equal(r.status, 200); await r.text();
+r = await gcall(S1, '/api/generate', { action: 'start', homeId: 'guest-home' }); assert.equal(r.status, 200); await gcall(S1, '/api/generate', { action: 'finish', genId: r.body.genId }); ok('a guest can read a plan and start a design');
+assert.equal((await gcall(S2, '/api/generate', { action: 'start', homeId: 'guest-home' })).status, 403); ok("one guest cannot touch another guest's home");
+process.env.SITE_DESIGNS_PER_DAY = '1'; process.env.GUEST_MODE = 'off';
+assert.equal((await gcall('guestsecret_CCCCCCCCCCCCCCCCCCCC', '/api/me')).status, 401); ok('GUEST_MODE=off requires sign-in again'); delete process.env.GUEST_MODE; delete process.env.SITE_DESIGNS_PER_DAY;
 process.env.FREE_MODE = 'off';
 
 // launch tiers step up: simulate sales until the first tier is gone

@@ -5137,8 +5137,16 @@ if (SITE) (() => {
     if (S.token) { const w = authWaiters; authWaiters = []; w.forEach(f => f()); S.refresh().then(askPersona); }
     else { S.me = null; renderCredits(); }
   }
-  S.onSignedOut = () => setToken(null);
-  S.ensureAuth = () => S.token ? Promise.resolve() : new Promise(res => { authWaiters.push(res); openSignIn(); });
+  S.onSignedOut = () => { if (isGuest()) S.noGuest = true; setToken(null); };   // a refused guest key falls back to normal sign-in
+  // Guest mode: no sign-in. The browser keeps a random guest key; the server gives it an account of its own.
+  const GUESTS = () => !!S.cfg?.guest;
+  const isGuest = () => !!S.token?.startsWith('guest:');
+  function guestToken() {
+    let k = null; try { k = localStorage.getItem('mirage-guest'); } catch { }
+    if (!/^[A-Za-z0-9_-]{24,80}$/.test(k || '')) { const b = crypto.getRandomValues(new Uint8Array(24)); k = Array.from(b, x => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[x & 63]).join(''); try { localStorage.setItem('mirage-guest', k); } catch { } }
+    return 'guest:' + k;
+  }
+  S.ensureAuth = () => { if (S.token) return Promise.resolve(); if (GUESTS() && !S.noGuest) { setToken(guestToken()); return Promise.resolve(); } return new Promise(res => { authWaiters.push(res); openSignIn(); }); };
 
   function openSignIn() {
     if (document.getElementById('siEmail')) return;
@@ -5174,7 +5182,7 @@ if (SITE) (() => {
   }
 
   function askPersona() {
-    if (!S.me || S.me.persona || document.getElementById('rcmp')) return;
+    if (!S.me || S.me.persona || isGuest() || document.getElementById('rcmp')) return;
     const m = modal(`<div class="eyebrow">[ One quick question ]</div><h2>Whose home is this?</h2>
       <p class="lead">So we can suggest the right plan. You can use Mirage either way.</p>
       <div class="packs" style="grid-template-columns:repeat(2,minmax(0,1fr))">
@@ -5184,7 +5192,7 @@ if (SITE) (() => {
     m.el.querySelectorAll('[data-persona]').forEach(b => b.onclick = async () => { m.close(); try { await S.api('/api/me', { persona: b.dataset.persona }); S.me.persona = b.dataset.persona; } catch (e) { flash(e.message, true); } });
   }
 
-  S.signOut = async () => { try { await supa?.auth.signOut(); } catch { } try { localStorage.removeItem('mirage-test-token'); } catch { } setToken(null); flash('Signed out.'); };
+  S.signOut = async () => { try { await supa?.auth.signOut(); } catch { } try { localStorage.removeItem('mirage-test-token'); } catch { } setToken(GUESTS() && !S.noGuest ? guestToken() : null); flash('Signed out.'); };
 
   /* ---------- state ---------- */
   S.refresh = async () => {
@@ -5202,7 +5210,7 @@ if (SITE) (() => {
     let tag = 'Sign in', detail = '';
     if (S.token && S.me) {
       const h = home(), s = sub();
-      if (FREE()) { tag = 'FREE'; detail = 'everything unlocked'; }
+      if (FREE()) { tag = isGuest() ? 'GUEST' : 'FREE'; detail = 'everything unlocked'; }
       else if (subOn()) { tag = s.plan === 'max' ? 'PRO MAX' : 'PRO'; detail = `${homesLeft()} homes · ${changesLeftPro()} changes`; }
       else if (h?.access === 'pass') { tag = 'PASS'; detail = h.editable ? `${h.changes_left} changes · ${Math.max(0, Math.ceil((new Date(h.expires_at) - Date.now()) / 864e5))} days` : 'view only'; }
       else { tag = 'FREE'; detail = 'bare shell'; }
@@ -5375,8 +5383,13 @@ if (SITE) (() => {
 
   /* ---------- account ---------- */
   S.openAccount = async () => {
-    if (!S.token) { await S.ensureAuth(); return; }
+    if (!S.token) { await S.ensureAuth(); if (!isGuest()) return; }
     await S.refresh();
+    if (isGuest()) {
+      const g = modal(`<div class="eyebrow">[ Guest ]</div><h2>You're using Mirage as a guest</h2><p class="lead">No sign-in needed. Your homes are kept in this browser. Sign in if you want them on your account, or to open a home someone shared with your email.</p><div class="mact"><button data-close>Stay a guest</button><button class="primary" id="gSign">Sign in</button></div>`);
+      g.el.querySelector('#gSign').onclick = () => { g.close(); openSignIn(); };
+      return;
+    }
     const s = sub(), h = home(), me = S.me || {};
     const rows = [];
     if (subOn()) rows.push(['Plan', `${s.plan === 'max' ? 'Pro Max' : 'Pro'}${s.cancel_at_period_end ? ' · ends ' : ' · renews '}${s.current_end ? new Date(s.current_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}`], ['Homes this month', `${s.homes_used} of ${s.homes_limit}`], ['Changes this month', `${s.changes_used} of ${s.changes_limit}`]);
@@ -5561,7 +5574,7 @@ if (SITE) (() => {
       <div class="mact"><button id="shCopy">Copy link</button>${owner ? '' : '<button id="shLeave">Leave this home</button>'}<button class="primary" data-close>Done</button></div>`, { wide: true });
     const L = m.el.querySelector('#shList');
     const draw = (members, ownerEmail) => {
-      L.innerHTML = `<div class="shm"><span><b>${esc(ownerEmail || (owner ? myEmail() : 'Owner'))}</b>${owner ? ' (you)' : ''}</span><span class="r">Owner</span></div>` + (members.length ? members.map(x => `<div class="shm" data-e="${esc(x.email)}"><span><b>${esc(x.email)}</b>${x.email === myEmail() ? ' (you)' : ''}${x.joined ? '' : ' <small>invited</small>'}</span>${owner ? `<select data-role>${Object.entries(ROLE_TXT).map(([k, v]) => `<option value="${k}"${k === x.role ? ' selected' : ''}>${v}</option>`).join('')}</select><button class="ghost icon" data-rm title="Remove">✕</button>` : `<span class="r">${ROLE_TXT[x.role]}</span>`}</div>`).join('') : '<p class="note">Nobody else yet.</p>');
+      L.innerHTML = `<div class="shm"><span><b>${esc(ownerEmail || (owner ? (myEmail() || 'Guest') : 'Owner'))}</b>${owner ? ' (you)' : ''}</span><span class="r">Owner</span></div>` + (members.length ? members.map(x => `<div class="shm" data-e="${esc(x.email)}"><span><b>${esc(x.email)}</b>${x.email === myEmail() ? ' (you)' : ''}${x.joined ? '' : ' <small>invited</small>'}</span>${owner ? `<select data-role>${Object.entries(ROLE_TXT).map(([k, v]) => `<option value="${k}"${k === x.role ? ' selected' : ''}>${v}</option>`).join('')}</select><button class="ghost icon" data-rm title="Remove">✕</button>` : `<span class="r">${ROLE_TXT[x.role]}</span>`}</div>`).join('') : '<p class="note">Nobody else yet.</p>');
       L.querySelectorAll('[data-role]').forEach(s => s.onchange = () => act('role', s.closest('[data-e]').dataset.e, s.value));
       L.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => act('remove', b.closest('[data-e]').dataset.e));
     };
@@ -5658,9 +5671,10 @@ if (SITE) (() => {
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
         supa = createClient(S.cfg.supabaseUrl, S.cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
         const { data } = await supa.auth.getSession(); if (data?.session) setToken(data.session.access_token);
-        supa.auth.onAuthStateChange((ev, session) => { const t = session?.access_token || null; if (t !== S.token) { if (t && document.getElementById('siEmail')) $('modalRoot').innerHTML = ''; setToken(t); } });
+        supa.auth.onAuthStateChange((ev, session) => { const t = session?.access_token || (GUESTS() && !S.noGuest ? guestToken() : null); if (t !== S.token) { if (t && document.getElementById('siEmail')) $('modalRoot').innerHTML = ''; setToken(t); } });
       } catch (e) { console.error('auth init', e); }
     }
+    if (!S.token && GUESTS()) setToken(guestToken());   // no sign-in needed for now
     renderCredits();
     // the one-tap AI render is retired: the 3D itself is the product's look
     // Deep links from the landing page: /app#start opens a new home, /app#sample opens the sample home.
