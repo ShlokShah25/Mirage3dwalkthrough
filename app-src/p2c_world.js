@@ -154,11 +154,11 @@ function buildWall(w, g) {
 }
 const shapeOf = poly => { const s = new THREE.Shape(); poly.forEach(([x, z], i) => i ? s.lineTo(x, z) : s.moveTo(x, z)); return s; };
 const isOutdoorType = t => ['balcony', 'terrace', 'deck', 'garden'].includes(t);
-const floorY = r => r.kind === 'outdoor' ? -0.25 : r.kind === 'ledge' ? -0.6 : 0;
+const floorY = r => r.kind === 'outdoor' ? -0.25 : r.kind === 'ledge' ? -0.6 : r.under ? -0.006 : 0;   // gap-filling floors sit just under the rooms they meet
 function centroid(p) { let x = 0, z = 0; p.forEach(q => { x += q[0]; z += q[1]; }); return [x / p.length, z / p.length]; }
 function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const [x1, z1] = p[i], [x2, z2] = p[(i + 1) % p.length]; a += x1 * z2 - x2 * z1; } return Math.abs(a) / 2; }
 function pip([x, z], poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) ins = !ins; } return ins; }
-function roomAt(x, z) { let best = null; for (const r of layout.rooms) if (r.polygon?.length > 2 && pip([x, z], r.polygon)) { if (!best || (r.kind === 'room' && best.kind !== 'room') || (r.kind === best.kind && polyArea(r.polygon) < polyArea(best.polygon))) best = r; } return best; }
+function roomAt(x, z) { let best = null; for (const r of layout.rooms) if (r.polygon?.length > 2 && pip([x, z], r.polygon)) { if (!best || (best.under && !r.under) || (!r.under === !best.under && ((r.kind === 'room' && best.kind !== 'room') || (r.kind === best.kind && polyArea(r.polygon) < polyArea(best.polygon))))) best = r; } return best; }
 function segDist(px, pz, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1; let t = ((px - a[0]) * dx + (pz - a[1]) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - a[0] - t * dx, pz - a[1] - t * dz); }
 /* ---- fake light spill: cove glow on ceilings and walls, downlight scallops (additive, cheap, reads like real lighting) ---- */
 const GLOW = new Set();

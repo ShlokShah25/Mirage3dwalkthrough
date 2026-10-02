@@ -146,7 +146,46 @@ function cleanWalls(walls, tol = .8) {
   return walls.filter(w => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) > .4);
 }
 const PRESET = { door: { type: 'door', sill: 0, head: 7 }, slider: { type: 'slider', sill: 0, head: 8 }, window: { type: 'window', sill: 2.5, head: 7 }, opening: { type: 'opening', sill: 0, head: 7.5 } };
-function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || polyArea(r.polygon) < polyArea(best.polygon)) best = r; } return best; }
+// Floor inside the walls that no room covers (a corridor nobody labelled, the gap between two rooms) still needs a
+// floor and a ceiling, or it shows as a hole. Rasterise at 0.5 ft: walls block, the outside is whatever is reachable
+// from the edge, and every uncovered inside patch becomes a passage.
+function fillGaps(walls, rooms) {
+  const pts = walls.flatMap(w => [w.a, w.b]).concat(rooms.flatMap(r => r.polygon)); if (pts.length < 3) return [];
+  const g = .5, x0 = Math.min(...pts.map(p => p[0])) - 2, z0 = Math.min(...pts.map(p => p[1])) - 2, x1 = Math.max(...pts.map(p => p[0])) + 2, z1 = Math.max(...pts.map(p => p[1])) + 2;
+  const W = Math.ceil((x1 - x0) / g), H = Math.ceil((z1 - z0) / g); if (W * H > 400000) return [];
+  const cell = new Uint8Array(W * H);   // 1 wall, 2 outside, 3 room, 4 gap
+  for (const w of walls) {
+    const r = Math.max(w.thickness / 2, .3) + .15, xa = Math.floor((Math.min(w.a[0], w.b[0]) - r - x0) / g), xb = Math.ceil((Math.max(w.a[0], w.b[0]) + r - x0) / g), za = Math.floor((Math.min(w.a[1], w.b[1]) - r - z0) / g), zb = Math.ceil((Math.max(w.a[1], w.b[1]) + r - z0) / g);
+    for (let j = Math.max(0, za); j <= Math.min(H - 1, zb); j++) for (let i = Math.max(0, xa); i <= Math.min(W - 1, xb); i++) if (segDist(x0 + (i + .5) * g, z0 + (j + .5) * g, w.a, w.b) <= r) cell[j * W + i] = 1;
+  }
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i; if (!cell[k] && rooms.some(r => pip([x0 + (i + .5) * g, z0 + (j + .5) * g], r.polygon))) cell[k] = 3; }
+  const q = []; for (let i = 0; i < W; i++) q.push(i, (H - 1) * W + i); for (let j = 0; j < H; j++) q.push(j * W, j * W + W - 1);
+  while (q.length) { const k = q.pop(); if (cell[k]) continue; cell[k] = 2; const i = k % W, j = (k / W) | 0; if (i > 0) q.push(k - 1); if (i < W - 1) q.push(k + 1); if (j > 0) q.push(k - W); if (j < H - 1) q.push(k + W); }
+  const out = [], seen = new Uint8Array(W * H);
+  for (let k = 0; k < W * H; k++) {
+    if (cell[k] || seen[k]) continue;
+    const comp = [], st = [k]; seen[k] = 1;
+    while (st.length) { const c = st.pop(); comp.push(c); const i = c % W; for (const n of [i > 0 ? c - 1 : -1, i < W - 1 ? c + 1 : -1, c - W, c + W]) if (n >= 0 && n < W * H && !cell[n] && !seen[n]) { seen[n] = 1; st.push(n); } }
+    if (comp.length * g * g < 6) continue;
+    // grow it one cell into the walls and rooms around it so no seam shows, then trace its outline from the cell edges
+    const inSet = new Set(comp);
+    for (const c of comp) { const i = c % W; for (const n of [i > 0 ? c - 1 : -1, i < W - 1 ? c + 1 : -1, c - W, c + W]) if (n >= 0 && n < W * H && cell[n] !== 2) inSet.add(n); }
+    comp.length = 0; comp.push(...inSet); const edges = new Map(), key = (i, j) => i + ',' + j;
+    for (const c of comp) { const i = c % W, j = (c / W) | 0;
+      if (!inSet.has(c - W) || j === 0) edges.set(key(i, j), [i + 1, j]);
+      if (!inSet.has(c + 1) || i === W - 1) edges.set(key(i + 1, j), [i + 1, j + 1]);
+      if (!inSet.has(c + W) || j === H - 1) edges.set(key(i + 1, j + 1), [i, j + 1]);
+      if (!inSet.has(c - 1) || i === 0) edges.set(key(i, j + 1), [i, j]); }
+    let best = null;
+    while (edges.size) { const [k0, v0] = edges.entries().next().value; edges.delete(k0); const loop = [k0.split(',').map(Number)]; let cur = v0, n = 0;
+      while (n++ < 100000) { const kk = key(cur[0], cur[1]); loop.push(cur); const nx = edges.get(kk); if (!nx) break; edges.delete(kk); cur = nx; }
+      if (!best || loop.length > best.length) best = loop; }
+    const poly = best.filter((p, i, a) => { const a0 = a[(i - 1 + a.length) % a.length], a1 = a[(i + 1) % a.length]; return !((a0[0] === p[0] && p[0] === a1[0]) || (a0[1] === p[1] && p[1] === a1[1])); }).map(([i, j]) => [r2(x0 + i * g), r2(z0 + j * g)]);
+    if (poly.length >= 4) out.push(poly);
+  }
+  return out;
+}
+function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || (best.under && !r.under) || (!r.under === !best.under && polyArea(r.polygon) < polyArea(best.polygon))) best = r; } return best; }
 function traceToLayout(tr, W, Hh, opt) {
   const warns = []; const sc = opt.scale || deriveScale(tr, W, Hh), s = sc.s;
   if (!sc.sure) warns.push(sc.method);
@@ -213,6 +252,8 @@ function traceToLayout(tr, W, Hh, opt) {
   }
   for (const w of walls) for (const o of w.openings) { delete o._hinge; delete o._into; }
   if (main) { main.o.name = 'Main door'; main.o.swing = { ...main.o.swing, open: 0 }; }
+  // uncovered floor inside the walls becomes passage, so there is never a hole in the floor
+  for (const poly of fillGaps(walls, rooms)) { const n = rooms.filter(r => /^Passage/.test(r.name)).length; rooms.push({ name: n ? `Passage ${n + 1}` : 'Passage', type: 'passage', kind: 'room', polygon: poly, under: true }); }
   // railings on open outdoor edges
   const railings = [];
   for (const r of rooms.filter(r => r.kind === 'outdoor')) {

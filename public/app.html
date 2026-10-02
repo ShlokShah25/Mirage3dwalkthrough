@@ -2183,11 +2183,11 @@ function buildWall(w, g) {
 }
 const shapeOf = poly => { const s = new THREE.Shape(); poly.forEach(([x, z], i) => i ? s.lineTo(x, z) : s.moveTo(x, z)); return s; };
 const isOutdoorType = t => ['balcony', 'terrace', 'deck', 'garden'].includes(t);
-const floorY = r => r.kind === 'outdoor' ? -0.25 : r.kind === 'ledge' ? -0.6 : 0;
+const floorY = r => r.kind === 'outdoor' ? -0.25 : r.kind === 'ledge' ? -0.6 : r.under ? -0.006 : 0;   // gap-filling floors sit just under the rooms they meet
 function centroid(p) { let x = 0, z = 0; p.forEach(q => { x += q[0]; z += q[1]; }); return [x / p.length, z / p.length]; }
 function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const [x1, z1] = p[i], [x2, z2] = p[(i + 1) % p.length]; a += x1 * z2 - x2 * z1; } return Math.abs(a) / 2; }
 function pip([x, z], poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) ins = !ins; } return ins; }
-function roomAt(x, z) { let best = null; for (const r of layout.rooms) if (r.polygon?.length > 2 && pip([x, z], r.polygon)) { if (!best || (r.kind === 'room' && best.kind !== 'room') || (r.kind === best.kind && polyArea(r.polygon) < polyArea(best.polygon))) best = r; } return best; }
+function roomAt(x, z) { let best = null; for (const r of layout.rooms) if (r.polygon?.length > 2 && pip([x, z], r.polygon)) { if (!best || (best.under && !r.under) || (!r.under === !best.under && ((r.kind === 'room' && best.kind !== 'room') || (r.kind === best.kind && polyArea(r.polygon) < polyArea(best.polygon))))) best = r; } return best; }
 function segDist(px, pz, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1; let t = ((px - a[0]) * dx + (pz - a[1]) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - a[0] - t * dx, pz - a[1] - t * dz); }
 /* ---- fake light spill: cove glow on ceilings and walls, downlight scallops (additive, cheap, reads like real lighting) ---- */
 const GLOW = new Set();
@@ -3138,7 +3138,46 @@ function cleanWalls(walls, tol = .8) {
   return walls.filter(w => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) > .4);
 }
 const PRESET = { door: { type: 'door', sill: 0, head: 7 }, slider: { type: 'slider', sill: 0, head: 8 }, window: { type: 'window', sill: 2.5, head: 7 }, opening: { type: 'opening', sill: 0, head: 7.5 } };
-function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || polyArea(r.polygon) < polyArea(best.polygon)) best = r; } return best; }
+// Floor inside the walls that no room covers (a corridor nobody labelled, the gap between two rooms) still needs a
+// floor and a ceiling, or it shows as a hole. Rasterise at 0.5 ft: walls block, the outside is whatever is reachable
+// from the edge, and every uncovered inside patch becomes a passage.
+function fillGaps(walls, rooms) {
+  const pts = walls.flatMap(w => [w.a, w.b]).concat(rooms.flatMap(r => r.polygon)); if (pts.length < 3) return [];
+  const g = .5, x0 = Math.min(...pts.map(p => p[0])) - 2, z0 = Math.min(...pts.map(p => p[1])) - 2, x1 = Math.max(...pts.map(p => p[0])) + 2, z1 = Math.max(...pts.map(p => p[1])) + 2;
+  const W = Math.ceil((x1 - x0) / g), H = Math.ceil((z1 - z0) / g); if (W * H > 400000) return [];
+  const cell = new Uint8Array(W * H);   // 1 wall, 2 outside, 3 room, 4 gap
+  for (const w of walls) {
+    const r = Math.max(w.thickness / 2, .3) + .15, xa = Math.floor((Math.min(w.a[0], w.b[0]) - r - x0) / g), xb = Math.ceil((Math.max(w.a[0], w.b[0]) + r - x0) / g), za = Math.floor((Math.min(w.a[1], w.b[1]) - r - z0) / g), zb = Math.ceil((Math.max(w.a[1], w.b[1]) + r - z0) / g);
+    for (let j = Math.max(0, za); j <= Math.min(H - 1, zb); j++) for (let i = Math.max(0, xa); i <= Math.min(W - 1, xb); i++) if (segDist(x0 + (i + .5) * g, z0 + (j + .5) * g, w.a, w.b) <= r) cell[j * W + i] = 1;
+  }
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i; if (!cell[k] && rooms.some(r => pip([x0 + (i + .5) * g, z0 + (j + .5) * g], r.polygon))) cell[k] = 3; }
+  const q = []; for (let i = 0; i < W; i++) q.push(i, (H - 1) * W + i); for (let j = 0; j < H; j++) q.push(j * W, j * W + W - 1);
+  while (q.length) { const k = q.pop(); if (cell[k]) continue; cell[k] = 2; const i = k % W, j = (k / W) | 0; if (i > 0) q.push(k - 1); if (i < W - 1) q.push(k + 1); if (j > 0) q.push(k - W); if (j < H - 1) q.push(k + W); }
+  const out = [], seen = new Uint8Array(W * H);
+  for (let k = 0; k < W * H; k++) {
+    if (cell[k] || seen[k]) continue;
+    const comp = [], st = [k]; seen[k] = 1;
+    while (st.length) { const c = st.pop(); comp.push(c); const i = c % W; for (const n of [i > 0 ? c - 1 : -1, i < W - 1 ? c + 1 : -1, c - W, c + W]) if (n >= 0 && n < W * H && !cell[n] && !seen[n]) { seen[n] = 1; st.push(n); } }
+    if (comp.length * g * g < 6) continue;
+    // grow it one cell into the walls and rooms around it so no seam shows, then trace its outline from the cell edges
+    const inSet = new Set(comp);
+    for (const c of comp) { const i = c % W; for (const n of [i > 0 ? c - 1 : -1, i < W - 1 ? c + 1 : -1, c - W, c + W]) if (n >= 0 && n < W * H && cell[n] !== 2) inSet.add(n); }
+    comp.length = 0; comp.push(...inSet); const edges = new Map(), key = (i, j) => i + ',' + j;
+    for (const c of comp) { const i = c % W, j = (c / W) | 0;
+      if (!inSet.has(c - W) || j === 0) edges.set(key(i, j), [i + 1, j]);
+      if (!inSet.has(c + 1) || i === W - 1) edges.set(key(i + 1, j), [i + 1, j + 1]);
+      if (!inSet.has(c + W) || j === H - 1) edges.set(key(i + 1, j + 1), [i, j + 1]);
+      if (!inSet.has(c - 1) || i === 0) edges.set(key(i, j + 1), [i, j]); }
+    let best = null;
+    while (edges.size) { const [k0, v0] = edges.entries().next().value; edges.delete(k0); const loop = [k0.split(',').map(Number)]; let cur = v0, n = 0;
+      while (n++ < 100000) { const kk = key(cur[0], cur[1]); loop.push(cur); const nx = edges.get(kk); if (!nx) break; edges.delete(kk); cur = nx; }
+      if (!best || loop.length > best.length) best = loop; }
+    const poly = best.filter((p, i, a) => { const a0 = a[(i - 1 + a.length) % a.length], a1 = a[(i + 1) % a.length]; return !((a0[0] === p[0] && p[0] === a1[0]) || (a0[1] === p[1] && p[1] === a1[1])); }).map(([i, j]) => [r2(x0 + i * g), r2(z0 + j * g)]);
+    if (poly.length >= 4) out.push(poly);
+  }
+  return out;
+}
+function roomAtIn(rooms, x, z) { let best = null; for (const r of rooms) if (pip([x, z], r.polygon)) { if (!best || (best.under && !r.under) || (!r.under === !best.under && polyArea(r.polygon) < polyArea(best.polygon))) best = r; } return best; }
 function traceToLayout(tr, W, Hh, opt) {
   const warns = []; const sc = opt.scale || deriveScale(tr, W, Hh), s = sc.s;
   if (!sc.sure) warns.push(sc.method);
@@ -3205,6 +3244,8 @@ function traceToLayout(tr, W, Hh, opt) {
   }
   for (const w of walls) for (const o of w.openings) { delete o._hinge; delete o._into; }
   if (main) { main.o.name = 'Main door'; main.o.swing = { ...main.o.swing, open: 0 }; }
+  // uncovered floor inside the walls becomes passage, so there is never a hole in the floor
+  for (const poly of fillGaps(walls, rooms)) { const n = rooms.filter(r => /^Passage/.test(r.name)).length; rooms.push({ name: n ? `Passage ${n + 1}` : 'Passage', type: 'passage', kind: 'room', polygon: poly, under: true }); }
   // railings on open outdoor edges
   const railings = [];
   for (const r of rooms.filter(r => r.kind === 'outdoor')) {
@@ -3361,7 +3402,7 @@ function inkFromRGBA(d, W, H) {
   for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; T = t; } }
   T = clamp(T, 70, 165);
   const ink = new Uint8Array(n); for (let i = 0; i < n; i++) ink[i] = lum[i] < T ? 1 : 0;
-  return { W, H, ink, T };
+  return { W, H, ink, T, lum };
 }
 
 const axisOf = w => { const dx = Math.abs(w.b[0] - w.a[0]), dy = Math.abs(w.b[1] - w.a[1]); return dy <= dx * .08 ? 'h' : dx <= dy * .08 ? 'v' : null; };
@@ -3429,43 +3470,47 @@ function refineTrace(tr, P) {
   }
   stats.style = style;
   const tMed = median(S.filter(s => s?.band && s.band.kind !== 'line').map(s => s.band.t)) || median(S.filter(Boolean).map(s => s.t)) || 8; stats.tMed = tMed;
-  // the drawing decides: a wall exists only where a wall is drawn. Furniture, counters and dimension lines are thin lines,
-  // so on a plan whose walls are drawn thick, a thin line is not a wall.
-  const dropped = [];
-  // on a solid-wall plan, a band far thinner than the usual wall is an outline (balcony edge, counter, furniture), not a wall
-  // and on a two-line plan, two lines only make a wall when they are spaced like the other walls (a bed or counter outline is not)
-  const thin = b => b && ((b.kind === 'filled' && style === 'filled' && b.t < Math.max(3, tMed * .45)) || (b.kind === 'double' && style === 'double' && (b.t < tMed * .5 || b.t > tMed * 1.8)));
-  for (const s of S) if (s && thin(s.band)) s.band = { ...s.band, kind: 'line' };
+  // Is a wall drawn here at all? Compare the strip under the wall with the floor beside it: a drawn wall, however thin or
+  // grey (brochure partitions are often a single grey line), is darker than the floor next to it; open floor is not.
+  // Only walls lying on plain open floor are removed, and only stretches of plain floor are opened up.
+  // a missed doorway is about as wide as the doors the tracing did find
+  const doorW = median(S.filter(Boolean).flatMap(s => s.ops.filter(q => q.o.type === 'door').map(q => q.s1 - q.s0)));
+  const minGap = doorW ? Math.max(10, doorW * .6) : Math.max(tMed * 2.5, 12);
+  const contrastAt = (s, u, c, t) => {
+    const lum = (u2, v) => { const x = Math.round(s.ax === 'h' ? u2 : v), y = Math.round(s.ax === 'h' ? v : u2); return x < 0 || y < 0 || x >= P.W || y >= P.H ? 255 : P.lum[y * P.W + x]; };
+    const h = Math.max(1.5, t / 2), k = Math.max(3, Math.round(t)); let band = 0, nb = 0, sa = 0, sb = 0;
+    for (let v = Math.round(c - h); v <= Math.round(c + h); v++) { band += lum(u, v); nb++; }
+    for (let i = 0; i < k; i++) { sa += lum(u, c - h - 2 - i); sb += lum(u, c + h + 2 + i); }
+    return Math.max(sa, sb) / k - band / nb;
+  };
+  const dropped = [], added = [];
   for (let i = 0; i < S.length; i++) {
     const s = S[i]; if (!s) continue; stats.walls++;
-    let b = s.band;
-    if (!b || (style !== 'line' && b.kind === 'line')) { const wide = findWallBand(P, s.ax, s.u0, s.u1, s.c0, Math.max(s.t, tMed) * 2, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style === 'line' ? null : style); if (wide && !thin(wide) && (style === 'line' || wide.kind !== 'line')) b = wide; }
-    const glazed = s.ops.reduce((a, q) => a + Math.max(0, Math.min(q.s1, s.u1) - Math.max(q.s0, s.u0)), 0) >= (s.u1 - s.u0) * .6;
-    if (!b || (style !== 'line' && b.kind === 'line')) { if (glazed && s.w.ext) { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v < s.c + s.t / 2; v++) s.rows.push(v); continue; } dropped.push(s); S[i] = null; continue; }
-    s.c = b.c; s.t = b.kind === 'line' ? tMed : b.t; s.rows = b.rows; stats.snapped++;
-  }
-  stats.dropped = dropped.length;
-  const live = S.filter(Boolean), added = [];
-  // along each wall: trim the ends to where the drawn wall stops, and wherever nothing is drawn across the wall
-  // (a gap the tracing has no door or window for) leave a way through instead of a solid wall
-  const minGap = Math.max(tMed * 2.5, 10);
-  for (const s of live) {
-    if (!s.band && !s.rows?.length) continue;
-    const lo = Math.round(s.u0), hi = Math.round(s.u1), f = [];
-    for (let u = lo; u <= hi; u++) f.push(fillAt(P, s, u));
-    const runs = []; let st = null;
-    f.forEach((v, i) => { const e = v < .15; if (e && st === null) st = i; if ((!e || i === f.length - 1) && st !== null) { runs.push([lo + st, lo + (e ? i + 1 : i)]); st = null; } });
-    for (const [a, b] of runs) {
-      if (b - a < minGap) continue;
-      const known = s.ops.some(q => Math.min(b, q.s1) - Math.max(a, q.s0) > (b - a) * .4);
-      if (a <= s.u0 + tMed) { if (!known) s.u0 = b; continue; }
-      if (b >= s.u1 - tMed) { if (!known) s.u1 = a; continue; }
+    const b = s.band;
+    if (b && (b.kind !== 'line' || Math.abs(b.c - s.c0) <= Math.max(3, s.t))) { s.c = b.c; s.t = b.kind === 'line' ? Math.min(s.t, tMed) : b.t; s.rows = b.rows; stats.snapped++; }
+    else { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v <= s.c + s.t / 2; v++) s.rows.push(v); }
+    const lo = Math.round(s.u0), hi = Math.round(s.u1), prof = [];
+    for (let u = lo; u <= hi; u++) prof.push(contrastAt(s, u, s.c, s.t));
+    const inOp = u => s.ops.some(q => u >= q.s0 - 2 && u <= q.s1 + 2), solidU = prof.filter((_, k) => !inOp(lo + k));
+    const drawn = solidU.length ? solidU.filter(v => v >= 12).length / solidU.length : 1;
+    s.drawn = drawn;
+    if (drawn < .15 && !s.w.ext && hi - lo >= minGap) { dropped.push(s); S[i] = null; continue; }
+    if (drawn < .4) continue;
+    // stretches of plain floor across a drawn wall: a doorway the tracing missed (or a wall end that overshoots)
+    let st = null; const runs = [];
+    prof.forEach((v, k) => { const e = v < 8; if (e && st === null) st = k; if ((!e || k === prof.length - 1) && st !== null) { runs.push([lo + st, lo + (e ? k + 1 : k)]); st = null; } });
+    for (const [a, b2] of runs) {
+      if (b2 - a < minGap) continue;
+      const known = s.ops.some(q => Math.min(b2, q.s1) - Math.max(a, q.s0) > (b2 - a) * .4);
       if (known) continue;
-      const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], o = { type: s.w.ext ? 'window' : 'opening', a: at(a), b: at(b), auto: true };
-      added.push(o); s.ops.push({ o, s0: a, s1: b });
+      if (a <= s.u0 + tMed) { s.u0 = b2; continue; }
+      if (b2 >= s.u1 - tMed) { s.u1 = a; continue; }
+      const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], o = { type: s.w.ext ? 'window' : 'opening', a: at(a), b: at(b2), auto: true };
+      added.push(o); s.ops.push({ o, s0: a, s1: b2 });
     }
   }
-  stats.added = added.length;
+  stats.dropped = dropped.length; stats.added = added.length;
+  const live = S.filter(Boolean);
   // ends: meet the centreline of the wall they run into
   for (const s of live) for (const end of ['u0', 'u1']) {
     const ue = s[end], tol = 6; let best = null, bd = 1e9;

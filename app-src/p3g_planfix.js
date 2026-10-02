@@ -18,7 +18,7 @@ function inkFromRGBA(d, W, H) {
   for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; T = t; } }
   T = clamp(T, 70, 165);
   const ink = new Uint8Array(n); for (let i = 0; i < n; i++) ink[i] = lum[i] < T ? 1 : 0;
-  return { W, H, ink, T };
+  return { W, H, ink, T, lum };
 }
 
 const axisOf = w => { const dx = Math.abs(w.b[0] - w.a[0]), dy = Math.abs(w.b[1] - w.a[1]); return dy <= dx * .08 ? 'h' : dx <= dy * .08 ? 'v' : null; };
@@ -86,43 +86,47 @@ function refineTrace(tr, P) {
   }
   stats.style = style;
   const tMed = median(S.filter(s => s?.band && s.band.kind !== 'line').map(s => s.band.t)) || median(S.filter(Boolean).map(s => s.t)) || 8; stats.tMed = tMed;
-  // the drawing decides: a wall exists only where a wall is drawn. Furniture, counters and dimension lines are thin lines,
-  // so on a plan whose walls are drawn thick, a thin line is not a wall.
-  const dropped = [];
-  // on a solid-wall plan, a band far thinner than the usual wall is an outline (balcony edge, counter, furniture), not a wall
-  // and on a two-line plan, two lines only make a wall when they are spaced like the other walls (a bed or counter outline is not)
-  const thin = b => b && ((b.kind === 'filled' && style === 'filled' && b.t < Math.max(3, tMed * .45)) || (b.kind === 'double' && style === 'double' && (b.t < tMed * .5 || b.t > tMed * 1.8)));
-  for (const s of S) if (s && thin(s.band)) s.band = { ...s.band, kind: 'line' };
+  // Is a wall drawn here at all? Compare the strip under the wall with the floor beside it: a drawn wall, however thin or
+  // grey (brochure partitions are often a single grey line), is darker than the floor next to it; open floor is not.
+  // Only walls lying on plain open floor are removed, and only stretches of plain floor are opened up.
+  // a missed doorway is about as wide as the doors the tracing did find
+  const doorW = median(S.filter(Boolean).flatMap(s => s.ops.filter(q => q.o.type === 'door').map(q => q.s1 - q.s0)));
+  const minGap = doorW ? Math.max(10, doorW * .6) : Math.max(tMed * 2.5, 12);
+  const contrastAt = (s, u, c, t) => {
+    const lum = (u2, v) => { const x = Math.round(s.ax === 'h' ? u2 : v), y = Math.round(s.ax === 'h' ? v : u2); return x < 0 || y < 0 || x >= P.W || y >= P.H ? 255 : P.lum[y * P.W + x]; };
+    const h = Math.max(1.5, t / 2), k = Math.max(3, Math.round(t)); let band = 0, nb = 0, sa = 0, sb = 0;
+    for (let v = Math.round(c - h); v <= Math.round(c + h); v++) { band += lum(u, v); nb++; }
+    for (let i = 0; i < k; i++) { sa += lum(u, c - h - 2 - i); sb += lum(u, c + h + 2 + i); }
+    return Math.max(sa, sb) / k - band / nb;
+  };
+  const dropped = [], added = [];
   for (let i = 0; i < S.length; i++) {
     const s = S[i]; if (!s) continue; stats.walls++;
-    let b = s.band;
-    if (!b || (style !== 'line' && b.kind === 'line')) { const wide = findWallBand(P, s.ax, s.u0, s.u1, s.c0, Math.max(s.t, tMed) * 2, s.ops.map(q => [q.s0 - 2, q.s1 + 2]), style === 'line' ? null : style); if (wide && !thin(wide) && (style === 'line' || wide.kind !== 'line')) b = wide; }
-    const glazed = s.ops.reduce((a, q) => a + Math.max(0, Math.min(q.s1, s.u1) - Math.max(q.s0, s.u0)), 0) >= (s.u1 - s.u0) * .6;
-    if (!b || (style !== 'line' && b.kind === 'line')) { if (glazed && s.w.ext) { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v < s.c + s.t / 2; v++) s.rows.push(v); continue; } dropped.push(s); S[i] = null; continue; }
-    s.c = b.c; s.t = b.kind === 'line' ? tMed : b.t; s.rows = b.rows; stats.snapped++;
-  }
-  stats.dropped = dropped.length;
-  const live = S.filter(Boolean), added = [];
-  // along each wall: trim the ends to where the drawn wall stops, and wherever nothing is drawn across the wall
-  // (a gap the tracing has no door or window for) leave a way through instead of a solid wall
-  const minGap = Math.max(tMed * 2.5, 10);
-  for (const s of live) {
-    if (!s.band && !s.rows?.length) continue;
-    const lo = Math.round(s.u0), hi = Math.round(s.u1), f = [];
-    for (let u = lo; u <= hi; u++) f.push(fillAt(P, s, u));
-    const runs = []; let st = null;
-    f.forEach((v, i) => { const e = v < .15; if (e && st === null) st = i; if ((!e || i === f.length - 1) && st !== null) { runs.push([lo + st, lo + (e ? i + 1 : i)]); st = null; } });
-    for (const [a, b] of runs) {
-      if (b - a < minGap) continue;
-      const known = s.ops.some(q => Math.min(b, q.s1) - Math.max(a, q.s0) > (b - a) * .4);
-      if (a <= s.u0 + tMed) { if (!known) s.u0 = b; continue; }
-      if (b >= s.u1 - tMed) { if (!known) s.u1 = a; continue; }
+    const b = s.band;
+    if (b && (b.kind !== 'line' || Math.abs(b.c - s.c0) <= Math.max(3, s.t))) { s.c = b.c; s.t = b.kind === 'line' ? Math.min(s.t, tMed) : b.t; s.rows = b.rows; stats.snapped++; }
+    else { s.rows = []; for (let v = Math.round(s.c - s.t / 2); v <= s.c + s.t / 2; v++) s.rows.push(v); }
+    const lo = Math.round(s.u0), hi = Math.round(s.u1), prof = [];
+    for (let u = lo; u <= hi; u++) prof.push(contrastAt(s, u, s.c, s.t));
+    const inOp = u => s.ops.some(q => u >= q.s0 - 2 && u <= q.s1 + 2), solidU = prof.filter((_, k) => !inOp(lo + k));
+    const drawn = solidU.length ? solidU.filter(v => v >= 12).length / solidU.length : 1;
+    s.drawn = drawn;
+    if (drawn < .15 && !s.w.ext && hi - lo >= minGap) { dropped.push(s); S[i] = null; continue; }
+    if (drawn < .4) continue;
+    // stretches of plain floor across a drawn wall: a doorway the tracing missed (or a wall end that overshoots)
+    let st = null; const runs = [];
+    prof.forEach((v, k) => { const e = v < 8; if (e && st === null) st = k; if ((!e || k === prof.length - 1) && st !== null) { runs.push([lo + st, lo + (e ? k + 1 : k)]); st = null; } });
+    for (const [a, b2] of runs) {
+      if (b2 - a < minGap) continue;
+      const known = s.ops.some(q => Math.min(b2, q.s1) - Math.max(a, q.s0) > (b2 - a) * .4);
       if (known) continue;
-      const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], o = { type: s.w.ext ? 'window' : 'opening', a: at(a), b: at(b), auto: true };
-      added.push(o); s.ops.push({ o, s0: a, s1: b });
+      if (a <= s.u0 + tMed) { s.u0 = b2; continue; }
+      if (b2 >= s.u1 - tMed) { s.u1 = a; continue; }
+      const at = u => s.ax === 'h' ? [u, s.c] : [s.c, u], o = { type: s.w.ext ? 'window' : 'opening', a: at(a), b: at(b2), auto: true };
+      added.push(o); s.ops.push({ o, s0: a, s1: b2 });
     }
   }
-  stats.added = added.length;
+  stats.dropped = dropped.length; stats.added = added.length;
+  const live = S.filter(Boolean);
   // ends: meet the centreline of the wall they run into
   for (const s of live) for (const end of ['u0', 'u1']) {
     const ue = s[end], tol = 6; let best = null, bd = 1e9;
