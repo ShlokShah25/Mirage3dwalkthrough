@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 
 Object.assign(process.env, {
-  MIRAGE_DB: 'memory', PORT: '3100', ANTHROPIC_BASE_URL: 'http://localhost:4001', RAZORPAY_BASE_URL: 'http://localhost:4002', FAL_URL: 'http://localhost:4003', FAL_KEY: 'fal_test',
+  MIRAGE_DB: 'memory', PORT: '3100', FREE_MODE: 'off', ANTHROPIC_BASE_URL: 'http://localhost:4001', RAZORPAY_BASE_URL: 'http://localhost:4002', FAL_URL: 'http://localhost:4003', FAL_KEY: 'fal_test',
   RAZORPAY_KEY_ID: 'rzp_test', RAZORPAY_KEY_SECRET: 'test_secret', RAZORPAY_WEBHOOK_SECRET: 'whsec',
   RAZORPAY_PLAN_PRO: 'plan_pro', RAZORPAY_PLAN_MAX: 'plan_max', RAZORPAY_OFFER_UPGRADE: 'offer_up',
 });
@@ -204,6 +204,20 @@ r = await call(ED, '/api/comments', { id: cid, resolved: true }, 'PATCH'); asser
 await call(A, '/api/share', { homeId: 'h1', action: 'remove', email: em(VW) });
 assert.equal((await me(VW)).shared.length, 0); assert.equal((await call(VW, '/api/homedata?home=h1')).status, 403); ok('removing someone ends their access');
 r = await call(ED, '/api/share', { homeId: 'h1', action: 'remove', email: em(ED) }); assert.equal(r.status, 200); assert.equal((await me(ED)).shared.length, 0); ok('a member can leave a shared home');
+
+// --- free mode: everything unlocked, with daily caps ---
+process.env.FREE_MODE = 'on';
+const G = '88888888-ffff-4fff-8fff-000000000001';
+assert.equal((await (await fetch(B + '/api/config', { cache: 'no-store' })).json()).free, true);
+await ai(G, { kind: 'plan_read', homeId: 'g1', prompt: 'You are an architectural draftsperson', images: ['data:image/png;base64,' + Buffer.from('free-plan').toString('base64')] });
+r = await call(G, '/api/generate', { action: 'start', homeId: 'g1' }); assert.equal(r.status, 200); ok('free mode: designing needs no plan or payment');
+let gid = r.body.genId; r = await ai(G, { kind: 'design', genId: gid, prompt: FURNISH }); assert.ok(r.json.items.length > 0); await call(G, '/api/generate', { action: 'finish', genId: gid });
+r = await ai(G, { kind: 'edit', homeId: 'g1', prompt: 'You are editing a furnished 3D model' }); assert.ok(r.done); assert.equal((await me(G)).homes.g1.editable, true); ok('free mode: changes work and the home is editable');
+r = await ai(G, { kind: 'edit', homeId: 'g1', prompt: 'You are editing NOOP' }); assert.ok(r.done); r = await ai(G, { kind: 'refurnish', homeId: 'g1', prompt: FURNISH }); assert.ok(r.done); ok('free mode: refunds and room redos need no balance');
+for (let i = 0; i < 4; i++) { const x = await call(G, '/api/generate', { action: 'start', homeId: 'g1' }); assert.equal(x.status, 200); await ai(G, { kind: 'design', genId: x.body.genId, prompt: FURNISH }); await call(G, '/api/generate', { action: 'finish', genId: x.body.genId }); }
+r = await call(G, '/api/generate', { action: 'start', homeId: 'g1' }); assert.equal(r.status, 429); ok('free mode: designs are capped at 5 a day per account');
+r = await ai(A, { kind: 'plan_read', homeId: 'h1', prompt: 'You are an architectural draftsperson', images: [IMG] }); assert.ok(r.done); ok('free mode leaves existing paid homes working');
+process.env.FREE_MODE = 'off';
 
 // launch tiers step up: simulate sales until the first tier is gone
 for (let i = 0; i < 4; i++) { const u = `55555555-dddd-4ddd-8ddd-00000000000${i}`; await ai(u, { kind: 'plan_read', homeId: 'L' + i, prompt: 'You are an architectural draftsperson', images: ['data:image/png;base64,' + Buffer.from('L' + i).toString('base64')] }); const o = await call(u, '/api/billing', { action: 'pass', homeId: 'L' + i }); await pay(u, { orderId: o.body.orderId }); }

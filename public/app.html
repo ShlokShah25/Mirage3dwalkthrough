@@ -5127,6 +5127,7 @@ if (SITE) (() => {
   const home = () => (project && S.me?.homes?.[project.id]) || null;
   const sub = () => S.me?.sub || null;
   const subOn = () => !!sub()?.active;
+  const FREE = () => !!S.cfg?.free;   // everything unlocked for now; the server keeps daily caps
   const homesLeft = () => Math.max(0, (sub()?.homes_limit || 0) - (sub()?.homes_used || 0));
   const changesLeftPro = () => Math.max(0, (sub()?.changes_limit || 0) - (sub()?.changes_used || 0));
 
@@ -5201,7 +5202,8 @@ if (SITE) (() => {
     let tag = 'Sign in', detail = '';
     if (S.token && S.me) {
       const h = home(), s = sub();
-      if (subOn()) { tag = s.plan === 'max' ? 'PRO MAX' : 'PRO'; detail = `${homesLeft()} homes · ${changesLeftPro()} changes`; }
+      if (FREE()) { tag = 'FREE'; detail = 'everything unlocked'; }
+      else if (subOn()) { tag = s.plan === 'max' ? 'PRO MAX' : 'PRO'; detail = `${homesLeft()} homes · ${changesLeftPro()} changes`; }
       else if (h?.access === 'pass') { tag = 'PASS'; detail = h.editable ? `${h.changes_left} changes · ${Math.max(0, Math.ceil((new Date(h.expires_at) - Date.now()) / 864e5))} days` : 'view only'; }
       else { tag = 'FREE'; detail = 'bare shell'; }
     }
@@ -5216,6 +5218,7 @@ if (SITE) (() => {
     if (!layout.walls.length) { note.textContent = 'Free. We find every room first, so you can give any room its own look before designing.'; return; }
     const redo = project.status === 'generated';
     lbl.textContent = redo ? 'Redesign my home' : 'Design my home';
+    if (FREE()) { cost.textContent = 'Free'; note.textContent = 'Mirage is free right now: every room designed, changes by asking, Mira and sharing included.'; return; }
     if (subOn() && (h?.access === 'pro' || !h || h.access === 'none')) {
       cost.textContent = sub().plan === 'max' ? 'Pro Max' : 'Pro';
       note.textContent = h?.access === 'pro' ? 'Restyles are free on your plan.' : `Uses 1 of your ${homesLeft()} homes left this month.`;
@@ -5234,6 +5237,7 @@ if (SITE) (() => {
 
   S.canDesign = async p => {
     await S.ensureAuth(); await S.refresh();
+    if (FREE()) { if (!S.me?.homes?.[p.id]) await S.api('/api/homes', { id: p.id, name: p.name }).catch(() => { }); return true; }
     const h = home();
     if (h?.access === 'pass' && h.editable && h.designs_left > 0) return true;
     if (h?.access === 'pro' && subOn()) return true;
@@ -5243,13 +5247,14 @@ if (SITE) (() => {
   };
   S.canEdit = async p => {
     await S.ensureAuth(); if (!S.me) await S.refresh();
+    if (FREE()) return true;
     const h = home();
     if (h?.access === 'pass') { if (!h.editable) { S.paywall('pass_expired'); return false; } if (h.changes_left > 0) return true; S.paywall('no_changes_left'); return false; }
     if (h?.access === 'pro') { if (!subOn()) { S.paywall('sub_inactive'); return false; } if (changesLeftPro() > 0) return true; S.paywall('no_changes_left'); return false; }
     S.paywall('payment_required'); return false;
   };
-  S.costLabel = () => { const h = home(); return h?.access === 'pass' ? '1 Home Pass design' : h?.access === 'pro' ? 'Free restyle' : subOn() ? '1 Pro home' : ''; };
-  S.balanceText = () => { const h = home(); return h?.access === 'pass' ? `${Math.max(0, h.designs_left - 1)} left after this` : h?.access === 'pro' ? '' : subOn() ? `${Math.max(0, homesLeft() - 1)} homes left this month after this` : ''; };
+  S.costLabel = () => { if (FREE()) return 'Free'; const h = home(); return h?.access === 'pass' ? '1 Home Pass design' : h?.access === 'pro' ? 'Free restyle' : subOn() ? '1 Pro home' : ''; };
+  S.balanceText = () => { if (FREE()) return ''; const h = home(); return h?.access === 'pass' ? `${Math.max(0, h.designs_left - 1)} left after this` : h?.access === 'pro' ? '' : subOn() ? `${Math.max(0, homesLeft() - 1)} homes left this month after this` : ''; };
   S.startGen = async p => { const r = await S.api('/api/generate', { action: 'start', homeId: p.id }); S.refreshSoon(); return r.genId; };
   S.finishGen = async genId => { try { const r = await S.api('/api/generate', { action: 'finish', genId }); if (r.status === 'refunded') flash('Nothing was placed, so this design was not counted.', true); } catch { } S.refresh(); };
 
@@ -5261,7 +5266,7 @@ if (SITE) (() => {
     const n = inspRooms().length, h = home();
     const rooms = inspRooms().filter(r => r.type !== 'other');
     const room = rooms.find(r => /living/i.test(r.type + ' ' + r.name)) || [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
-    const canTease = room && !h?.teaser_used && !project.teaserRoom && (!h || h.access === 'none') && !subOn();
+    const canTease = !FREE() && room && !h?.teaser_used && !project.teaserRoom && (!h || h.access === 'none') && !subOn();
     const style = presetById(project.presetId)?.name || 'your chosen';
     const m = modal(`<div class="eyebrow">[ Plan read · ${n} rooms found ]</div><h2>Your bare 3D shell is ready</h2>
       <p class="lead">Walk through it and check the walls. If something looks off, fix it in <b>Fix the layout</b>.</p>
@@ -5286,6 +5291,7 @@ if (SITE) (() => {
     ${o.launchNote ? `<div class="n launchnote">${o.launchNote}</div>` : ''}<button class="${o.best ? 'primary' : ''}" data-buy="${o.id}"${o.disabled ? ' disabled' : ''}>${o.cta}</button>${o.note ? `<div class="n" style="margin-top:2px">${o.note}</div>` : ''}</div>`;
 
   S.paywall = async (reason = 'payment_required') => {
+    if (FREE()) { flash('Mirage is free right now. If something was refused, try again in a moment.', true); return; }
     S.lastPaywall = { reason, t: Date.now() };
     if (!S.token) { await S.ensureAuth(); }
     if (!S.me) await S.refresh();
@@ -5374,13 +5380,13 @@ if (SITE) (() => {
     const s = sub(), h = home(), me = S.me || {};
     const rows = [];
     if (subOn()) rows.push(['Plan', `${s.plan === 'max' ? 'Pro Max' : 'Pro'}${s.cancel_at_period_end ? ' · ends ' : ' · renews '}${s.current_end ? new Date(s.current_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}`], ['Homes this month', `${s.homes_used} of ${s.homes_limit}`], ['Changes this month', `${s.changes_used} of ${s.changes_limit}`]);
-    else rows.push(['Subscription', 'None · bare shells are always free']);
+    else rows.push(FREE() ? ['Plan', 'Free for now · everything is unlocked, with daily limits'] : ['Subscription', 'None · bare shells are always free']);
     if (h?.access === 'pass') rows.push(['This home', `Home Pass · ${h.designs_left} designs, ${h.changes_left} changes left · edits until ${new Date(h.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`]);
     const m = modal(`<div class="eyebrow">[ Your account ]</div><h2>${esc(me.user?.email || 'Signed in')}</h2>
       <dl class="sumlist">${rows.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('')}</dl>
-      <div class="mact"><button id="acOut">Sign out</button>${subOn() && !s.cancel_at_period_end ? '<button id="acCancel">Cancel subscription</button>' : ''}${h?.access === 'pass' && h.editable ? '<button id="acTop">Add 15 changes</button>' : ''}<button class="primary" id="acPlans">${subOn() ? 'Change plan' : 'See plans'}</button></div>`, { wide: true });
+      <div class="mact"><button id="acOut">Sign out</button>${subOn() && !s.cancel_at_period_end ? '<button id="acCancel">Cancel subscription</button>' : ''}${h?.access === 'pass' && h.editable ? '<button id="acTop">Add 15 changes</button>' : ''}${FREE() ? '<button class="primary" data-close>Done</button>' : `<button class="primary" id="acPlans">${subOn() ? 'Change plan' : 'See plans'}</button>`}</div>`, { wide: true });
     m.el.querySelector('#acOut').onclick = () => { m.close(); S.signOut(); };
-    m.el.querySelector('#acPlans').onclick = () => { m.close(); S.paywall('payment_required'); };
+    m.el.querySelector('#acPlans')?.addEventListener('click', () => { m.close(); S.paywall('payment_required'); });
     m.el.querySelector('#acTop')?.addEventListener('click', () => { m.close(); buy('topup'); });
     m.el.querySelector('#acCancel')?.addEventListener('click', async () => {
       const c = modal(`<div class="eyebrow">[ Cancel ]</div><h2>Cancel your subscription?</h2><p class="lead">You keep everything until the end of this billing period. After that your homes stay viewable and shareable, but editing and new designs stop.</p><div class="mact"><button data-close>Keep my plan</button><button class="primary" id="ccGo">Cancel at period end</button></div>`);

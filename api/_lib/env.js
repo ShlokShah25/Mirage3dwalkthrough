@@ -24,6 +24,11 @@ export const PRICING = {
   ],
 };
 
+// Free mode: everything is unlocked for every signed-in account, with daily caps to keep costs sane.
+// On by default for now; set FREE_MODE=off to bring back the Home Pass and Pro paywall.
+export const freeMode = () => String(env('FREE_MODE', 'on')).toLowerCase() !== 'off';
+export const FREE = { designsPerDay: 5, changesPerDay: 60, rendersPerDay: 10 };
+
 export const MODELS = {
   complex: () => env('MODEL_COMPLEX', 'claude-opus-5-5'),
   default: () => env('MODEL_DEFAULT', 'claude-sonnet-5'),
@@ -34,7 +39,7 @@ export const LIMITS = { promptChars: 160000, images: 8, imageChars: 3_000_000 };
 
 export function publicConfig(launch) {
   return {
-    launch,
+    launch, free: freeMode(),
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

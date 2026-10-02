@@ -1,6 +1,6 @@
 // Who may do what, and what it costs them. All checks run on the server.
 import { db, cas } from './db.js';
-import { PRICING } from './env.js';
+import { PRICING, FREE, freeMode } from './env.js';
 import { HttpError } from './http.js';
 
 const now = () => new Date();
@@ -113,7 +113,11 @@ export async function startGeneration(uid, homeId) {
   if (!home.plan_hash) throw new HttpError(409, 'no_plan', 'Read the floor plan first.');
   if (home.locked_hash && home.plan_hash !== home.locked_hash) throw new HttpError(409, 'plan_locked', 'This home is locked to the floor plan it was designed with. Start a new home for a different plan.');
   let source;
-  if (home.access === 'pass') {
+  if (freeMode()) {
+    const today = await db.count('generations', { user_id: uid, status: { neq: 'refunded' }, created_at: { gte: iso(startOfDay()) } });
+    if (today >= FREE.designsPerDay) throw new HttpError(429, 'rate_limited', `That is ${FREE.designsPerDay} designs today, which is the daily limit while Mirage is free. Come back tomorrow.`);
+    source = 'free';
+  } else if (home.access === 'pass') {
     const acc = await editAccess(uid, home);
     const ok = await cas('passes', { id: acc.pass.id }, 'designs_left', v => v - 1, v => v > 0);
     if (!ok) throw new HttpError(402, 'no_designs_left', 'You have used all the redesigns on this Home Pass. Go Pro for unlimited restyles.');
@@ -130,7 +134,7 @@ export async function startGeneration(uid, homeId) {
     source = 'pro_new';
   }
   const first = !home.locked_hash;
-  await db.update('homes', { id: homeId }, { locked_hash: home.plan_hash, designed_at: iso(now()) });
+  await db.update('homes', { id: homeId }, { locked_hash: freeMode() ? home.locked_hash || null : home.plan_hash, designed_at: iso(now()) });
   return db.insert('generations', {
     user_id: uid, home_id: homeId, source, first, calls_left: PRICING.budgets.designCalls, items: 0, status: 'running',
     expires_at: iso(new Date(Date.now() + PRICING.budgets.generationMinutes * 60e3)),
@@ -177,6 +181,12 @@ export async function sweepGenerations(uid) {
 
 // ---- changes ----
 async function takeChange(uid, home) {
+  if (freeMode()) {
+    const since = { gte: iso(startOfDay()) };
+    const used = await db.count('edits', { user_id: uid, refunded: false, created_at: since }) + await db.count('usage', { user_id: uid, kind: 'refurnish', created_at: since });
+    if (used >= FREE.changesPerDay) throw new HttpError(429, 'rate_limited', `That is ${FREE.changesPerDay} changes today, which is the daily limit while Mirage is free. Come back tomorrow.`);
+    return 'free';
+  }
   const acc = await editAccess(uid, home);
   if (acc.kind === 'pass') {
     const ok = await cas('passes', { id: acc.pass.id }, 'changes_left', v => v - 1, v => v > 0);
@@ -189,6 +199,7 @@ async function takeChange(uid, home) {
   return 'pro';
 }
 export async function giveChangeBack(uid, homeId, source) {
+  if (source === 'free') return;
   if (source === 'pass') { const h = await db.one('homes', { id: homeId }); if (h?.pass_id) await cas('passes', { id: h.pass_id }, 'changes_left', v => v + 1); }
   else await cas('subscriptions', { user_id: uid }, 'changes_used', v => Math.max(0, v - 1));
 }
@@ -217,14 +228,14 @@ export async function startRefurnish(uid, homeId) {
 
 // ---- the guide: cheap, fast chat; changes it asks for go through the normal (metered) edit path ----
 export async function allowGuide(uid) {
-  const sub = await getSub(uid), paid = subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;
+  const sub = await getSub(uid), paid = freeMode() || subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;
   const cap = paid ? PRICING.guide.paidPerDay : PRICING.guide.freePerDay;
   if (await dailyCount(uid, 'guide') >= cap) throw new HttpError(429, 'rate_limited', paid ? 'Your guide has talked a lot today. She will be back tomorrow.' : `Free accounts get ${cap} guide messages a day. Get a Home Pass to keep talking.`);
 }
 
 // ---- Mira's voice ----
 export async function allowVoice(uid) {
-  const sub = await getSub(uid), paid = subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;
+  const sub = await getSub(uid), paid = freeMode() || subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;
   const cap = paid ? PRICING.voice.paidPerDay : PRICING.voice.freePerDay;
   if (await dailyCount(uid, 'voice') >= cap) throw new HttpError(429, 'rate_limited', 'Mira has talked a lot today; she will switch to the device voice.');
   await db.insert('usage', { user_id: uid, kind: 'voice', model: 'elevenlabs' });
@@ -257,8 +268,9 @@ export async function allowRender(uid, homeId) {
       tier = sub.plan;
     }
   }
-  if (tier === 'free' && await db.count('usage', { user_id: uid, kind: 'render', model: RENDER_OK, created_at: { gte: iso(startOfDay()) } }) >= R.freePerDay)
-    throw new HttpError(402, 'render_limit', `Free accounts get ${R.freePerDay} photo-real renders a day. Get a Home Pass for ${R.pass} per home.`);
+  const freeCap = freeMode() ? FREE.rendersPerDay : R.freePerDay;
+  if (tier === 'free' && await db.count('usage', { user_id: uid, kind: 'render', model: RENDER_OK, created_at: { gte: iso(startOfDay()) } }) >= freeCap)
+    throw freeMode() ? new HttpError(429, 'rate_limited', `That is ${freeCap} photo-real renders today, the daily limit while Mirage is free.`) : new HttpError(402, 'render_limit', `Free accounts get ${R.freePerDay} photo-real renders a day. Get a Home Pass for ${R.pass} per home.`);
   const row = await db.insert('usage', { user_id: uid, home_id: homeId || null, kind: 'render', model: 'pending' });
   return { tier, usageId: row.id };
 }
@@ -308,14 +320,14 @@ export async function snapshot(uid) {
   const out = {};
   for (const h of homes) {
     const p = h.pass_id ? byId[h.pass_id] : null;
-    const editable = h.access === 'pass' ? !!p && new Date(p.expires_at) > now() : h.access === 'pro' ? active : false;
+    const editable = freeMode() ? true : h.access === 'pass' ? !!p && new Date(p.expires_at) > now() : h.access === 'pro' ? active : false;
     out[h.id] = {
       access: h.access, editable, locked: !!h.locked_hash, teaser_used: !!h.teaser_used, designed: !!h.designed_at, has_plan: !!h.plan_hash,
       members: nMembers(h.id), designs_left: p?.designs_left ?? null, changes_left: p?.changes_left ?? null, expires_at: p?.expires_at ?? null,
     };
   }
   return {
-    persona: profile?.persona || null,
+    persona: profile?.persona || null, free: freeMode(),
     sub: sub ? {
       plan: sub.plan, status: sub.status, active, homes_used: sub.homes_used, homes_limit: plan?.homes ?? 0,
       changes_used: sub.changes_used, changes_limit: plan?.changes ?? 0, current_end: sub.current_end, cancel_at_period_end: !!sub.cancel_at_period_end,

@@ -333,6 +333,14 @@
   document.getElementById('yr').textContent = new Date().getFullYear();
   // live launch offer: price and spots left come from the server
   fetch('/api/config').then(r => r.json()).then(c => {
+    if (c.free) {   // free for now: no prices anywhere on the page
+      document.getElementById('pricing')?.remove(); document.querySelector('.links a[href="#pricing"]')?.remove();
+      const o = document.querySelector('.offer'); if (o) { o.href = '/app#start'; o.querySelector('span:nth-child(2)').textContent = 'FREE RIGHT NOW · EVERY ROOM, MIRA AND SHARING INCLUDED'; }
+      const tr = document.querySelector('.trust'); if (tr) tr.textContent = 'FREE RIGHT NOW · NO CARD NEEDED · RUNS IN YOUR BROWSER';
+      const tb = document.querySelector('.tier.on .top b'); if (tb) tb.textContent = 'FREE FOR NOW';
+      document.querySelectorAll('.faq > div').forEach(d => { const h = d.querySelector('h3')?.textContent || ''; if (/Home Pass or Pro|cancel Pro/.test(h)) d.remove(); else if (/What's free/.test(h)) d.querySelector('p').textContent = 'Everything, for now: reading your plan, designing every room, changing things by asking, Mira, and sharing with others. There are generous daily limits per account.'; });
+      return;
+    }
     const L = c.launch; if (!L) return;
     const inr = p => '₹' + Math.round(p / 100).toLocaleString('en-IN');
     const rows = document.querySelectorAll('#ladder div');
