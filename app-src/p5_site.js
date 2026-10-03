@@ -294,7 +294,7 @@ if (SITE) (() => {
   function grabView(maxW = 1344) {
     const src = renderer.domElement, k = Math.min(1, maxW / src.width), c = document.createElement('canvas');
     c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
-    if (!photo) { if (composer) composer.render(); else renderer.render(scene, camera); }
+    if (!photo) { if (composer) composer.render(); else renderer.render(scene, camera); } else if (ptReady) PT.renderSample();
     c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
     return { image: c.toDataURL('image/jpeg', .9), w: c.width, h: c.height };
   }

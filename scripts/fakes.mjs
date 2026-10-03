@@ -17,7 +17,16 @@ function answer(prompt) {
   if (prompt.startsWith('You are correcting a tracing') && process.env.MOCK_DEEP) { try { return JSON.parse(readFileSync(`${process.env.MOCK_DEEP}/answer-round-${prompt.match(/round (\d+) of/)[1]}.json`)); } catch { return { edits: [], dismiss: [], done: true }; } }   // MOCK_DEEP=dir replays saved deep-read answers
   if (prompt.startsWith('You are correcting a tracing')) return /round 1 of/.test(prompt) ? { edits: [], dismiss: [...prompt.matchAll(/^- \[([^\]]+)\]/gm)].map(m => ({ id: m[1], why: 'test' })), zoom: [], ask: [], notes: 'looked at everything', done: false } : { edits: [], dismiss: [], zoom: [], ask: [], notes: 'nothing to change', done: true };
   if (prompt.startsWith('You are an interior designer. The image')) return { summary: 'x', tokens: {}, floors: {} };
-  if (/the guide inside Mirage/.test(prompt)) return /Write the script for a guided tour/.test(prompt) ? { intro: 'Welcome.', stops: [...prompt.matchAll(/^(.+?) \((\w+)/gm)].slice(0, 3).map(m => ({ room: m[1], say: `This is the ${m[1]}.`, look: '' })), outro: 'Ask me anything.' } : /lounge chair by the window/.test(prompt) ? { say: 'Adding a leather lounge chair by the window.', actions: [{ do: 'edit', request: 'Add a leather lounge chair by the window in the Master Bedroom' }] } : { say: 'Here is the kitchen.', actions: [{ do: 'go', room: 'Kitchen' }] };
+  if (/guide inside Mirage/.test(prompt)) {
+    if (/Write the script for a guided tour/.test(prompt)) return { intro: 'Welcome.', stops: [...prompt.matchAll(/^(.+?) \((\w+)/gm)].slice(0, 3).map(m => ({ room: m[1], say: `This is the ${m[1]}.`, look: '' })), outro: 'Ask me anything.' };
+    const said = (prompt.match(/VISITOR SAYS: "([^]*?)"\n/) || [])[1] || '';
+    if (/lounge chair by the window/.test(said)) return { say: 'Adding a leather lounge chair by the window.', actions: [{ do: 'edit', request: 'Add a leather lounge chair by the window in the Master Bedroom' }] };
+    if (/ideas/i.test(said)) return { say: 'Three directions for this room.', actions: [], options: [{ label: 'Midnight studio', why: 'Dark, glowing and made for late nights.', request: 'SLOWTEST Make it night in a dark moody studio with RGB accent lighting' }, { label: 'Gallery calm', why: 'Pale stone and one great piece.', request: 'Make it day' }] };
+    if (/go for it/i.test(said)) return /CHANGES IN PROGRESS/.test(prompt) ? { say: 'It is already under way.', actions: [] } : { say: 'On it.', actions: [{ do: 'edit', request: 'SLOWTEST Make it night in a dark moody studio with RGB accent lighting' }] };
+    if (/^TESTEDIT /.test(said)) return { say: 'On it.', actions: [{ do: 'edit', request: said.slice(9) }] };
+    return { say: 'Here is the kitchen.', actions: [{ do: 'go', room: 'Kitchen' }] };
+  }
+  if (prompt.startsWith('You are editing') && /TESTOPS /.test(prompt)) { try { return { summary: 'Test operations applied.', ops: JSON.parse(prompt.match(/TESTOPS (\[[^]*?\])"\nWHERE/)[1]) }; } catch (e) { return { summary: 'bad test ops ' + e.message, ops: [] }; } }
   if (prompt.startsWith('You are editing')) return /NOOP/.test(prompt) ? { summary: 'Nothing to change.', ops: [] } : { summary: 'Switched to night.', ops: [{ op: 'time', value: 'night' }] };
   if (prompt.includes('placing furniture')) {
     if (/EMPTYROOM/.test(prompt)) return { items: [] };
@@ -32,6 +41,7 @@ export function startFakes() {
     const b = await readJson(req);
     const text = b.messages?.[0]?.content?.find(c => c.type === 'text')?.text || '';
     calls.push({ model: b.model, head: text.slice(0, 40), images: b.messages?.[0]?.content?.filter(c => c.type === 'image').length });
+    if (/HOMEOWNER'S REQUEST: "SLOWTEST/.test(text)) await new Promise(r => setTimeout(r, 3500));   // lets tests ask for a second change while the first is being made
     const out = JSON.stringify(answer(text));
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     const send = o => res.write(`event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`);

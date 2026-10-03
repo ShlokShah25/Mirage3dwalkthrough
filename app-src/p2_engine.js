@@ -23,7 +23,8 @@ const $ = id => document.getElementById(id);
 
 /* ================= renderer & post ================= */
 const stage = $('stage');
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });   // captures render first, then read the canvas in the same task
+renderer.shadowMap.autoUpdate = false;   // the home stands still: shadows are redrawn when something changes, not 60 times a second
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -89,7 +90,13 @@ const envFloor = new THREE.Mesh(new THREE.CircleGeometry(100, 32), new THREE.Mes
 let envRT = null;
 function rebuildEnv(floorHex) { envFloor.material.color.set(floorHex || '#9a8a78'); if (envRT) envRT.dispose(); envRT = pmrem.fromScene(envScene, .02); scene.environment = envRT.texture; }
 
-let composer = null, gtao = null, bloom = null, quality = TOUCH ? 'fast' : 'high';
+let composer = null, gtao = null, bloom = null, quality = TOUCH ? 'fast' : 'auto';
+// Auto quality starts at full quality and steps down if this device cannot keep the walkthrough smooth:
+// 0 full · 1 full effects at standard resolution · 2 balanced · 3 fast. The step is remembered for next time.
+let autoStep = 0; try { autoStep = clamp0(+localStorage.getItem('mirage-gfx-step') || 0); } catch { }
+function clamp0(v) { return Math.max(0, Math.min(3, v | 0)); }
+const effQ = () => quality !== 'auto' ? quality : autoStep >= 3 ? 'fast' : autoStep === 2 ? 'balanced' : 'high';
+let shadowTTL = 4; const shadowsDirty = (n = 3) => { shadowTTL = Math.max(shadowTTL, n); };
 let grade = null;
 // cinematic finish: gentle S-curve, warm highlights, soft vignette and fine grain (applied in display space)
 const GradeShader = {
@@ -108,17 +115,18 @@ const GradeShader = {
 function setupPost() {
   composer?.dispose?.(); composer = null; gtao = null; bloom = null; grade = null;
   const w = Math.max(2, stage.clientWidth), h = Math.max(2, stage.clientHeight);
-  const pr = quality === 'high' ? Math.min(devicePixelRatio, 1.5) : quality === 'balanced' ? Math.min(devicePixelRatio, 1.25) : 1;
-  renderer.setPixelRatio(pr);
-  const sm = quality === 'high' ? 4096 : quality === 'balanced' ? 2048 : 1024;
+  const q = effQ(), lite = quality === 'auto' && autoStep === 1;
+  const pr = q === 'high' ? Math.min(devicePixelRatio, lite ? 1 : 1.5) : q === 'balanced' ? Math.min(devicePixelRatio, 1.25) : 1;
+  renderer.setPixelRatio(pr); shadowsDirty();
+  const sm = q === 'high' ? 4096 : q === 'balanced' ? 2048 : 1024;
   if (sun.shadow.mapSize.x !== sm) { sun.shadow.mapSize.set(sm, sm); sun.shadow.map?.dispose(); sun.shadow.map = null; }
-  if (quality === 'fast') return;
-  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: 4 });
+  if (q === 'fast') return;
+  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: lite ? 2 : 4 });
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  if (quality === 'high') {
+  if (q === 'high') {
     gtao = new GTAOPass(scene, camera, w * pr, h * pr);
-    gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.05, samples: 16, distanceFallOff: 1 });
+    gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.05, samples: lite ? 8 : 16, distanceFallOff: 1 });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
     gtao.blendIntensity = .9;
     const cache = gtao._visibilityCache;

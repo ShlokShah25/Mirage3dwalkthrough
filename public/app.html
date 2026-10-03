@@ -14,7 +14,7 @@
   :root{
     color-scheme: dark;
     --bg:#0A0B0C; --bg2:#0E1011; --surface:#111315; --surface2:#17191B; --surface3:#1E2124;
-    --glass:rgba(14,16,17,.74); --glass-strong:rgba(10,11,12,.95);
+    --glass:rgba(14,16,17,.9); --glass-strong:rgba(10,11,12,.95);
     --line:rgba(237,235,228,.08); --line2:rgba(237,235,228,.16); --line3:rgba(237,235,228,.28);
     --ink:#EDEBE4; --muted:#A3A9AE; --faint:#7C848A;
     --gold:#5BF0D1; --gold-hi:#8FF6E2; --gold-lo:#2FC9AA; --gold-ink:#0A0B0C;
@@ -151,8 +151,8 @@
   #stage{position:absolute;inset:0;touch-action:none;background:#0a0908}
   #stage canvas{display:block;width:100%;height:100%;cursor:grab}
   #stage canvas:active{cursor:grabbing}
-  .gpanel{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 12px 40px rgba(0,0,0,.35)}
-  .gpanel button:not(.primary):not([aria-pressed="true"]),.hud button:not([aria-pressed="true"]){background:rgba(17,19,21,.6);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  .gpanel{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+  .gpanel button:not(.primary):not([aria-pressed="true"]),.hud button:not([aria-pressed="true"]){background:rgba(17,19,21,.84)}
   .hud{position:absolute;left:14px;right:14px;top:14px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;pointer-events:none;z-index:4}
   .hud > *{pointer-events:auto}
   .where{padding:10px 15px;min-width:0}
@@ -200,7 +200,7 @@
   .full{grid-column:1/-1}
   .sel-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
   .danger{color:#f3c0a8;border-color:rgba(234,141,123,.35)}
-  #drawer{position:absolute;top:0;right:0;bottom:0;width:min(410px,100%);background:var(--glass-strong);border-left:1px solid var(--line);display:flex;flex-direction:column;padding-block:14px;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.7,.2,1);z-index:10;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+  #drawer{position:absolute;top:0;right:0;bottom:0;width:min(410px,100%);background:var(--glass-strong);border-left:1px solid var(--line);display:flex;flex-direction:column;padding-block:14px;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.7,.2,1);z-index:10}
   #drawer.open{transform:none;box-shadow:-30px 0 80px rgba(0,0,0,.45)}
   #drawer header{display:flex;align-items:center;justify-content:space-between;padding:0 16px 12px;border-bottom:1px solid var(--line)}
   #drawer h2{font-family:var(--serif);font-weight:500;letter-spacing:-.02em;font-size:24px;margin:0}
@@ -246,14 +246,14 @@
   body.presenting #view3d::before,body.presenting #view3d::after{content:"";position:absolute;left:0;right:0;height:6.5vh;background:#000;z-index:3;pointer-events:none}
   body.presenting #view3d::before{top:0}body.presenting #view3d::after{bottom:0}
   body.presenting #guideCap{bottom:calc(6.5vh + 18px);top:auto;font-size:19px;max-width:min(820px,calc(100% - 40px));background:rgba(8,8,9,.55)}
-  #presentBar{position:absolute;top:calc(6.5vh + 14px);left:50%;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 10px;border-radius:999px;background:rgba(10,11,12,.62);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);font-size:13px;color:var(--ink);white-space:nowrap}
+  #presentBar{position:absolute;top:calc(6.5vh + 14px);left:50%;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 10px;border-radius:999px;background:rgba(10,11,12,.86);border:1px solid rgba(255,255,255,.1);font-size:13px;color:var(--ink);white-space:nowrap}
   #presentBar .pb-who{padding:0 8px 0 2px;color:var(--muted)}#presentBar .pb-who b{color:var(--ink)}
   #presentBar button{padding:5px 12px;font-size:12.5px;border-radius:999px}
   #presentBar .gav{width:22px;height:22px}
   .presbtn{font-weight:600}
   @media (max-width:760px){body.presenting #guideCap{font-size:15.5px;top:auto}#presentBar{font-size:12px}#presentBar .pb-who span{display:none}}
   #guideFade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:4}
-  #guideCap{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(760px,calc(100% - 40px));z-index:7;padding:12px 18px;border-radius:14px;background:rgba(10,11,12,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:17px;line-height:1.45;text-align:center;color:var(--ink);text-wrap:balance;pointer-events:none}
+  #guideCap{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(760px,calc(100% - 40px));z-index:7;padding:12px 18px;border-radius:14px;background:rgba(10,11,12,.86);font-size:17px;line-height:1.45;text-align:center;color:var(--ink);text-wrap:balance;pointer-events:none}
   #guidePanel{position:absolute;right:14px;bottom:14px;width:370px;max-height:min(560px,calc(100% - 120px));display:flex;flex-direction:column;z-index:8;border-radius:18px;overflow:hidden}
   #guidePanel header{display:flex;align-items:center;gap:10px;padding:12px 12px 10px 14px;border-bottom:1px solid var(--line)}
   #guidePanel header div{flex:1;display:flex;flex-direction:column;line-height:1.25}
@@ -467,7 +467,9 @@
   .vlist .more{color:var(--faint);padding-left:26px}
   .vact{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.vact button{font-size:12px;padding:6px 11px}
   .gopts{display:flex;flex-direction:column;gap:6px;align-self:flex-start;max-width:92%}
-  .gopts button{text-align:left;font-size:12.5px;padding:8px 12px;border-radius:12px;font-weight:500}
+  .gopts button{text-align:left;font-size:12.5px;padding:9px 12px;border-radius:12px;font-weight:500;display:flex;flex-direction:column;gap:3px}
+  .gopts button b{font-weight:600;font-size:13px}.gopts button span{color:var(--muted);font-weight:400;line-height:1.35}
+  .gmsg.work{display:flex;align-items:center;gap:8px;color:var(--gold-hi)}.gmsg.work button{font-size:11px;padding:2px 8px;border-radius:99px}
   .gopts button.chosen{border-color:var(--gold);color:var(--gold)}
   /* collaborators */
   body[data-role="viewer"] #side .step,body[data-role="commenter"] #side .step,body[data-role="editor"] #side .step{display:none}
@@ -505,7 +507,7 @@
     <div class="crumbs" id="crumbs" hidden><span class="sep">/</span><input type="text" id="projName" aria-label="Project name"></div>
     <div class="crumbs" id="crumbsHome"></div>
     <div class="acts">
-      <select id="quality" aria-label="Render quality" class="hide-s ws-only"><option value="high">High quality</option><option value="balanced">Balanced</option><option value="fast">Fast</option></select>
+      <select id="quality" aria-label="Render quality" class="hide-s ws-only"><option value="auto">Auto quality</option><option value="high">High quality</option><option value="balanced">Balanced</option><option value="fast">Fast</option></select>
       <button id="btnSave" class="hide-s ws-only">Save a copy</button>
       <button class="credits" id="btnWallet" aria-label="Credits"><span class="gem"></span><b id="creditCount">0</b><span>credits</span></button>
     </div>
@@ -603,7 +605,7 @@
           <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Your guide · walks, answers, changes</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Close">✕</button></header>
           <div id="guideTourBar" hidden><span class="live"></span><span>Touring · <b id="guideStep"></b></span><button id="guidePause">Pause</button><button id="guideStop">End tour</button></div>
           <div id="guideLog" role="log"></div>
-          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="vastu">Is my home Vastu compliant?</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button">Show me the kitchen</button><button type="button">Make it night</button></div>
+          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="vastu">Is my home Vastu compliant?</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button" data-act="fix">The plan is wrong here</button><button type="button">Show me the kitchen</button><button type="button">Make it night</button></div>
           <form id="guideForm"><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira anything, or say what to change" aria-label="Message your guide"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>
@@ -658,10 +660,10 @@ globalThis.__MIRAGE_SITE = (() => {
   S.sample = {
     async limits() { return { maxPromptBytes: 160000, images: { maxCount: 10, maxInputBytes: 2e7, mediaTypes: ['image/jpeg', 'image/png', 'image/webp'] } }; },
     async json(prompt, opts = {}) {
+      const ctx = { ...(opts.ctx || S.ctx) };   // taken now, before anything is awaited: another request may set S.ctx meanwhile
       await S.ensureAuth?.();
       const imgs = opts.images == null ? [] : Array.isArray(opts.images) ? opts.images : [opts.images];
       const images = await Promise.all(imgs.map(toDataURL));
-      const ctx = { ...S.ctx };
       let r;
       try {
         r = await fetch('/api/ai', { method: 'POST', signal: opts.signal, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + S.token }, body: JSON.stringify({ ...ctx, prompt, images }) });
@@ -718,7 +720,8 @@ const $ = id => document.getElementById(id);
 
 /* ================= renderer & post ================= */
 const stage = $('stage');
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });   // captures render first, then read the canvas in the same task
+renderer.shadowMap.autoUpdate = false;   // the home stands still: shadows are redrawn when something changes, not 60 times a second
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -784,7 +787,13 @@ const envFloor = new THREE.Mesh(new THREE.CircleGeometry(100, 32), new THREE.Mes
 let envRT = null;
 function rebuildEnv(floorHex) { envFloor.material.color.set(floorHex || '#9a8a78'); if (envRT) envRT.dispose(); envRT = pmrem.fromScene(envScene, .02); scene.environment = envRT.texture; }
 
-let composer = null, gtao = null, bloom = null, quality = TOUCH ? 'fast' : 'high';
+let composer = null, gtao = null, bloom = null, quality = TOUCH ? 'fast' : 'auto';
+// Auto quality starts at full quality and steps down if this device cannot keep the walkthrough smooth:
+// 0 full · 1 full effects at standard resolution · 2 balanced · 3 fast. The step is remembered for next time.
+let autoStep = 0; try { autoStep = clamp0(+localStorage.getItem('mirage-gfx-step') || 0); } catch { }
+function clamp0(v) { return Math.max(0, Math.min(3, v | 0)); }
+const effQ = () => quality !== 'auto' ? quality : autoStep >= 3 ? 'fast' : autoStep === 2 ? 'balanced' : 'high';
+let shadowTTL = 4; const shadowsDirty = (n = 3) => { shadowTTL = Math.max(shadowTTL, n); };
 let grade = null;
 // cinematic finish: gentle S-curve, warm highlights, soft vignette and fine grain (applied in display space)
 const GradeShader = {
@@ -803,17 +812,18 @@ const GradeShader = {
 function setupPost() {
   composer?.dispose?.(); composer = null; gtao = null; bloom = null; grade = null;
   const w = Math.max(2, stage.clientWidth), h = Math.max(2, stage.clientHeight);
-  const pr = quality === 'high' ? Math.min(devicePixelRatio, 1.5) : quality === 'balanced' ? Math.min(devicePixelRatio, 1.25) : 1;
-  renderer.setPixelRatio(pr);
-  const sm = quality === 'high' ? 4096 : quality === 'balanced' ? 2048 : 1024;
+  const q = effQ(), lite = quality === 'auto' && autoStep === 1;
+  const pr = q === 'high' ? Math.min(devicePixelRatio, lite ? 1 : 1.5) : q === 'balanced' ? Math.min(devicePixelRatio, 1.25) : 1;
+  renderer.setPixelRatio(pr); shadowsDirty();
+  const sm = q === 'high' ? 4096 : q === 'balanced' ? 2048 : 1024;
   if (sun.shadow.mapSize.x !== sm) { sun.shadow.mapSize.set(sm, sm); sun.shadow.map?.dispose(); sun.shadow.map = null; }
-  if (quality === 'fast') return;
-  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: 4 });
+  if (q === 'fast') return;
+  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: lite ? 2 : 4 });
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  if (quality === 'high') {
+  if (q === 'high') {
     gtao = new GTAOPass(scene, camera, w * pr, h * pr);
-    gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.05, samples: 16, distanceFallOff: 1 });
+    gtao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.05, samples: lite ? 8 : 16, distanceFallOff: 1 });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
     gtao.blendIntensity = .9;
     const cache = gtao._visibilityCache;
@@ -2027,6 +2037,184 @@ Object.assign(NOTES, {
   'media-wall': 'walnut media wall: stone TV panel, floating lit console, lit display shelving bays either side; back to wall; living rooms and lounges',
 });
 
+/* ---------- Statement pieces: coloured accent light, studio and cinema rooms, fire, wine, built-ins ---------- */
+const hexOr = (v, d) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : d;
+// a surface that glows in any colour (LED strips, neon, flame, screens)
+function ledMat(c, k = 1.25) { const key = `glow:${c}:${k}`; return MC[key] ||= emis(c, c, k); }   // kept under 1.5 so the colour stays a colour and does not burn out to white
+// the wash of light a strip throws on the wall beside it: brightest at the strip, fading out
+function haloTex(kind) {
+  const key = 'halo-' + kind; if (TX[key]) return TX[key];
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), im = g.createImageData(128, 128);
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const u = x / 127, v = 1 - y / 127; let a;
+    if (kind === 'radial') { const r = Math.hypot(u - .5, v - .5) * 2; a = Math.max(0, 1 - r) ** 2; }
+    else a = (1 - v) ** 2.2 * Math.min(1, Math.sin(Math.PI * u) * 3.2);
+    const i = (y * 128 + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = 255; im.data[i + 3] = Math.round(a * 255);
+  }
+  g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (TX[key] = t);
+}
+function haloMat(c, kind = 'edge', op = .75) { const key = `halo:${kind}:${c}:${op}`; return MC[key] ||= new THREE.MeshBasicMaterial({ map: haloTex(kind), color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); }
+function halo(g, w, h, c, x, y, z, rz = 0, kind = 'edge', op = .75) { const me = add(g, new THREE.PlaneGeometry(w, h), haloMat(c, kind, op), x, y, z, 0, 0, rz); me.castShadow = false; me.receiveShadow = false; return me; }
+function tube(g, pts, r, m, closed = false) { const me = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => V(...p)), closed), Math.max(24, pts.length * 8), r, 6, closed), m); g.add(me); return me; }
+
+Object.assign(CAT, {
+  'led-strip': { label: 'RGB LED accent strip', cat: 'Lighting', d: { w: 8, d: .1, h: .1, y: .2, accent: '#ff3df2', wash: 3.2, vertical: false }, nc: true,
+    extras: [['wash', 'Glow reach (ft)', 'num', 0, 6], ['vertical', 'Run it up the wall', 'bool']],
+    build(it, ctx) {
+      const g = G(), c = hexOr(it.accent, '#ff3df2'), back = -it.d / 2, len = it.w, wash = Math.max(0, +it.wash || 0), m = ledMat(c);
+      if (it.vertical) { bx(g, .07, len, .05, m, 0, 0, back + .04); if (wash) for (const s of [-1, 1]) halo(g, len, wash, c, s * wash / 2, len / 2, back + .025, s > 0 ? -Math.PI / 2 : Math.PI / 2); }
+      else { const down = (+it.y || 0) > ctx.H / 2; bx(g, len, .07, .05, m, 0, 0, back + .04); if (wash) halo(g, len, wash, c, 0, down ? -wash / 2 : wash / 2 + .07, back + .025, down ? Math.PI : 0); }
+      return g;
+    } },
+  'neon-sign': { label: 'Neon wall sign', cat: 'Lighting', d: { w: 3.6, d: .14, h: 1.6, y: 5, accent: '#ff3d8b', shape: 'wave' }, nc: true,
+    build(it) {
+      const g = G(), c = hexOr(it.accent, '#ff3d8b'), w = it.w, h = it.h, z = -it.d / 2 + .09, m = ledMat(c, 2.4), cy0 = h / 2; let pts, closed = false;
+      if (it.shape === 'ring') { const r = Math.min(w, h) / 2 - .06; pts = Array.from({ length: 16 }, (_, i) => [Math.cos(i / 16 * 6.283) * r, cy0 + Math.sin(i / 16 * 6.283) * r, z]); closed = true; }
+      else if (it.shape === 'bolt') pts = [[-w * .12, h, z], [-w * .3, h * .52, z], [w * .02, h * .56, z], [-w * .1, 0, z], [w * .3, h * .5, z], [w * .0, h * .46, z], [w * .16, h, z]].map(p => [p[0], p[1], p[2]]);
+      else if (it.shape === 'arc') pts = Array.from({ length: 11 }, (_, i) => [Math.cos(Math.PI - i / 10 * Math.PI) * (w / 2 - .05), Math.sin(i / 10 * Math.PI) * (h - .1), z]);
+      else if (it.shape === 'line') pts = [[-w / 2, cy0, z], [0, cy0, z], [w / 2, cy0, z]];
+      else pts = Array.from({ length: 13 }, (_, i) => [-w / 2 + w * i / 12, cy0 + Math.sin(i / 12 * Math.PI * 3) * (h / 2 - .08), z]);
+      tube(g, pts, .035, m, closed); halo(g, w * 1.7, h * 2.2 + 1, c, 0, cy0, -it.d / 2 + .03, 0, 'radial', .5);
+      for (const s of [-1, 1]) cy(g, .02, .02, .08, mat('black-metal'), s * w * .3, cy0 - .04, -it.d / 2 + .04, 6, Math.PI / 2);
+      return g;
+    } },
+  'acoustic-panels': { label: 'Acoustic wall panels', cat: 'Walls', d: { w: 8, d: .25, h: 7.5, y: .5, finish: '#3a3d47', accent: '#7c5cff', leds: 2 }, nc: true,
+    extras: [['leds', 'LED lines', 'num', 0, 4]],
+    build(it) {
+      const g = G(), w = it.w, h = it.h, back = -it.d / 2, cols = Math.max(2, Math.round(w / 1.7)), rows = Math.max(2, Math.round(h / 1.7)), tw = w / cols, th = h / rows, m = mat(it.finish), m2 = mat(shade(hexOr(it.finish, '#3a3d47'), 1.45));
+      bx(g, w, h, .03, mat('#0d0e10'), 0, 0, back + .015);
+      for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const deep = (r + q) % 2, t = deep ? .17 : .1; bx(g, tw - .07, th - .07, t, deep ? m : m2, -w / 2 + tw * (q + .5), th * r + .035, back + .03 + t / 2); }
+      const L = Math.min(rows - 1, Math.max(0, it.leds | 0)), c = hexOr(it.accent, '#7c5cff');
+      for (let i = 1; i <= L; i++) { const row = Math.round(rows * i / (L + 1)); bx(g, w - .1, .035, .03, ledMat(c), 0, th * row - .018, back + .05); halo(g, w, 1.7, c, 0, th * row + .85, back + .21, 0, 'edge', .55); halo(g, w, 1.2, c, 0, th * row - .62, back + .21, Math.PI, 'edge', .4); }
+      return g;
+    } },
+  'studio-desk': { label: 'Studio desk (music, DJ or streaming)', cat: 'Work', d: { w: 6.5, d: 2.8, h: 4.3, finish: 'wood-dark', accent: '#00e5ff' },
+    build(it) {
+      const g = G(), w = it.w, d = it.d, back = -d / 2, m = mat(it.finish), dark = mat('#141518'), c = hexOr(it.accent, '#00e5ff');
+      bx(g, w, .12, d, m, 0, 2.4, 0);
+      for (const s of [-1, 1]) { bx(g, 1.25, 2.4, d - .35, dark, s * (w / 2 - .625), 0, -.1); for (let i = 0; i < 5; i++) bx(g, 1.0, .05, .02, mat(i % 2 ? 'led-soft' : 'black-metal'), s * (w / 2 - .625), .45 + i * .4, d / 2 - .29); }
+      for (const s of [-1, 1]) bx(g, .1, .5, .8, m, s * (w / 2 - .5), 2.52, back + .5);
+      bx(g, w - .5, .08, .95, m, 0, 3.02, back + .52);
+      for (const s of [-1, 1]) { const x = s * 1.05; bx(g, 1.95, 1.15, .07, mat('screen'), x, 3.25, back + .5, -s * .18); bx(g, 1.8, 1.0, .01, ledMat('#22345e', .55), x + s * .007, 3.325, back + .54, -s * .18); bx(g, .5, .16, .3, dark, x, 3.1, back + .5); }
+      bx(g, 2.6, .13, .8, dark, 0, 2.52, .35); bx(g, 2.3, .03, .28, mat('#ecebe7'), 0, 2.65, .52);
+      for (let i = 0; i < 8; i++) cy(g, .035, .035, .06, mat(i % 3 ? 'chrome' : 'brass'), -.95 + i * .27, 2.65, .12, 10);
+      bx(g, 1.0, .12, .8, mat('black-metal'), w / 2 - 1.5, 2.52, .3); bx(g, .8, .12, .7, mat('black-metal'), -w / 2 + 1.45, 2.52, .3);
+      bx(g, w - 2.7, .035, .03, ledMat(c), 0, 2.37, d / 2 - .06); halo(g, w - 2.7, 1.6, c, 0, 1.55, d / 2 - .05, Math.PI, 'edge', .4);
+      g.userData.colliders = [{ x: 0, z: 0, hx: w / 2, hz: d / 2, ang: 0, y0: 0, y1: 2.6 }];
+      return g;
+    } },
+  'speaker-pair': { label: 'Studio speakers on stands', cat: 'Work', d: { w: 6, d: 1.1, h: 4.4, finish: '#17181b' },
+    build(it) {
+      const g = G(), m = mat(it.finish), cone = mat('#2b2d31');
+      for (const s of [-1, 1]) { const x = s * (it.w / 2 - .45); cy(g, .36, .4, .07, mat('black-metal'), x, 0, 0, 20); cy(g, .06, .06, 3, mat('black-metal'), x, .07, 0, 10);
+        bx(g, .85, 1.3, .9, m, x, 3.05, 0, -s * .2); const fx = x - s * .09, fz = .45;
+        cy(g, .27, .27, .04, cone, fx, 3.42, fz, 20, Math.PI / 2).rotation.y = -s * .2; cy(g, .1, .1, .05, mat('chrome'), fx, 4.03, fz, 14, Math.PI / 2).rotation.y = -s * .2; }
+      g.userData.colliders = [-1, 1].map(s => ({ x: s * (it.w / 2 - .45), z: 0, hx: .45, hz: .5, ang: 0, y0: 0, y1: it.h }));
+      return g;
+    } },
+  'guitar-wall': { label: 'Guitars on the wall', cat: 'Decor', d: { w: 5, d: .4, h: 3.5, y: 3.3, count: 3 }, nc: true,
+    extras: [['count', 'Guitars', 'num', 1, 5]],
+    build(it) {
+      const g = G(), n = Math.max(1, Math.min(5, it.count | 0 || 3)), back = -it.d / 2, cols = ['#b9814a', '#7a2e1d', '#1b1c1f', '#d7b98a', '#3c4a5c'];
+      for (let i = 0; i < n; i++) {
+        const x = -it.w / 2 + it.w * (i + .5) / n, m = mat(cols[i % cols.length]), z = back + .16;
+        cy(g, .56, .56, .13, m, x, .5, z, 28, Math.PI / 2); cy(g, .42, .42, .13, m, x, 1.18, z, 28, Math.PI / 2);
+        cy(g, .15, .15, .02, mat('#0e0e0f'), x, .93, z + .07, 18, Math.PI / 2); bx(g, .34, .06, .04, mat('#0e0e0f'), x, .52, z + .08);
+        bx(g, .16, 1.85, .07, mat('#3a2a20'), x, 1.6, z + .02); bx(g, .24, .46, .06, mat('#1a1410'), x, 3.02, z);
+        for (const s of [-1, 1]) for (let k = 0; k < 3; k++) cy(g, .025, .025, .05, mat('chrome'), x + s * .15, 3.08 + k * .13, z, 8, 0);
+        bx(g, .3, .05, .2, mat('black-metal'), x, 2.98, back + .1);
+      }
+      return g;
+    } },
+  'recliner-row': { label: 'Cinema recliners', cat: 'Living', d: { w: 9, d: 3.4, h: 3.5, count: 3, finish: 'leather-dark', accent: '#ff8a3c' },
+    extras: [['count', 'Seats', 'num', 1, 5]],
+    build(it) {
+      const g = G(), n = Math.max(1, Math.min(5, it.count | 0 || 3)), arm = .34, sw = (it.w - arm * (n + 1)) / n, d = it.d, m = mat(it.finish), back = -d / 2;
+      for (let i = 0; i <= n; i++) { const x = -it.w / 2 + arm / 2 + i * (sw + arm); rb(g, arm, 1.95, d - 1.0, .1, m, x, 0, -.35); bx(g, arm - .1, .03, .5, mat('black-metal'), x, 1.95, .2); cy(g, .1, .08, .04, mat('led-soft'), x, 1.98, .2, 14); }
+      for (let i = 0; i < n; i++) { const x = -it.w / 2 + arm + sw / 2 + i * (sw + arm);
+        rb(g, sw, 1.0, d - 1.15, .12, m, x, .15, -.3); rb(g, sw - .06, .34, d - 1.5, .14, m, x, 1.12, -.12);
+        const b = rb(g, sw - .04, 2.55, .62, .2, m, x, 1.0, back + .42); b.rotation.x = -.2; rb(g, sw - .5, .5, .3, .12, m, x, 3.05, back + .32).rotation.x = -.2;
+        rb(g, sw - .08, .42, 1.15, .14, m, x, .62, d / 2 - .62).rotation.x = .12; }
+      bx(g, it.w - .2, .035, .03, ledMat(hexOr(it.accent, '#ff8a3c'), 1.2), 0, .05, d / 2 - 1.1);
+      return g;
+    } },
+  'projector-screen': { label: 'Cinema screen', cat: 'Living', d: { w: 10, d: .2, h: 5.6, y: 2.4 }, nc: true,
+    build(it) {
+      const g = G(), back = -it.d / 2;
+      bx(g, it.w, it.h, .09, mat('#0b0b0d'), 0, 0, back + .05); bx(g, it.w - .28, it.h - .28, .02, ledMat('#5d6677', .22), 0, .14, back + .1);
+      halo(g, it.w + 3, it.h + 3, '#8fa4c8', 0, it.h / 2, back + .03, 0, 'radial', .22);
+      return g;
+    } },
+  'fireplace-linear': { label: 'Linear fireplace wall', cat: 'Living', d: { w: 6.5, d: 1.1, h: 10, finish: 'stone-dark', accent: '#ff8a3c' },
+    build(it, ctx) {
+      const g = G(), w = it.w, d = it.d, Hh = Math.min(it.h, ctx.H), back = -d / 2, m = mat(it.finish), c = hexOr(it.accent, '#ff8a3c'), y0 = 1.25, fh = 1.45, fw = w - 1.4;
+      bx(g, w, y0, d, m, 0, 0, 0); bx(g, w, Hh - y0 - fh, d, m, 0, y0 + fh, 0); for (const s of [-1, 1]) bx(g, (w - fw) / 2, fh, d, m, s * (w / 2 - (w - fw) / 4), y0, 0);
+      bx(g, fw, fh, .08, mat('#08080a'), 0, y0, back + .12); bx(g, fw, .16, d - .3, mat('#141210'), 0, y0, .05); bx(g, fw - .2, .05, .3, ledMat('#ff5a1f', 1.3), 0, y0 + .16, .12);
+      const R = rng('fire' + Math.round(w * 10)), n = Math.max(5, Math.round(fw / .42));
+      for (let i = 0; i < n; i++) { const x = -fw / 2 + fw * (i + .5) / n, s = .55 + R() * .6; PX_(g, .15, ledMat(c, 2.4), x, y0 + .22 + .22 * s, .12, .75, 1.5 * s, .45); if (R() < .6) PX_(g, .09, ledMat('#ffd27a', 2.6), x + .05, y0 + .2 + .14 * s, .16, .7, 1.4 * s, .45); }
+      bx(g, fw, fh, .03, mat('glass'), 0, y0, d / 2 - .06); bx(g, w + .7, .3, d + .55, mat('marble'), 0, 0, .27);
+      halo(g, fw + 2.5, 3.2, c, 0, y0 + .6, d / 2 + .04, 0, 'radial', .35);
+      return g;
+    } },
+  'wine-wall': { label: 'Glass wine wall', cat: 'Dining', d: { w: 6, d: 1.4, h: 8.6, finish: 'black-metal' },
+    build(it) {
+      const g = G(), w = it.w, d = it.d, h = it.h, back = -d / 2, m = mat(it.finish);
+      bx(g, w, h, .06, mat('wine-glow'), 0, 0, back + .03); bx(g, w, .12, d, m, 0, 0, 0); bx(g, w, .12, d, m, 0, h - .12, 0); for (const s of [-1, 1]) bx(g, .1, h, d, m, s * (w / 2 - .05), 0, 0);
+      const cols = Math.max(3, Math.floor((w - .5) / .36)), rows = Math.max(3, Math.floor((h - .9) / .5)), cs = ['#3b2416', '#1f3a2c', '#2a1a12'];
+      for (let r = 0; r < rows; r++) { const y = .45 + r * (h - .9) / rows; bx(g, w - .2, .025, .03, mat('brass'), 0, y - .03, .1);
+        for (let q = 0; q < cols; q++) { const x = -w / 2 + .25 + (w - .5) * (q + .5) / cols; cy(g, .11, .11, .78, mat(cs[(r + q) % 3]), x, y + .05, -.05, 10, Math.PI / 2); cy(g, .04, .04, .22, mat(cs[(r + q) % 3]), x, y + .12, .42, 8, Math.PI / 2); } }
+      for (const s of [-1, 1]) ledV(g, s * (w / 2 - .14), .15, d / 2 - .12, h - .3);
+      bx(g, w - .2, h - .24, .04, mat('glass'), 0, .12, d / 2 - .04); bx(g, .06, h - .24, .06, m, 0, .12, d / 2 - .03);
+      return g;
+    } },
+  'window-seat': { label: 'Window seat with storage', cat: 'Living', d: { w: 6, d: 2, h: 1.55, finish: 'wood-light', accent: 'fabric-main' },
+    build(it) {
+      const g = G(), w = it.w, d = it.d, m = mat(it.finish), f = mat(it.accent), n = Math.max(2, Math.round(w / 2.2));
+      bx(g, w, 1.2, d, m, 0, 0, 0); for (let i = 1; i < n; i++) bx(g, .03, 1.0, .02, mat('#1d1510'), -w / 2 + w * i / n, .1, d / 2 + .005); bx(g, w, .03, .02, mat('#1d1510'), 0, 1.1, d / 2 + .005);
+      rb(g, w - .08, .32, d - .1, .12, f, 0, 1.2, 0);
+      const cs = ['fabric-accent', 'fabric-second', 'fabric-main'], k = Math.min(4, n + 1); for (let i = 0; i < k; i++) rb(g, 1.25, 1.1, .36, .16, mat(cs[i % 3]), -w / 2 + .8 + i * ((w - 1.6) / Math.max(1, k - 1)), 1.5, -d / 2 + .3, i % 2 ? .1 : -.08).rotation.x = -.22;
+      g.userData.surfaces = [{ x: 0, z: 0, hx: w / 2, hz: d / 2, y: 1.52 }];
+      return g;
+    } },
+  'ceiling-slats': { label: 'Timber slat ceiling with light', cat: 'Structure', d: { w: 10, d: 8, h: .35, y: 9.3, finish: 'wood-dark', accent: '#ffd9a8' }, nc: true,
+    build(it, ctx) {
+      const g = G(), w = it.w, d = it.d, th = Math.max(.25, ctx.H - it.y - .02), m = mat(it.finish), n = Math.max(4, Math.round(w / .5)), c = hexOr(it.accent, '#ffd9a8');
+      bx(g, w, .03, d, mat('#15110e'), 0, th - .03, 0);
+      for (let i = 0; i < n; i++) bx(g, .2, th - .03, d, m, -w / 2 + w * (i + .5) / n, 0, 0);
+      const k = Math.max(1, Math.round(n / 5)); for (let i = k; i < n; i += k) bx(g, .05, .03, d - .3, ledMat(c, 1.5), -w / 2 + w * i / n, th - .09, 0);
+      return g;
+    } },
+  'gym-set': { label: 'Home gym set', cat: 'Work', d: { w: 9, d: 6.5, h: 5, accent: '#ff5a3c' },
+    build(it) {
+      const g = G(), w = it.w, d = it.d, dark = mat('#17181b'), steel = mat('chrome'), c = hexOr(it.accent, '#ff5a3c'), tx = -w / 2 + 1.5;
+      bx(g, w, .04, d, mat('#222429'), 0, 0, 0);
+      bx(g, 2.5, .5, 5.6, dark, tx, 0, .2); bx(g, 1.9, .03, 4.6, mat('#0b0b0c'), tx, .5, .3);
+      for (const s of [-1, 1]) { rod(g, V(tx + s * 1.1, .5, -1.9), V(tx + s * 1.1, 3.9, -2.4), .06, steel); rod(g, V(tx + s * 1.1, 3.2, -2.3), V(tx + s * 1.1, 3.1, -.6), .05, steel); }
+      bx(g, 2.3, .9, .2, dark, tx, 3.7, -2.45, 0, -.25); bx(g, 1.3, .5, .02, ledMat('#22345e', .6), tx, 3.9, -2.33, 0, -.25);
+      const rx = w / 2 - 2.2; bx(g, 3.6, .08, 1.3, dark, rx, 1.0, -d / 2 + .8); bx(g, 3.6, .08, 1.3, dark, rx, 2.2, -d / 2 + .8); for (const s of [-1, 1]) bx(g, .1, 2.6, 1.3, dark, rx + s * 1.8, 0, -d / 2 + .8);
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 5; i++) { const x = rx - 1.4 + i * .7, y = 1.08 + r * 1.2, k = .13 + i * .02; cy(g, k, k, .16, mat(r ? '#2b2d31' : c), x, y + k - .08, -d / 2 + .55, 12, Math.PI / 2); cy(g, k, k, .16, mat(r ? '#2b2d31' : c), x, y + k - .08, -d / 2 + 1.05, 12, Math.PI / 2); cy(g, .04, .04, .5, steel, x, y + k - .25, -d / 2 + .8, 8, Math.PI / 2); }
+      const bxn = w / 2 - 3.7; bx(g, 1.3, .25, 3.4, dark, bxn, 1.25, d / 2 - 2.1); for (const z of [d / 2 - 3.5, d / 2 - .7]) bx(g, 1.1, 1.25, .12, steel, bxn, 0, z);
+      bx(g, 2.1, .05, Math.min(5.2, d - 2), mat(c), w / 2 - 1.25, .04, d / 2 - Math.min(5.2, d - 2) / 2 - .2);
+      g.userData.colliders = [{ x: tx, z: .2, hx: 1.3, hz: 2.9, ang: 0, y0: 0, y1: 4 }, { x: rx, z: -d / 2 + .8, hx: 1.9, hz: .7, ang: 0, y0: 0, y1: 2.6 }];
+      return g;
+    } },
+});
+Object.assign(NOTES, {
+  'led-strip': 'RGB LED ACCENT STRIP: a glowing line in any colour (accent "#hex") with a wash of coloured light on the wall; back to a wall. w = its length. y≈0.2 along the skirting (washes upward), y≈ceiling−0.6 under a cove (washes downward), or behind a bed/TV/desk at y≈2.5; vertical:true runs it up a corner. Use two or three in a room for a real RGB scheme',
+  'neon-sign': 'neon wall sign in any colour (accent "#hex"); shape: wave, ring, bolt, arc or line; back to wall, y≈5; one per room, above a bar, desk or bed',
+  'acoustic-panels': 'padded acoustic wall panels in a relief grid with LED lines between rows (leds: count, accent "#hex"); back to wall, w = the wall run, y≈0.5; for studios, cinemas, bedrooms',
+  'studio-desk': 'production desk with rack sides, two monitors on a bridge, keyboard controller and an LED under-glow (accent "#hex"); back to wall; for a music, DJ, gaming or streaming room. Add an office-chair in front',
+  'speaker-pair': 'two studio monitors on stands, w apart, angled in; either side of a desk or screen',
+  'guitar-wall': 'guitars hung on the wall (count 1 to 5); back to wall, y≈3.3',
+  'recliner-row': 'row of cinema recliners (count seats) with lit arm consoles; faces the screen, 9 to 12 ft away',
+  'projector-screen': 'large cinema screen; back to wall, y≈2.4; pair with recliner-row, acoustic-panels and led-strip',
+  'fireplace-linear': 'full-height stone chimney wall with a long glazed linear fire (flame colour accent) and a stone hearth; back to wall in living, dining or master bedroom; a signature piece',
+  'wine-wall': 'floor-to-ceiling glass wine wall, backlit, with hundreds of bottles; back to wall in dining, living or a bar corner',
+  'window-seat': 'built-in window seat with drawers, a long cushion and pillows; back against the wall under a window (the sill should be at or above 1.6 ft)',
+  'ceiling-slats': 'timber slat ceiling feature with light lines between slats; centre it over a seating, dining or bed area; y = ceiling height − 0.7',
+  'gym-set': 'home gym: treadmill, dumbbell rack, bench and mat on rubber flooring; needs about 9 × 6.5 ft; back to wall',
+});
+
 
 /* ================= merge a built group into a few meshes ================= */
 function mergeGroup(g) {
@@ -2104,9 +2292,10 @@ function buildAllItems() {
 }
 function addItemsLive(list) {
   for (const it of list) { it.id ||= newId(); const g = buildItem(it); if (g) { itemsGroup.add(g); itemGroups.set(it.id, g); } }
-  refreshItemPhysics(); drawMapBaseSoon();
+  refreshItemPhysics(); drawMapBaseSoon(); shadowsDirty();
 }
 function removeItemsWhere(fn) {
+  shadowsDirty();
   const keep = [];
   for (const it of layout.furniture) { if (fn(it)) { const g = itemGroups.get(it.id); if (g) { itemsGroup.remove(g); disposeGroup(g); itemGroups.delete(it.id); } } else keep.push(it); }
   layout.furniture = keep; refreshItemPhysics(); drawMapBaseSoon();
@@ -2114,7 +2303,7 @@ function removeItemsWhere(fn) {
 function rebuildItem(it) {
   const old = itemGroups.get(it.id); if (old) { itemsGroup.remove(old); disposeGroup(old); itemGroups.delete(it.id); }
   const g = buildItem(it); if (g) { itemsGroup.add(g); itemGroups.set(it.id, g); }
-  refreshItemPhysics(); updateSelBox(); drawMapBaseSoon(); saveSoon();
+  refreshItemPhysics(); updateSelBox(); drawMapBaseSoon(); saveSoon(); shadowsDirty();
 }
 
 /* ================= shell ================= */
@@ -2259,7 +2448,7 @@ function buildShell() {
   // world-scale UVs on the walls so the plaster texture has a real size (about 9 ft per tile)
   wallGroup.children.forEach(me => { if (me.material !== M.wall) return; const p = me.geometry.attributes.position, n = me.geometry.attributes.normal, uv = me.geometry.attributes.uv; if (!uv) return;
     for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)); const u = ay > .5 ? p.getX(i) : ax > .5 ? p.getZ(i) : p.getX(i), v = ay > .5 ? p.getZ(i) : p.getY(i); uv.setXY(i, u / 9, v / 9); } uv.needsUpdate = true; });
-  if (quality !== 'fast') {
+  if (effQ() !== 'fast') {
     const glaz = [];
     for (const w of layout.walls) {
       const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]); if (L < .05) continue; const ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
@@ -2271,7 +2460,7 @@ function buildShell() {
         glaz.push({ w: o.end - o.start, h: Math.min(H, o.head || 7) - (o.sill || 0), y: ((o.sill || 0) + Math.min(H, o.head || 7)) / 2, cx, cz, nx, nz, t: w.thickness });
       }
     }
-    glaz.sort((a, b) => b.w * b.h - a.w * a.h).slice(0, quality === 'high' ? 10 : 5).forEach(g => {
+    glaz.sort((a, b) => b.w * b.h - a.w * a.h).slice(0, effQ() === 'high' ? 10 : 5).forEach(g => {
       const l = new THREE.RectAreaLight('#ffffff', 1, g.w * .95, g.h * .95); l.position.set(g.cx + g.nx * (g.t / 2 + .1), g.y, g.cz + g.nz * (g.t / 2 + .1)); l.lookAt(g.cx + g.nx * 8, g.y - 1.2, g.cz + g.nz * 8);
       l.userData.area = g.w * g.h; house.add(l); dayLights.push(l);
     });
@@ -2342,7 +2531,7 @@ function buildShell() {
   orbit.target.copy(S.center);
   camera.fov = +layout.settings.fieldOfView || 80; camera.updateProjectionMatrix();
 }
-function buildAll() { buildShell(); buildAllItems(); applyTime(); applyCut(); setCeilings(mode === 'walk'); drawMapBase(); updateMeta(); }
+function buildAll() { buildShell(); buildAllItems(); applyTime(); applyCut(); setCeilings(mode === 'walk'); drawMapBase(); updateMeta(); shadowsDirty(4); }
 
 /* ================= time of day ================= */
 const TIMES = {
@@ -2354,6 +2543,7 @@ TIMES.dusk = { label: 'Dusk', top: '#2b3a63', mid: '#f2b48e', bot: '#1b2436', fo
 TIMES.golden.city = .25; TIMES.night.city = 1.3; TIMES.day.city = 0;
 const TIME_ORDER = ['dusk', 'golden', 'night', 'day'];
 function applyTime() {
+  shadowsDirty();
   const t = TIMES[layout.settings.timeOfDay] || TIMES.golden;
   if (grade) { const du = t === TIMES.dusk || t === TIMES.night; grade.uniforms.warm.value = du ? .03 : .01; grade.uniforms.contrast.value = du ? .2 : .17; grade.uniforms.vig.value = du ? .26 : .2; grade.uniforms.sat.value = du ? .96 : 1.02; }
   skyU.top.value.set(t.top); skyU.mid.value.set(t.mid); skyU.bot.value.set(t.bot); skyU.sunCol.value.set(t.sun).multiplyScalar(t === TIMES.night ? .15 : 1);
@@ -2487,8 +2677,8 @@ function move(f, s, dt, fast) {
 /* ================= modes ================= */
 const btnWalk = $('btnWalk'), btnOver = $('btnOver'), btnCut = $('btnCut');
 let cut = false;
-function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); }
-function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; }
+function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); shadowsDirty(); }
+function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; shadowsDirty(); }
 function setMode(m) {
   mode = m; btnWalk.setAttribute('aria-pressed', m === 'walk'); btnOver.setAttribute('aria-pressed', m === 'over');
   btnCut.hidden = m !== 'over'; orbit.enabled = m === 'over'; setCeilings(m === 'walk'); applyCut();
@@ -2523,10 +2713,12 @@ function drawMapBase() {
     for (const [a, b, k] of segs) { if (!k || b <= a) continue; g.globalAlpha = k; g.lineWidth = Math.max(1.2 * mmT.dpr, w.thickness * mmT.s); g.beginPath(); g.moveTo(...P([w.a[0] + ux * a, w.a[1] + uz * a])); g.lineTo(...P([w.a[0] + ux * b, w.a[1] + uz * b])); g.stroke(); }
     g.globalAlpha = 1;
   }
-  mapBase = off;
+  mapBase = off; mapKey = '';
 }
+let mapKey = '';
 function drawMap() {
   if (!mapBase || !mmT) return;
+  const key = Math.round(player.x * 12) + ',' + Math.round(player.z * 12) + ',' + Math.round(player.yaw * 50); if (key === mapKey) return; mapKey = key;   // only when the visitor has moved
   mg.clearRect(0, 0, mm.width, mm.height); mg.drawImage(mapBase, 0, 0);
   const x = player.x * mmT.s + mmT.ox, z = player.z * mmT.s + mmT.oz, d = mmT.dpr, a = Math.atan2(-Math.cos(player.yaw), -Math.sin(player.yaw));
   mg.fillStyle = 'rgba(91,240,209,.4)'; mg.beginPath(); mg.moveTo(x, z); mg.arc(x, z, 26 * d, a - .55, a + .55); mg.closePath(); mg.fill();
@@ -2657,7 +2849,7 @@ async function enterPhoto() {
         r.autoClear = ac;
       };
     }
-    PT.renderScale = quality === 'high' ? 1 : quality === 'balanced' ? .75 : .5;
+    PT.renderScale = effQ() === 'high' ? 1 : effQ() === 'balanced' ? .75 : .5;
     const t = TIMES[layout.settings.timeOfDay] || TIMES.golden;
     const top = new THREE.Color(t.top), mid = new THREE.Color(t.mid), bot = new THREE.Color(t.bot), sc = new THREE.Color(t.sun), sd = V(...t.sunPos).normalize(), d = new THREE.Vector3();
     const k = t === TIMES.night ? .6 : 1;
@@ -2683,6 +2875,7 @@ function exitPhoto() {
 $('btnPhoto').onclick = () => photo ? exitPhoto() : enterPhoto();
 $('photoExit').onclick = exitPhoto;
 $('photoSave').onclick = async () => {
+  if (photo && ptReady) PT.renderSample();   // draw, then read the canvas straight away
   const blob = await new Promise(r => renderer.domElement.toBlob(r, 'image/png'));
   if (!blob) return flash('The image could not be captured.', true);
   const room = roomName.textContent.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'view';
@@ -2724,7 +2917,26 @@ function tick() {
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
   drawMap(); SITE?.frame?.();
+  // shadows: on a change, a few times a second as a safety net, and every frame while Mira's figure is moving in the scene
+  if (shadowTTL > 0 || ++shadowTick % 24 === 0 || PRES.fig?.visible) { renderer.shadowMap.needsUpdate = true; if (shadowTTL > 0) shadowTTL--; }
   if (composer) composer.render(); else renderer.render(scene, camera);
+  govern();
+}
+// keeps the walkthrough smooth: when most frames over a few seconds are slow, auto quality steps down one level
+let shadowTick = 0, gT = performance.now(), gN = 0, gSlow = 0, gHold = 240, gTold = false;
+function govern() {
+  const now = performance.now(), ms = now - gT; gT = now;
+  if (quality !== 'auto' || autoStep >= 3 || document.hidden || running || editing) { gN = gSlow = 0; return; }
+  if (ms > 400) { gHold = 45; return; }            // a rebuild or a tab switch, not the frame rate
+  if (gHold > 0) { gHold--; return; }
+  gN++; if (ms > 29) gSlow++;
+  if (gN < 150) return;
+  if (gSlow > 95) {
+    const before = effQ(); autoStep++; try { localStorage.setItem('mirage-gfx-step', String(autoStep)); } catch { }
+    setupPost(); if (effQ() !== before) buildAll(); resize(); gHold = 300;
+    if (!gTold) { gTold = true; flash('Switched to smoother graphics for this device. You can choose High quality at the top if you prefer.'); }
+  }
+  gN = gSlow = 0;
 }
 
 
@@ -2879,7 +3091,7 @@ $('projName').addEventListener('input', e => { project.name = e.target.value; sa
 $('brief').addEventListener('input', e => { project.brief = e.target.value; saveSoon(); });
 $('ceilH').addEventListener('change', e => { const v = parseFloat(e.target.value); if (v >= 7 && v <= 20) { layout.settings.ceilingHeight = v; buildAll(); saveSoon(); } });
 $('seaSide').addEventListener('change', e => { layout.settings.view = e.target.value; applyTime(); saveSoon(); });
-$('quality').value = quality; $('quality').addEventListener('change', e => { quality = e.target.value; setupPost(); buildAll(); resize(); });
+$('quality').value = quality; $('quality').addEventListener('change', e => { quality = e.target.value; if (quality === 'auto') { autoStep = 0; try { localStorage.removeItem('mirage-gfx-step'); } catch { } } setupPost(); buildAll(); resize(); });
 $('btnSide').onclick = () => { document.body.classList.toggle('side-hidden'); setTimeout(() => { resize(); if (activeView === 'plan') planResize(); }, 60); };
 $('btnSave').onclick = () => saveFile(slug(project.name) + '.mirage.json', JSON.stringify(project));
 $('openFile').addEventListener('change', async e => {
@@ -4621,6 +4833,215 @@ async function furnishOne(sample, rooms, extra, signal, repairOK) {
   return { items: settleItems(items, rooms), issues };
 }
 
+/* ================= changing the building itself: walls, windows, doors, and corrections to the plan =================
+   Mira and the change box may:
+   - open up or remove LIGHT walls (thin interior partitions). Outside walls, thick walls, columns and beams are structure
+     and stay: a removed partition leaves its beam at the ceiling unless the homeowner says there is none;
+   - add, move, resize and remove windows and doors (windows and sliding doors may go in an outside wall);
+   - correct a plan that was read wrong: move a wall, add a missing one, remove one that is not there, split or rename a room.
+   Every refusal comes back as a short note the homeowner sees, so nothing fails silently. */
+for (const t of ['led-strip', 'neon-sign', 'acoustic-panels', 'guitar-wall', 'projector-screen']) { WALLMOUNT.add(t); BACKED.add(t); }
+for (const t of ['studio-desk', 'fireplace-linear', 'wine-wall', 'window-seat', 'gym-set']) BACKED.add(t);
+const STRUCT_OPS = new Set(['wall_remove', 'wall_move', 'wall_add', 'wall_mark', 'opening_add', 'opening_set', 'opening_remove', 'room_set']);
+const wallLen = w => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+const wallDir = w => { const L = wallLen(w) || 1; return [(w.b[0] - w.a[0]) / L, (w.b[1] - w.a[1]) / L]; };
+function ensureWallIds() {
+  const used = new Set(); let n = 1;
+  for (const w of layout.walls) { if (w.id && !used.has(w.id)) { used.add(w.id); continue; } w.id = null; }
+  for (const w of layout.walls) { if (w.id) continue; while (used.has('w' + n)) n++; w.id = 'w' + n; used.add(w.id); }
+}
+// exterior | column | thick (both structural) | light (a partition that may be opened or removed)
+function wallClass(w) {
+  if (w.structural === true) return 'thick';
+  if (w.structural === false) return 'light';
+  if (w.kind === 'ext') return 'exterior';
+  const t = +w.thickness || .5, L = wallLen(w), med = median(layout.walls.filter(x => x.kind !== 'ext' && wallLen(x) > 3).map(x => +x.thickness || .5)) || .5;
+  if (L < Math.max(2.2, t * 2.6) && t >= Math.max(.7, med * 1.3)) return 'column';
+  if (t >= Math.max(.8, med * 1.5)) return 'thick';
+  return 'light';
+}
+const CLASS_WORDS = { exterior: 'an outside wall', column: 'a column', thick: 'a thick structural wall', light: 'a light partition' };
+// the rooms on either side of a wall
+function wallSides(w) {
+  const L = wallLen(w), u = wallDir(w), n = [-u[1], u[0]], off = (+w.thickness || .5) / 2 + .9, A = new Map(), B = new Map();
+  for (const q of [.2, .5, .8]) { const p = [w.a[0] + u[0] * L * q, w.a[1] + u[1] * L * q]; const a = roomAt(p[0] + n[0] * off, p[1] + n[1] * off), b = roomAt(p[0] - n[0] * off, p[1] - n[1] * off); if (a) A.set(a.name, a); if (b) B.set(b.name, b); }
+  return { a: [...A.values()], b: [...B.values()], n };
+}
+function wallBetween(w) { const s = wallSides(w), nm = l => l.map(r => r.name).join(' / ') || 'outside'; return `${nm(s.a)} and ${nm(s.b)}`; }
+function wallsText(rooms) {
+  ensureWallIds(); const keep = rooms?.length ? new Set(rooms.map(r => r.name)) : null;
+  return layout.walls.filter(w => wallLen(w) > .3).map(w => {
+    const s = wallSides(w), names = [...s.a, ...s.b].map(r => r.name); if (keep && !names.some(n => keep.has(n))) return null;
+    const cls = wallClass(w), ops = (w.openings || []).map((o, i) => `[${i}] ${o.type} ${f1(o.start)}–${f1(o.end)} ft${o.type === 'window' ? `, sill ${f1(o.sill || 0)} head ${f1(o.head ?? 7)}` : ''}${o.name ? ` "${o.name}"` : ''}`).join('; ');
+    return `${w.id} | (${f1(w.a[0])},${f1(w.a[1])})→(${f1(w.b[0])},${f1(w.b[1])}) | ${f1(wallLen(w))} ft long, ${f1(+w.thickness || .5)} thick | ${cls === 'light' ? 'LIGHT partition (may be opened or removed)' : 'STRUCTURE: ' + CLASS_WORDS[cls]} | between ${wallBetween(w)}${ops ? ' | openings, measured in ft from the first point: ' + ops : ''}`;
+  }).filter(Boolean).join('\n');
+}
+// what the visitor is facing: the first wall straight ahead, and the door or window there if any
+function lookingAt() {
+  ensureWallIds(); const d = [-Math.sin(player.yaw), -Math.cos(player.yaw)]; let best = null;
+  for (const w of layout.walls) {
+    const e = [w.b[0] - w.a[0], w.b[1] - w.a[1]], den = d[0] * e[1] - d[1] * e[0]; if (Math.abs(den) < 1e-6) continue;
+    const t = ((w.a[0] - player.x) * e[1] - (w.a[1] - player.z) * e[0]) / den, u = ((w.a[0] - player.x) * d[1] - (w.a[1] - player.z) * d[0]) / den;
+    if (t < .3 || u < 0 || u > 1 || (best && t >= best.t)) continue;
+    const s = u * wallLen(w), op = (w.openings || []).findIndex(o => s >= o.start - .3 && s <= o.end + .3);
+    best = { t, w, s, op };
+  }
+  if (!best) return '';
+  const o = best.op >= 0 ? best.w.openings[best.op] : null, cls = wallClass(best.w);
+  return `the visitor is facing wall ${best.w.id} (${CLASS_WORDS[cls]} between ${wallBetween(best.w)}), ${f1(best.t)} ft ahead${o ? `, at its ${o.type} [${best.op}]${o.name ? ' "' + o.name + '"' : ''}` : ''}.`;
+}
+
+/* ---------- the operations ---------- */
+let structSnap = null;   // the openings as the model saw them, so [index] keeps meaning what it meant through several operations
+function structRef(w, i) { structSnap ||= new Map(layout.walls.map(x => [x, [...(x.openings || [])]])); const o = (structSnap.get(w) || w.openings || [])[+i]; return o && (w.openings || []).includes(o) ? o : null; }
+const findWall = id => layout.walls.find(w => w.id === String(id)) || null;
+const findRoomByName = n => layout.rooms.find(r => r.name.toLowerCase() === String(n || '').toLowerCase()) || null;
+function fitOpening(w, start, end, self) {   // keep an opening inside its wall and clear of its neighbours
+  const L = wallLen(w); let s = clamp(Math.min(+start, +end), .15, L - .15), e = clamp(Math.max(+start, +end), .15, L - .15);
+  for (const o of w.openings || []) { if (o === self) continue; if (e <= o.start - .2 || s >= o.end + .2) continue; const mid = (s + e) / 2; if (mid < (o.start + o.end) / 2) e = Math.min(e, o.start - .25); else s = Math.max(s, o.end + .25); }
+  return e - s >= 1.2 ? [r2(s), r2(e)] : null;
+}
+function applyStructOp(op) {
+  ensureWallIds(); const Hc = +layout.settings.ceilingHeight || 10, no = note => ({ ok: false, note }), yes = note => ({ ok: true, note });
+  const misread = op.misread === true;
+  if (op.op === 'wall_mark') { const w = findWall(op.id); if (!w) return no(''); w.structural = !!op.structural; return yes(''); }
+  if (op.op === 'wall_remove') {
+    const w = findWall(op.id); if (!w) return no('');
+    const cls = wallClass(w), L = wallLen(w);
+    if (cls !== 'light' && !misread) return no(`The wall between ${wallBetween(w)} is ${CLASS_WORDS[cls]}, so it stays.`);
+    const from = clamp(isFinite(+op.from) && op.from != null ? +op.from : 0, 0, L), to = clamp(isFinite(+op.to) && op.to != null ? +op.to : L, 0, L), s = Math.min(from, to), e = Math.max(from, to);
+    if (e - s < 1) return no('');
+    const whole = s <= .4 && e >= L - .4;
+    if (whole && (misread || op.beam === false)) { layout.walls = layout.walls.filter(x => x !== w); return yes(''); }
+    // the wall goes, its beam stays: a full-height opening up to the underside of the beam
+    w.openings = (w.openings || []).filter(o => o.end <= s + .1 || o.start >= e - .1);
+    w.openings.push({ type: 'opening', start: r2(whole ? 0 : s), end: r2(whole ? L : e), sill: 0, head: op.beam === false ? Hc : r2(Hc - 1), name: 'Opened wall' }); w.openings.sort((p, q) => p.start - q.start);
+    return yes(op.beam === false ? '' : 'The beam above that wall is kept, since beams are structure.');
+  }
+  if (op.op === 'wall_move') {
+    const w = findWall(op.id), by = clamp(Math.abs(+op.by || 0), 0, 8); if (!w || by < .05) return no('');
+    const cls = wallClass(w); if (cls !== 'light' && !misread) return no(`The wall between ${wallBetween(w)} is ${CLASS_WORDS[cls]}; it can only be moved to correct the plan.`);
+    // only a stretch moves: the wall is cut there first, and short returns join the moved stretch to what stays
+    let w0 = w; const L0 = wallLen(w), hasF = op.from != null && isFinite(+op.from), hasT = op.to != null && isFinite(+op.to);
+    if (hasF || hasT) { const s = clamp(Math.min(hasF ? +op.from : 0, hasT ? +op.to : L0), 0, L0), e = clamp(Math.max(hasF ? +op.from : 0, hasT ? +op.to : L0), 0, L0); if (e - s < 1.5) return no(''); if (e < L0 - .6) splitWallAt(w, e); if (s > .6) w0 = splitWallAt(w, s); }
+    moveWall(w0, by, op); return yes('');
+  }
+  if (op.op === 'wall_add') {
+    let a = numOk(op.a) ? op.a.map(Number) : null, b = numOk(op.b) ? op.b.map(Number) : null; if (!a || !b) return no('');
+    if (Math.abs(a[0] - b[0]) < Math.abs(a[1] - b[1]) * .09) b[0] = a[0]; else if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0]) * .09) b[1] = a[1];
+    // ends that stop just short of a wall are run into it
+    for (const p of [a, b]) { let best = null; for (const x of layout.walls) { const dd = segDist(p[0], p[1], x.a, x.b); if (dd < .9 && (!best || dd < best.d)) best = { d: dd, x }; } if (best) { const x = best.x, xu = wallDir(x), s = clamp((p[0] - x.a[0]) * xu[0] + (p[1] - x.a[1]) * xu[1], 0, wallLen(x)); p[0] = r2(x.a[0] + xu[0] * s); p[1] = r2(x.a[1] + xu[1] * s); } }
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1.5) return no('');
+    const light = median(layout.walls.filter(x => wallClass(x) === 'light').map(x => +x.thickness || .5)) || .5;
+    const w = { a: a.map(r2), b: b.map(r2), thickness: r2(clamp(+op.thickness || light, .3, 1.2)), kind: 'int', openings: [], structural: false }; layout.walls.push(w); ensureWallIds();
+    if (op.door && isFinite(+op.door.start) && isFinite(+op.door.end)) { const fit = fitOpening(w, op.door.start, op.door.end); if (fit) w.openings.push({ ...PRESET.door, start: fit[0], end: fit[1], name: 'Door', swing: { hinge: 'start', side: 1, open: 90 } }); }
+    const sp = op.split; let note = '';
+    if (sp?.room) { const r = findRoomByName(sp.room); if (r) { const done = splitRoom(r, w.a, w.b, sp.names, sp.types); if (!done) note = `${r.name} was not divided: the new wall does not cross it from side to side.`; } }
+    return yes(note);
+  }
+  if (op.op === 'room_set') {
+    const r = findRoomByName(op.room), set = op.set || {}; if (!r) return no('');
+    if (set.name && String(set.name).trim() && !findRoomByName(set.name)) renameRoom(r, String(set.name).trim().slice(0, 40));
+    if (set.type && TYPES.includes(set.type)) { r.type = set.type; r.kind = ['balcony', 'terrace'].includes(set.type) ? 'outdoor' : 'room'; }
+    return yes('');
+  }
+  // doors, windows, sliding doors and open doorways
+  const w = findWall(op.wall); if (!w) return no('');
+  const cls = wallClass(w), okHere = type => cls === 'light' || misread || (cls === 'exterior' && ['window', 'slider'].includes(type)) || (cls === 'thick' && type === 'window');
+  const why = type => `A ${type === 'opening' ? 'new opening' : type} cannot go in the wall between ${wallBetween(w)}: it is ${CLASS_WORDS[cls]}.`;
+  if (op.op === 'opening_add') {
+    const type = ['door', 'window', 'slider', 'opening'].includes(op.type) ? op.type : null; if (!type) return no('');
+    if (!okHere(type)) return no(why(type));
+    const fit = fitOpening(w, op.start, op.end); if (!fit) return no(`There is no room on that wall for the ${type}.`);
+    const o = { ...PRESET[type], start: fit[0], end: fit[1] };
+    if (isFinite(+op.sill) && op.sill != null) o.sill = clamp(+op.sill, 0, Hc - 1.5); if (isFinite(+op.head) && op.head != null) o.head = clamp(+op.head, o.sill + 1, Hc);
+    if (type === 'door') { o.name = op.name || 'Door'; o.swing = doorSwing(w, o, op); }
+    w.openings.push(o); w.openings.sort((p, q) => p.start - q.start); return yes('');
+  }
+  const o = structRef(w, op.index); if (!o) return no('');
+  if (op.op === 'opening_remove') {
+    if (o.name === 'Main door' && !misread) return no('The main door stays.');
+    w.openings = w.openings.filter(x => x !== o); return yes('');
+  }
+  if (op.op === 'opening_set') {
+    const set = op.set || {}, type = ['door', 'window', 'slider', 'opening'].includes(set.type) ? set.type : o.type;
+    const grows = (isFinite(+set.start) && set.start != null && +set.start < o.start - .05) || (isFinite(+set.end) && set.end != null && +set.end > o.end + .05) || type !== o.type;
+    if (grows && !okHere(type)) return no(why(type));
+    const fit = fitOpening(w, set.start ?? o.start, set.end ?? o.end, o); if (!fit) return no('');
+    o.start = fit[0]; o.end = fit[1];
+    if (type !== o.type) { const keepName = o.name; Object.assign(o, PRESET[type]); delete o.swing; if (type === 'door') { o.name = keepName || 'Door'; o.swing = doorSwing(w, o, set); } }
+    if (isFinite(+set.sill) && set.sill != null) o.sill = clamp(+set.sill, 0, Hc - 1.5); if (isFinite(+set.head) && set.head != null) o.head = clamp(+set.head, (o.sill || 0) + 1, Hc);
+    if (o.type === 'door' && (set.hinge || set.into)) o.swing = doorSwing(w, o, set, o.swing);
+    return yes('');
+  }
+  return no('');
+}
+// cut a wall in two at s ft from its first point; doors and windows go with the piece they are in. Returns the second piece.
+function splitWallAt(w, s) {
+  const u = wallDir(w), p = [r2(w.a[0] + u[0] * s), r2(w.a[1] + u[1] * s)], rest = { ...w, id: null, a: p.slice(), b: w.b.slice(), openings: [] }, keep = [];
+  for (const o of w.openings || []) { if ((o.start + o.end) / 2 < s) keep.push({ ...o, end: Math.min(o.end, r2(s - .1)) }); else rest.openings.push({ ...o, start: r2(Math.max(.1, o.start - s)), end: r2(o.end - s) }); }
+  w.b = p; w.openings = keep; layout.walls.splice(layout.walls.indexOf(w) + 1, 0, rest); ensureWallIds(); return rest;
+}
+function moveWall(w, by, op) {
+    const sides = wallSides(w), into = findRoomByName(op.into), u = wallDir(w), L = wallLen(w); let n = sides.n;
+    if (into) { const c = centroid(into.polygon), m = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2]; if ((c[0] - m[0]) * n[0] + (c[1] - m[1]) * n[1] < 0) n = [-n[0], -n[1]]; }
+    else if (+op.by < 0) n = [-n[0], -n[1]];
+    const d = [n[0] * by, n[1] * by], a0 = w.a.slice(), b0 = w.b.slice(), t = +w.thickness || .5;
+    const onWall = (p, tol) => { const s = (p[0] - a0[0]) * u[0] + (p[1] - a0[1]) * u[1], off = Math.abs((p[0] - a0[0]) * -u[1] + (p[1] - a0[1]) * u[0]); return s >= -tol && s <= L + tol && off <= tol; };
+    const extra = [];
+    for (const x of layout.walls) {
+      if (x === w) continue; const xu = wallDir(x), parallel = Math.abs(xu[0] * u[0] + xu[1] * u[1]) > .96, tol = Math.max(t, +x.thickness || .5) / 2 + .2;
+      for (const key of ['a', 'b']) {
+        const e = x[key]; if (!onWall(e, tol)) continue;
+        if (parallel) { extra.push({ a: e.slice(), b: [r2(e[0] + d[0]), r2(e[1] + d[1])], thickness: x.thickness, kind: x.kind, openings: [] }); continue; }   // a wall carrying on in the same line stays; a short return joins the two
+        const shift = d[0] * xu[0] + d[1] * xu[1]; e[0] = r2(e[0] + d[0]); e[1] = r2(e[1] + d[1]);
+        if (key === 'a') for (const o of x.openings || []) { o.start = r2(o.start - shift); o.end = r2(o.end - shift); }
+        const xl = wallLen(x); x.openings = (x.openings || []).filter(o => o.end > .3 && o.start < xl - .3).map(o => ({ ...o, start: r2(Math.max(.1, o.start)), end: r2(Math.min(xl - .1, o.end)) }));
+      }
+    }
+    w.a = [r2(a0[0] + d[0]), r2(a0[1] + d[1])]; w.b = [r2(b0[0] + d[0]), r2(b0[1] + d[1])]; layout.walls.push(...extra.filter(x => wallLen(x) > .2));
+    for (const r of layout.rooms) { let hit = false; for (const p of r.polygon || []) if (onWall(p, t / 2 + .45)) { p[0] = r2(p[0] + d[0]); p[1] = r2(p[1] + d[1]); hit = true; } if (hit) delete r.size; }
+    // pieces standing against the wall go with it
+    for (const it of layout.furniture) { const f = withDefaults(it), s = (it.x - a0[0]) * u[0] + (it.z - a0[1]) * u[1], off = Math.abs((it.x - a0[0]) * -u[1] + (it.z - a0[1]) * u[0]); if (s >= -.5 && s <= L + .5 && off <= t / 2 + Math.max(f.w, f.d) / 2 + .5 && (BACKED.has(it.type) || WALLMOUNT.has(it.type))) { it.x = r2(it.x + d[0]); it.z = r2(it.z + d[1]); } }
+}
+function doorSwing(w, o, set, cur) {
+  const sw = { hinge: cur?.hinge || 'start', side: cur?.side || 1, open: cur?.open ?? 90 };
+  if (['start', 'end'].includes(set.hinge)) sw.hinge = set.hinge;
+  const into = findRoomByName(set.into);
+  if (into) { const u = wallDir(w), n = [-u[1], u[0]], m = (o.start + o.end) / 2, p = [w.a[0] + u[0] * m, w.a[1] + u[1] * m], c = centroid(into.polygon); sw.side = (c[0] - p[0]) * n[0] + (c[1] - p[1]) * n[1] >= 0 ? 1 : -1; }
+  return sw;
+}
+// a room cut in two by a wall from side to side: the first name goes to the left part (or the upper part for a level cut)
+function splitRoom(r, a, b, names, types) {
+  const d = [b[0] - a[0], b[1] - a[1]], side = p => (p[0] - a[0]) * d[1] - (p[1] - a[1]) * d[0];
+  const clip = sg => { const out = [], P = r.polygon; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length], sp = side(p) * sg, sq = side(q) * sg; if (sp >= 0) out.push([r2(p[0]), r2(p[1])]); if ((sp > 0 && sq < 0) || (sp < 0 && sq > 0)) { const t = sp / (sp - sq); out.push([r2(p[0] + (q[0] - p[0]) * t), r2(p[1] + (q[1] - p[1]) * t)]); } } return out; };
+  const A = clip(1), B = clip(-1); if (A.length < 3 || B.length < 3 || polyArea(A) < 9 || polyArea(B) < 9) return false;
+  const level = Math.abs(d[0]) > Math.abs(d[1]), key = p => { const c = centroid(p); return level ? c[1] : c[0]; }, parts = [A, B].sort((p, q) => key(p) - key(q));
+  const nm = (Array.isArray(names) ? names : []).map(s => String(s || '').trim().slice(0, 40)), ty = Array.isArray(types) ? types : [], old = r.name;
+  const made = parts.map((poly, i) => { const o = { ...r, polygon: poly }; delete o.size; let name = nm[i] || (i ? old + ' 2' : old); while (layout.rooms.some(x => x !== r && x.name === name) || (i && name === (nm[0] || old))) name += ' 2'; o.name = name; if (TYPES.includes(ty[i])) o.type = ty[i]; return o; });
+  layout.rooms.splice(layout.rooms.indexOf(r), 1, ...made);
+  for (const k of ['roomStyles']) if (project[k]?.[old]) { for (const m of made) project[k][m.name] = structuredClone(project[k][old]); if (!made.some(m => m.name === old)) delete project[k][old]; }
+  for (const it of layout.furniture) if (it.room === old) { const at = made.find(m => pip([it.x, it.z], m.polygon)); it.room = (at || made[0]).name; }
+  return true;
+}
+// once the walls have changed: ids, the plan view, and every piece knows which room it is in
+function afterStructChange() {
+  structSnap = null; ensureWallIds();
+  for (const w of layout.walls) { const L = wallLen(w); w.openings = (w.openings || []).filter(o => o.end - o.start > .5 && o.start < L).sort((p, q) => p.start - q.start); }
+  for (const it of layout.furniture) { if (layout.rooms.some(r => r.name === it.room && pip([it.x, it.z], r.polygon))) continue; const r = roomAt(it.x, it.z); if (r) it.room = r.name; }
+  project.tour = null;
+}
+const STRUCT_HELP = `{"op":"wall_remove","id":"<wall id>","from":ft,"to":ft} open up a LIGHT wall: the whole wall, or only the stretch from–to (ft from its first point). A wall often runs on past several rooms: open only the stretch that belongs to the rooms in question, and leave at least 0.5 ft of wall at each end of the stretch as a pier unless the whole wall goes. The beam above it is kept (it is structure) unless the homeowner says there is no beam: then add "beam":false. STRUCTURE walls are refused.
+{"op":"wall_move","id":"<wall id>","by":ft,"into":"<room it moves into>","from":ft,"to":ft} slide a wall sideways; the room named in "into" gets smaller and the room on the other side larger. A wall that runs past several rooms is moved only along the stretch from–to (ft from its first point) that belongs to the room in question; the rest stays and short returns join them. Walls joined to it, room outlines and the pieces standing against it follow by themselves: do not update those pieces.
+{"op":"wall_add","a":[x,z],"b":[x,z],"thickness":0.5,"door":{"start":ft,"end":ft},"split":{"room":"<room it divides>","names":["<left or upper part>","<right or lower part>"],"types":["<type>","<type>"]}} a new partition in whole-home coordinates; "door" and "split" are optional.
+{"op":"opening_add","wall":"<wall id>","type":"window|slider|door|opening","start":ft,"end":ft,"sill":ft,"head":ft,"hinge":"start|end","into":"<room a door opens into>"} a new window, sliding door, door or open doorway. Windows and sliding doors may go in an outside wall; doors and doorways only in LIGHT walls.
+{"op":"opening_set","wall":"<wall id>","index":n,"set":{"start":ft,"end":ft,"sill":ft,"head":ft,"type":"window|slider|door|opening","hinge":"start|end","into":"<room>"}} move, widen, narrow, raise or change an existing opening ([n] in the WALLS list); give only what changes.
+{"op":"opening_remove","wall":"<wall id>","index":n} wall up a door or window.
+{"op":"room_set","room":"<room>","set":{"name":"<new name>","type":"<type>"}} rename a room or correct what it is.
+{"op":"wall_mark","id":"<wall id>","structural":true|false} when the homeowner tells you a wall is, or is not, structural.
+When the homeowner says the PLAN WAS READ WRONG (a wall that is not there, a wall in the wrong place, a missing door, a room that is larger or smaller in reality), correct it with these operations and add "misread":true to each: a correction may touch any wall, because it changes the drawing, not the building.
+After opening or removing a wall, deal with what stood against it in the same reply: move or remove those pieces, or follow with a refurnish of the rooms on both sides when the room's use changes.`;
+
 
 /* ================= step 1: read the plan (free) ================= */
 async function ensureImages() {
@@ -4870,8 +5291,8 @@ function editPrompt(text) {
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
-HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 800)}"
-WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. Words like "this", "here" or "that" refer to these.
+HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 1800)}"
+WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. ${lookingAt() ? 'Straight ahead, ' + lookingAt() : ''} Words like "this", "here", "that wall" or "this window" refer to these.
 STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
 CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.${profile().done ? '\n' + spaceText() : ''}
 ${hasNorth() ? `COMPASS: ${compassVecsText()}` : ''}${(vReq || vastuOn()) && hasNorth() ? '\n' + VASTU_RULES : ''}
@@ -4880,6 +5301,9 @@ ROOMS (name | type | area | bounds | floor${hasNorth() ? ' | position in the hom
 ${rooms}
 
 ${detail}
+
+WALLS (id | from→to in whole-home ft | size | LIGHT or STRUCTURE | the rooms on each side | its doors and windows):
+${wallsText()}
 
 FURNITURE (id | type | name | room | x,z rot | w×d×h y | finish | accent | extras):
 ${furn.join('\n')}
@@ -4896,13 +5320,14 @@ Reply with only JSON: {"summary":"one short sentence saying what you changed","o
 {"op":"paint","walls":"#hex","ceiling":"#hex"}
 {"op":"time","value":"golden|day|night"}
 {"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
+${STRUCT_HELP}
 {"op":"swap","a":"<room>","b":"<room>"} swap what two rooms are used for (their names and types trade places; walls stay). Always follow it with a refurnish op for both rooms, using the names after the swap.
 Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
-RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. If the request cannot be done, return an empty ops list and explain why in summary.`;
+RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. A wall marked STRUCTURE is never opened or removed as a design change: say so in the summary and do the nearest thing that is possible (open a LIGHT wall, widen a window, re-plan the furniture). If the home already is the way they ask, or the request cannot be done, return an empty ops list and say so in summary. "paint" recolours the walls of the whole home; to darken or colour one room use wall panels, acoustic panels or feature walls on its walls.`;
 }
 function applyOps(res) {
   const ops = Array.isArray(res?.ops) ? res.ops.slice(0, 120) : [];
-  let n = 0, shell = false, mats = false; const added = [], refurn = [];
+  let n = 0, shell = false, mats = false, struct = false; const added = [], refurn = [], notes = [];
   const roomByName = nm => layout.rooms.find(r => r.name.toLowerCase() === String(nm || '').toLowerCase());
   for (const op of ops) {
     if (!op || typeof op !== 'object') continue;
@@ -4925,6 +5350,7 @@ function applyOps(res) {
     } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
     else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
     else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
+    else if (STRUCT_OPS.has(op.op)) { const r = applyStructOp(op); if (r.ok) { shell = true; n++; struct = true; } if (r.note) notes.push(r.note); }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
   if (added.length) {
@@ -4933,39 +5359,53 @@ function applyOps(res) {
     const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length;
   }
   if (mats) for (const k in MC) delete MC[k];
+  if (struct) afterStructChange();
   if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
   saveSoon();
-  return { n, refurn };
+  return { n, refurn, notes: [...new Set(notes)].slice(0, 4) };
 }
 function undoEdit() {
   const snap = undoStack.pop(); if (!snap) return;
   project.layout = layout = snap.layout; project.style = snap.style; project.edits.shift();
   for (const k in MC) delete MC[k]; select(null); buildAll(); saveSoon(); renderPhist(); pstatus.textContent = ''; flash('Undone.');
 }
-let editing = false, editCtl = null;
-$('pform').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (editing) { editCtl?.abort(); return; }
-  const text = pinput.value.trim(); if (!text) return;
-  if (running) { flash('Wait for the current generation to finish, or stop it first.', true); return; }
-  if (SITE) { if (!(await SITE.canEdit?.(project))) return; SITE.ctx = { kind: 'edit', homeId: project.id }; }
-  else if (wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return; }
-  const sample = await getSample(); if (!sample) { flash('Prompt edits need Claude, which is not available in this view.', true); return; }
-  editing = true; editCtl = new AbortController(); $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
-  const t0 = performance.now(); const iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
+let editing = false, editCtl = null, editNow = null, editTail = Promise.resolve();
+// One change at a time. A second request waits its turn; it never cancels the first. Only the Stop button cancels.
+function requestEdit(text, opts = {}) { const job = editTail.then(() => runEdit(text, opts)); editTail = job.catch(() => { }); return job; }
+// Makes one change. Returns { ok, n, summary, notes, cancelled, paywall, reason } and never throws.
+async function runEdit(text, { signal } = {}) {
+  text = String(text || '').trim(); if (!text) return { ok: false, reason: 'Nothing to change.' };
+  if (running) return { ok: false, reason: 'A design is still being made. This can be done as soon as it finishes.' };
+  if (signal?.aborted) return { ok: false, cancelled: true, reason: 'Stopped. Nothing was changed.' };
+  if (SITE) { const t0 = Date.now(); if (!(await SITE.canEdit?.(project))) return { ok: false, paywall: (SITE.lastPaywall && SITE.lastPaywall.t >= t0 && SITE.lastPaywall.reason) || 'blocked', reason: 'This home has no changes left.' }; }
+  else if (wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return { ok: false, paywall: 'credits', reason: 'Not enough credits for a change.' }; }
+  const sample = await getSample(); if (!sample) return { ok: false, reason: 'Changes need Claude, which is not available in this view.' };
+  editing = true; editNow = text; editCtl = new AbortController(); signal?.addEventListener('abort', () => editCtl.abort());
+  $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
+  const t0 = performance.now(), iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
   const snap = { layout: structuredClone(layout), style: structuredClone(project.style) };
   try {
-    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal });
+    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal, ctx: SITE ? { kind: 'edit', homeId: project.id } : undefined });
     clearInterval(iv);
-    const { n, refurn } = applyOps(res);
-    const summary = String(res?.summary || '').slice(0, 220) || (n ? 'Done.' : 'No changes were made.');
-    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
-    pstatus.innerHTML = `<span>${esc(summary)}</span>${n || refurn.length ? '<button type="button" id="undoNow">Undo</button>' : ''}`;
-    $('undoNow')?.addEventListener('click', undoEdit);
-    pinput.value = ''; renderPhist(); saveSoon();
-    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); pstatus.innerHTML = `<span>${esc(summary)}</span><button type="button" id="undoNow">Undo</button>`; $('undoNow')?.addEventListener('click', undoEdit); }
-  } catch (err) { clearInterval(iv); pstatus.textContent = err?.code === 'cancelled' ? 'Stopped. Nothing was changed.' : errText(err); }
-  finally { clearInterval(iv); editing = false; pinput.disabled = false; renderCredits(); }
+    const { n, refurn, notes } = applyOps(res);
+    const summary = [String(res?.summary || '').slice(0, 260) || (n ? 'Done.' : 'No changes were made.'), ...notes].join(' ');
+    const ok = !!(n || refurn.length);
+    if (ok) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
+    const done = () => { pstatus.innerHTML = `<span>${esc(summary)}</span>${ok ? '<button type="button" id="undoNow">Undo</button>' : ''}`; $('undoNow')?.addEventListener('click', undoEdit); };
+    done(); if (pinput.value.trim() === text) pinput.value = ''; renderPhist(); saveSoon();
+    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); done(); }
+    return { ok, n, summary, notes };
+  } catch (err) {
+    clearInterval(iv); const cancelled = err?.code === 'cancelled', reason = cancelled ? 'Stopped. Nothing was changed.' : errText(err);
+    pstatus.textContent = reason; return { ok: false, cancelled, reason, paywall: SITE?.lastPaywall && Date.now() - SITE.lastPaywall.t < 4000 ? SITE.lastPaywall.reason : '' };
+  } finally { clearInterval(iv); editing = false; editNow = null; pinput.disabled = false; $('pgo').textContent = 'Apply'; renderCredits(); }
+}
+$('pform').addEventListener('submit', e => {
+  e.preventDefault();
+  if (editing) { editCtl?.abort(); return; }          // the button reads Stop while a change is being made
+  const text = pinput.value.trim(); if (!text) return;
+  if (running) { flash('Wait for the current generation to finish, or stop it first.', true); return; }
+  requestEdit(text).then(r => { if (!r.ok && !r.cancelled && !r.paywall && r.reason) pstatus.textContent = r.reason; });
 });
 
 /* ================= website: free one-room preview ================= */
@@ -5123,7 +5563,7 @@ const hero = (() => {
 })();
 
 /* ================= the guide: walks you through the home and makes changes as you talk ================= */
-const GUIDE = { open: false, busy: false, speak: true, touring: false, paused: false, skip: false, hist: [], flight: null, voice: null, rec: null, listening: false, stopTour: null };
+const GUIDE = { open: false, busy: false, speak: true, touring: false, paused: false, skip: false, hist: [], edits: [], flight: null, voice: null, rec: null, listening: false, stopTour: null };
 const GUIDE_NAME = 'Mira';
 
 /* ---------- camera: smooth moves and cinematic cuts ---------- */
@@ -5282,33 +5722,54 @@ function localTour() {
   return { intro: `Welcome home. I'm ${GUIDE_NAME}, and I'll walk you through it.`, stops, outro: 'That is the whole home. Ask me to change anything you like.' };
 }
 function chatPrompt(text) {
-  const F = homeFacts({ ids: true }), here = roomAt(player.x, player.z);
-  const hist = GUIDE.hist.slice(-8).map(m => `${m.who === 'you' ? 'VISITOR' : 'GUIDE'}: ${m.text}`).join('\n');
-  return `You are ${GUIDE_NAME}, the guide inside Mirage, a live 3D walkthrough of a home that has not been built yet. You can move the visitor's camera and ask the design engine to change the home. Speak like a warm, sharp interior designer: short (one to three sentences, it is read aloud), specific, honest. Only state facts listed below; never invent views, sunlight, directions, prices or brands. If you don't know, say so.
+  const F = homeFacts({ ids: true }), here = roomAt(player.x, player.z), P = profile();
+  const hist = GUIDE.hist.slice(-10).map(m => `${m.who === 'you' ? 'VISITOR' : 'MIRA'}: ${String(m.text).slice(0, 900)}`).join('\n');
+  const doing = GUIDE.edits.map(e => `"${e.request.slice(0, 280)}" (${e.state === 'working' ? 'being made now' : 'next in line'})`).join('; ');
+  const ahead = lookingAt(), walls = here ? wallsText([here]) : '';
+  return `You are ${GUIDE_NAME}, the designer and guide inside Mirage, a live 3D walkthrough of a home that has not been built yet. You have the eye of a principal at a top interior studio, and you can act: you move the visitor's camera, and you have the design engine change anything, from furniture, materials and lighting to light walls, windows and doors. Your words are read aloud: one to three short sentences, warm, specific and sure of yourself. Only state facts listed below; never invent views, sunlight, prices or brands.
+
+HOW YOU WORK
+- Act on what they say. When the visitor tells you what they want, make it happen in this same reply with an "edit" action. Never answer a clear request with a question, and never describe a change without the action that makes it.
+- "Yes", "go for it", "do it", "that one", "the second one" after you offered ideas means: make the idea they picked (the first if they did not pick), using its full request text.
+- If that change is already listed under CHANGES IN PROGRESS, do not start it again: tell them it is under way. A different change can be asked for straight away; it follows the first.
+- "This", "here", "that wall", "this window" mean the room they are in and what they are facing.
+- If something cannot be done, say why in a few words and offer the nearest thing that can.
+
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
-${profile().done ? 'THE CLIENT: ' + spaceText() + ' Budget ' + (BUDGETS[profile().budget]?.name || '') + '. Vastu: ' + profile().vastu + '.\n' : ''}${compassFacts()}
-THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${GUIDE.touring ? ' A guided tour is running.' : ''}
-${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 600)}"
-Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} using at most three actions:
-{"do":"go","room":"<exact room name>"} take them to a room (use when they ask to see or go somewhere, or when showing helps your answer)
+${P.done ? 'THE CLIENT: ' + spaceText() + ' Budget: ' + (BUDGETS[P.budget]?.name || '') + '. Vastu: ' + P.vastu + '.\n' : ''}${compassFacts()}
+THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${ahead ? ' Straight ahead, ' + ahead : ''}${GUIDE.touring ? ' A guided tour is running.' : ''}
+${walls ? `WALLS OF THIS ROOM (id | from→to | size | LIGHT or STRUCTURE | rooms on each side | openings):\n${walls}\n` : ''}${doing ? 'CHANGES IN PROGRESS: ' + doing + '\n' : ''}${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 700)}"
+
+Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} with at most three actions:
+{"do":"go","room":"<exact room name>"} take them to a room (when they ask to see it, or when showing helps your answer)
 {"do":"look","item":"<id>"} turn to face a piece
 {"do":"time","value":"dusk|golden|night|day"} change the light
-{"do":"edit","request":"<a precise instruction for the design engine, naming the room and pieces>"} for ANY change to furniture, colours, materials, floors, walls or layout. It uses one of their changes; mention that you're making it.
+{"do":"edit","request":"<a complete brief for the design engine: the room by name, the pieces, finishes and colours, the lighting, what to remove, any wall or window change by wall id>"} for ANY change. It uses one of their changes.
 {"do":"real"} when they want a real photo of the view
 {"do":"tour"} start the full guided tour · {"do":"stop"} stop the tour
 {"do":"vastu"} show the Vastu report card (when they ask whether the home is Vastu compliant, about directions, or Vastu in general). Summarise the score and the main points in "say".
-{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls (when they ask to make it Vastu compliant or fix it). It uses one change.
-OPTIONS: when they ask for ideas, what could be done differently, or how a room could be used, do NOT edit yet. Offer 2 to 4 distinct ideas as "options":[{"label":"under 8 words","request":"a precise instruction for the design engine naming the room and pieces"}], go to that room, and keep "say" to one sentence that introduces them. They tap one to make it happen. Ideas can change the room's use (a study, a kids' room, a guest room, a gym, a pooja room), its mood, or its layout.
+{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls. It uses one change.
+
+WALLS, WINDOWS AND DOORS: you may open up or remove LIGHT partition walls, and add, widen, move or remove windows and doors. STRUCTURE (outside walls, thick walls, columns) and beams stay where they are: when a light wall is opened its beam is kept. If they ask for a structural wall to go, say it is structure and offer what can be done (open a light wall, a wider window or sliding door). The first time you change a wall in a conversation, add that their engineer should confirm it before anything is broken on site. Name a wall by its id when it is in the list above, otherwise by the two rooms it stands between. One exception to acting at once: if opening a wall would expose a bathroom or take the privacy from a bedroom, say what it would mean and offer a better move (a glazed partition, a wider door, a dressing area) as options instead of doing it.
+PLAN CORRECTIONS: if they say the plan was read wrong (a wall that is not there, a room that is really bigger, a missing or misplaced door or window), that is a correction, not a renovation, and it may touch any wall. Start the request with "Plan correction:" and say exactly what is wrong and what is right.
+
+IDEAS: when they ask for ideas, options, what could be different, or for something more premium, do not edit yet. Go to that room and offer three or four concepts as "options":[{"label":"...","why":"...","request":"..."}]. Think like a designer pitching to a client with taste, not like a furniture catalogue. Each concept is a complete point of view:
+- a signature move: a statement piece, a feature wall, a ceiling or lighting scheme, or an architectural change (opening a light wall, a full-height window, a window seat, a partition that makes a dressing room or a study);
+- a palette and two or three real materials (stone, timber, metal, fabric), named;
+- layered light: cove or wall wash, an accent, and a pendant, sconce or lamp.
+Make the concepts different from each other and from what is there now, with at least one bold one, and pitch them at the client's budget. "label" is an evocative name of at most five words. "why" is one line, at most 16 words, on how it will feel to live in. "request" is the full brief, 60 to 120 words. Keep "say" to one sentence that introduces them.
+PIECES THE ENGINE CAN BUILD (any finish or colour): ${Object.values(CAT).map(c => c.label.toLowerCase()).filter((v, i, a) => a.indexOf(v) === i).join(', ')}.
 Questions (sizes, what is in a room) get an answer and usually a go or look.`;
 }
 
 /* ---------- talking to Claude ---------- */
+// quick questions and navigation go to the fast model; anything creative or that leads to a change goes to the stronger one
+const QUICK = /^\s*(show|take|go|walk|where|which room|how (big|large|many)|what('s| is) (in|the size)|make it (night|day|dusk|golden)|(start|stop|end|pause) (the )?tour|hi|hello|hey|thanks|thank you)\b/i;
 async function guideAsk(prompt, kind) {
-  if (SITE) SITE.ctx = { kind, homeId: project.id };
   const sample = await getSample(); if (!sample) throw Object.assign(new Error('The guide needs Claude, which is not available in this view.'), { code: 'no_claude' });
-  return sample.json(prompt, { modelTier: 'default' });
+  return sample.json(prompt, { modelTier: 'default', ctx: SITE ? { kind, homeId: project.id } : undefined });
 }
 
 /* ---------- the tour ---------- */
@@ -5353,7 +5814,7 @@ async function guideSend(text) {
   if (PRES.on) { PRES.paused = GUIDE.paused = true; $('presentPause').textContent = 'Resume'; } else if (GUIDE.touring) stopTour();
   gSay(text, 'you'); GUIDE.busy = true; const typing = gNote('…', 'guide typing');
   try {
-    const j = await guideAsk(chatPrompt(text), 'guide');
+    const j = await guideAsk(chatPrompt(text), QUICK.test(text) && text.length < 60 ? 'guide' : 'guide_pro');
     typing.remove();
     const line = String(j?.say || '').slice(0, 600) || 'Done.';
     gSay(line); gSpeak(line);
@@ -5371,18 +5832,29 @@ async function runAction(a) {
   else if (a.do === 'tour') { if (!GUIDE.touring) startTour(); }
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
-  else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
+  else if (a.do === 'edit' && a.request) guideEdit(a.request);   // not awaited: she can keep talking while the change is made
   else if (a.do === 'vastu') await showVastu(true);
   else if (a.do === 'vastu_fix') await vastuFix();
 }
+// A change asked for through Mira. It joins the queue (one change at a time), shows its progress in the chat with a
+// Stop button, and resolves true if the home changed. Asking for the same change twice returns the one already running.
 function guideEdit(request) {
-  return new Promise(res => {
-    const before = project.edits?.length || 0; pinput.value = request; $('pform').requestSubmit();
-    const t0 = Date.now(), iv = setInterval(() => { if ((!editing && Date.now() - t0 > 600) || Date.now() - t0 > 180000) { clearInterval(iv);
-      const ok = (project.edits?.length || 0) > before, pw = SITE?.lastPaywall && SITE.lastPaywall.t >= t0 ? SITE.lastPaywall.reason : '';
-      const why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : ($('pstatus').textContent || 'Nothing was changed.');
-      gNote(ok ? `✓ ${project.edits[0].summary || 'Changed.'}` : why, 'sys'); if (pw) gSpeak(why); if (ok) GUIDE.hist.push({ who: 'guide', text: `(changed: ${project.edits[0].summary})` }); res(ok); } }, 300);
+  request = String(request || '').trim().slice(0, 2400); if (!request) return Promise.resolve(false);
+  const same = GUIDE.edits.find(e => e.request === request); if (same) return same.job;
+  const ac = new AbortController(), t0 = Date.now(), ent = { request, state: editing || GUIDE.edits.length ? 'queued' : 'working' };
+  const note = gNote('', 'sys work'), label = document.createElement('span'), stop = document.createElement('button'); stop.type = 'button'; stop.textContent = 'Stop'; stop.onclick = () => ac.abort(); note.append(label, stop);
+  const paint = () => { ent.state = editNow === request ? 'working' : 'queued'; const s = Math.round((Date.now() - t0) / 1000); label.textContent = ent.state === 'queued' ? `Next in line… ${s}s` : running ? `Furnishing the room… ${s}s` : `Making the change… ${s}s`; };
+  paint(); const iv = setInterval(paint, 500);
+  ent.job = requestEdit(request, { signal: ac.signal }).then(r => {
+    clearInterval(iv); GUIDE.edits = GUIDE.edits.filter(e => e !== ent); note.remove();
+    const pw = r.paywall, why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw === 'credits' ? 'There are not enough credits for a change.' : pw && pw !== 'blocked' ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : '';
+    if (r.ok) { gNote(`✓ ${r.summary || 'Changed.'}`, 'sys'); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
+    else if (why) { gNote(why, 'sys'); gSpeak(why); }
+    else if (r.cancelled) gNote('Stopped. Nothing was changed.', 'sys');
+    else { const t = r.summary || r.reason || 'Nothing was changed.'; gSay(t); gSpeak(t); }
+    return !!r.ok;
   });
+  GUIDE.edits.push(ent); return ent.job;
 }
 
 /* ---------- panel ---------- */
@@ -5393,7 +5865,7 @@ function gNote(text, cls = 'guide') {
 function setTourUI(on) { $('guideTourBar').hidden = !on; $('guideTour').hidden = on; if (!on) $('guideStep').textContent = ''; $('guidePause').textContent = 'Pause'; }
 function openGuide(v = !GUIDE.open) {
   GUIDE.open = v; $('guidePanel').hidden = !v; document.body.classList.toggle('guide-open', v); $('btnGuide').setAttribute('aria-pressed', v);
-  if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, answer questions, and change anything you ask for. Try “show me the kitchen” or “make the bedroom darker”.`);
+  if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, give you ideas, and change anything: furniture, colours, lighting, even a light wall or a window. If the plan was read wrong, tell me and I'll correct it.`);
   if (v) setTimeout(() => $('guideIn').focus(), 50); else hush();
 }
 $('btnGuide').onclick = () => openGuide();
@@ -5407,7 +5879,8 @@ $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
 $('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour()
   : b.dataset.act === 'vastu' ? (gSay(b.textContent, 'you'), showVastu())
-  : b.dataset.act === 'ideas' ? guideSend(`What could be done differently with ${roomAt(player.x, player.z)?.name || 'this room'}? Give me a few options.`)
+  : b.dataset.act === 'fix' ? (() => { const i = $('guideIn'); i.value = 'The plan was read wrong: '; i.focus(); i.setSelectionRange(i.value.length, i.value.length); gNote('Tell me what is different in the real plan: a wall that is not there, a room that is bigger, a missing door or window. I will correct the drawing.', 'guide'); })()
+  : b.dataset.act === 'ideas' ? guideSend(`Give me your best ideas for ${roomAt(player.x, player.z)?.name || 'this room'}.`)
   : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));
@@ -6179,8 +6652,10 @@ function askNorthInChat(force) {
 function gOptions(opts) {
   const list = (Array.isArray(opts) ? opts : []).filter(o => o?.label && o?.request).slice(0, 4); if (!list.length) return;
   const el = document.createElement('div'); el.className = 'gopts';
-  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}">${esc(String(o.label).slice(0, 80))}</button>`).join('');
-  el.querySelectorAll('button').forEach(b => b.onclick = async () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); await guideEdit(String(o.request).slice(0, 600)); });
+  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}"><b>${esc(String(o.label).slice(0, 60))}</b>${o.why ? `<span>${esc(String(o.why).slice(0, 140))}</span>` : ''}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); GUIDE.hist.push({ who: 'guide', text: `(they chose "${o.label}"; the change is being made)` }); guideEdit(o.request); });
+  // she remembers what she offered, so "go for it" or "the second one" means something
+  GUIDE.hist.push({ who: 'guide', text: '(ideas offered: ' + list.map((o, i) => `${i + 1}. ${o.label} — ${String(o.request).slice(0, 700)}`).join(' | ') + ')' });
   const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
 }
 function compassFacts() {
@@ -6441,7 +6916,7 @@ setupPost(); renderCredits();
   showHome();
 })();
 tick();
-window.__studio = { clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
+window.__studio = { chatPrompt, editPrompt, goToRoom, applyOps, wallsText, wallClass, lookingAt, requestEdit, guideEdit, get gfx() { return { quality, autoStep, eff: effQ() }; }, clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
 
 /* ================= website: accounts, plans, paywall, meter (website build only) ================= */
 if (SITE) (() => {
@@ -6739,7 +7214,7 @@ if (SITE) (() => {
   function grabView(maxW = 1344) {
     const src = renderer.domElement, k = Math.min(1, maxW / src.width), c = document.createElement('canvas');
     c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
-    if (!photo) { if (composer) composer.render(); else renderer.render(scene, camera); }
+    if (!photo) { if (composer) composer.render(); else renderer.render(scene, camera); } else if (ptReady) PT.renderSample();
     c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
     return { image: c.toDataURL('image/jpeg', .9), w: c.width, h: c.height };
   }

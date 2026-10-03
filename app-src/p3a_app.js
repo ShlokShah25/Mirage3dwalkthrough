@@ -150,7 +150,7 @@ $('projName').addEventListener('input', e => { project.name = e.target.value; sa
 $('brief').addEventListener('input', e => { project.brief = e.target.value; saveSoon(); });
 $('ceilH').addEventListener('change', e => { const v = parseFloat(e.target.value); if (v >= 7 && v <= 20) { layout.settings.ceilingHeight = v; buildAll(); saveSoon(); } });
 $('seaSide').addEventListener('change', e => { layout.settings.view = e.target.value; applyTime(); saveSoon(); });
-$('quality').value = quality; $('quality').addEventListener('change', e => { quality = e.target.value; setupPost(); buildAll(); resize(); });
+$('quality').value = quality; $('quality').addEventListener('change', e => { quality = e.target.value; if (quality === 'auto') { autoStep = 0; try { localStorage.removeItem('mirage-gfx-step'); } catch { } } setupPost(); buildAll(); resize(); });
 $('btnSide').onclick = () => { document.body.classList.toggle('side-hidden'); setTimeout(() => { resize(); if (activeView === 'plan') planResize(); }, 60); };
 $('btnSave').onclick = () => saveFile(slug(project.name) + '.mirage.json', JSON.stringify(project));
 $('openFile').addEventListener('change', async e => {

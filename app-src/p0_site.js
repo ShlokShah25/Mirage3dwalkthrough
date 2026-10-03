@@ -16,10 +16,10 @@ globalThis.__MIRAGE_SITE = (() => {
   S.sample = {
     async limits() { return { maxPromptBytes: 160000, images: { maxCount: 10, maxInputBytes: 2e7, mediaTypes: ['image/jpeg', 'image/png', 'image/webp'] } }; },
     async json(prompt, opts = {}) {
+      const ctx = { ...(opts.ctx || S.ctx) };   // taken now, before anything is awaited: another request may set S.ctx meanwhile
       await S.ensureAuth?.();
       const imgs = opts.images == null ? [] : Array.isArray(opts.images) ? opts.images : [opts.images];
       const images = await Promise.all(imgs.map(toDataURL));
-      const ctx = { ...S.ctx };
       let r;
       try {
         r = await fetch('/api/ai', { method: 'POST', signal: opts.signal, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + S.token }, body: JSON.stringify({ ...ctx, prompt, images }) });

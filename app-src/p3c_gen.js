@@ -247,8 +247,8 @@ function editPrompt(text) {
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
-HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 800)}"
-WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. Words like "this", "here" or "that" refer to these.
+HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 1800)}"
+WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. ${lookingAt() ? 'Straight ahead, ' + lookingAt() : ''} Words like "this", "here", "that wall" or "this window" refer to these.
 STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
 CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.${profile().done ? '\n' + spaceText() : ''}
 ${hasNorth() ? `COMPASS: ${compassVecsText()}` : ''}${(vReq || vastuOn()) && hasNorth() ? '\n' + VASTU_RULES : ''}
@@ -257,6 +257,9 @@ ROOMS (name | type | area | bounds | floor${hasNorth() ? ' | position in the hom
 ${rooms}
 
 ${detail}
+
+WALLS (id | from→to in whole-home ft | size | LIGHT or STRUCTURE | the rooms on each side | its doors and windows):
+${wallsText()}
 
 FURNITURE (id | type | name | room | x,z rot | w×d×h y | finish | accent | extras):
 ${furn.join('\n')}
@@ -273,13 +276,14 @@ Reply with only JSON: {"summary":"one short sentence saying what you changed","o
 {"op":"paint","walls":"#hex","ceiling":"#hex"}
 {"op":"time","value":"golden|day|night"}
 {"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
+${STRUCT_HELP}
 {"op":"swap","a":"<room>","b":"<room>"} swap what two rooms are used for (their names and types trade places; walls stay). Always follow it with a refurnish op for both rooms, using the names after the swap.
 Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
-RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. If the request cannot be done, return an empty ops list and explain why in summary.`;
+RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. A wall marked STRUCTURE is never opened or removed as a design change: say so in the summary and do the nearest thing that is possible (open a LIGHT wall, widen a window, re-plan the furniture). If the home already is the way they ask, or the request cannot be done, return an empty ops list and say so in summary. "paint" recolours the walls of the whole home; to darken or colour one room use wall panels, acoustic panels or feature walls on its walls.`;
 }
 function applyOps(res) {
   const ops = Array.isArray(res?.ops) ? res.ops.slice(0, 120) : [];
-  let n = 0, shell = false, mats = false; const added = [], refurn = [];
+  let n = 0, shell = false, mats = false, struct = false; const added = [], refurn = [], notes = [];
   const roomByName = nm => layout.rooms.find(r => r.name.toLowerCase() === String(nm || '').toLowerCase());
   for (const op of ops) {
     if (!op || typeof op !== 'object') continue;
@@ -302,6 +306,7 @@ function applyOps(res) {
     } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
     else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
     else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
+    else if (STRUCT_OPS.has(op.op)) { const r = applyStructOp(op); if (r.ok) { shell = true; n++; struct = true; } if (r.note) notes.push(r.note); }
     else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
   }
   if (added.length) {
@@ -310,39 +315,53 @@ function applyOps(res) {
     const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length;
   }
   if (mats) for (const k in MC) delete MC[k];
+  if (struct) afterStructChange();
   if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
   saveSoon();
-  return { n, refurn };
+  return { n, refurn, notes: [...new Set(notes)].slice(0, 4) };
 }
 function undoEdit() {
   const snap = undoStack.pop(); if (!snap) return;
   project.layout = layout = snap.layout; project.style = snap.style; project.edits.shift();
   for (const k in MC) delete MC[k]; select(null); buildAll(); saveSoon(); renderPhist(); pstatus.textContent = ''; flash('Undone.');
 }
-let editing = false, editCtl = null;
-$('pform').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (editing) { editCtl?.abort(); return; }
-  const text = pinput.value.trim(); if (!text) return;
-  if (running) { flash('Wait for the current generation to finish, or stop it first.', true); return; }
-  if (SITE) { if (!(await SITE.canEdit?.(project))) return; SITE.ctx = { kind: 'edit', homeId: project.id }; }
-  else if (wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return; }
-  const sample = await getSample(); if (!sample) { flash('Prompt edits need Claude, which is not available in this view.', true); return; }
-  editing = true; editCtl = new AbortController(); $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
-  const t0 = performance.now(); const iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
+let editing = false, editCtl = null, editNow = null, editTail = Promise.resolve();
+// One change at a time. A second request waits its turn; it never cancels the first. Only the Stop button cancels.
+function requestEdit(text, opts = {}) { const job = editTail.then(() => runEdit(text, opts)); editTail = job.catch(() => { }); return job; }
+// Makes one change. Returns { ok, n, summary, notes, cancelled, paywall, reason } and never throws.
+async function runEdit(text, { signal } = {}) {
+  text = String(text || '').trim(); if (!text) return { ok: false, reason: 'Nothing to change.' };
+  if (running) return { ok: false, reason: 'A design is still being made. This can be done as soon as it finishes.' };
+  if (signal?.aborted) return { ok: false, cancelled: true, reason: 'Stopped. Nothing was changed.' };
+  if (SITE) { const t0 = Date.now(); if (!(await SITE.canEdit?.(project))) return { ok: false, paywall: (SITE.lastPaywall && SITE.lastPaywall.t >= t0 && SITE.lastPaywall.reason) || 'blocked', reason: 'This home has no changes left.' }; }
+  else if (wallet.credits < BILLING.perChange - 1e-9) { openWallet('empty'); return { ok: false, paywall: 'credits', reason: 'Not enough credits for a change.' }; }
+  const sample = await getSample(); if (!sample) return { ok: false, reason: 'Changes need Claude, which is not available in this view.' };
+  editing = true; editNow = text; editCtl = new AbortController(); signal?.addEventListener('abort', () => editCtl.abort());
+  $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
+  const t0 = performance.now(), iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
   const snap = { layout: structuredClone(layout), style: structuredClone(project.style) };
   try {
-    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal });
+    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal, ctx: SITE ? { kind: 'edit', homeId: project.id } : undefined });
     clearInterval(iv);
-    const { n, refurn } = applyOps(res);
-    const summary = String(res?.summary || '').slice(0, 220) || (n ? 'Done.' : 'No changes were made.');
-    if (n || refurn.length) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
-    pstatus.innerHTML = `<span>${esc(summary)}</span>${n || refurn.length ? '<button type="button" id="undoNow">Undo</button>' : ''}`;
-    $('undoNow')?.addEventListener('click', undoEdit);
-    pinput.value = ''; renderPhist(); saveSoon();
-    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); pstatus.innerHTML = `<span>${esc(summary)}</span><button type="button" id="undoNow">Undo</button>`; $('undoNow')?.addEventListener('click', undoEdit); }
-  } catch (err) { clearInterval(iv); pstatus.textContent = err?.code === 'cancelled' ? 'Stopped. Nothing was changed.' : errText(err); }
-  finally { clearInterval(iv); editing = false; pinput.disabled = false; renderCredits(); }
+    const { n, refurn, notes } = applyOps(res);
+    const summary = [String(res?.summary || '').slice(0, 260) || (n ? 'Done.' : 'No changes were made.'), ...notes].join(' ');
+    const ok = !!(n || refurn.length);
+    if (ok) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
+    const done = () => { pstatus.innerHTML = `<span>${esc(summary)}</span>${ok ? '<button type="button" id="undoNow">Undo</button>' : ''}`; $('undoNow')?.addEventListener('click', undoEdit); };
+    done(); if (pinput.value.trim() === text) pinput.value = ''; renderPhist(); saveSoon();
+    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); done(); }
+    return { ok, n, summary, notes };
+  } catch (err) {
+    clearInterval(iv); const cancelled = err?.code === 'cancelled', reason = cancelled ? 'Stopped. Nothing was changed.' : errText(err);
+    pstatus.textContent = reason; return { ok: false, cancelled, reason, paywall: SITE?.lastPaywall && Date.now() - SITE.lastPaywall.t < 4000 ? SITE.lastPaywall.reason : '' };
+  } finally { clearInterval(iv); editing = false; editNow = null; pinput.disabled = false; $('pgo').textContent = 'Apply'; renderCredits(); }
+}
+$('pform').addEventListener('submit', e => {
+  e.preventDefault();
+  if (editing) { editCtl?.abort(); return; }          // the button reads Stop while a change is being made
+  const text = pinput.value.trim(); if (!text) return;
+  if (running) { flash('Wait for the current generation to finish, or stop it first.', true); return; }
+  requestEdit(text).then(r => { if (!r.ok && !r.cancelled && !r.paywall && r.reason) pstatus.textContent = r.reason; });
 });
 
 /* ================= website: free one-room preview ================= */

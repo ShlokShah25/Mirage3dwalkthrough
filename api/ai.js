@@ -10,7 +10,7 @@ import { streamClaude, extractJSON } from './_lib/claude.js';
 import * as E from './_lib/entitle.js';
 import { authorizeGuest } from './_lib/guest.js';
 
-const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
+const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
 
 async function authorize(user, b) {
   const { kind } = b, uid = user.id;
@@ -56,6 +56,10 @@ async function authorize(user, b) {
       const e = await E.useEditFollowup(user, b.editId);
       return { homeId: e.home_id, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
     }
+    case 'guide_pro': {      // design ideas and anything that leads to a change: the default model, counted as a guide message
+      await E.allowGuide(uid);
+      return { homeId: b.homeId ? String(b.homeId).slice(0, 80) : null, model: MODELS.default(), maxTokens: 6000, effort: 'low', usageKind: 'guide' };
+    }
     case 'guide': {
       await E.allowGuide(uid);
       return { homeId: b.homeId ? String(b.homeId).slice(0, 80) : null, model: MODELS.fast(), maxTokens: 3000 };
@@ -89,7 +93,7 @@ export const POST = route(async req => {
       const ping = setInterval(() => { try { ctrl.enqueue(enc.encode(': ping\n\n')); } catch { } }, 15000);
       try {
         const out = await streamClaude({ model: plan.model, prompt: b.prompt, images, maxTokens: plan.maxTokens || 16000, effort: plan.effort, signal: ac.signal, onDelta: t => send({ t }) });
-        if (!user.guest) db.insert('usage', { user_id: user.id, home_id: plan.homeId || null, kind: b.kind, model: plan.model, in_tokens: out.usage.in, out_tokens: out.usage.out }).catch(e => console.error('usage log', e));
+        if (!user.guest) db.insert('usage', { user_id: user.id, home_id: plan.homeId || null, kind: plan.usageKind || b.kind, model: plan.model, in_tokens: out.usage.in, out_tokens: out.usage.out }).catch(e => console.error('usage log', e));
         const j = extractJSON(out.text);
         if (!j) { await plan.onFail?.(); send({ error: { code: out.stop === 'max_tokens' ? 'prompt_too_large' : 'invalid_json', message: 'The answer could not be read. Try again.' } }); }
         else { await plan.after?.(j); send({ done: true, json: j, meta: plan.meta || {} }); }

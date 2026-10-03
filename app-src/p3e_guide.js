@@ -1,5 +1,5 @@
 /* ================= the guide: walks you through the home and makes changes as you talk ================= */
-const GUIDE = { open: false, busy: false, speak: true, touring: false, paused: false, skip: false, hist: [], flight: null, voice: null, rec: null, listening: false, stopTour: null };
+const GUIDE = { open: false, busy: false, speak: true, touring: false, paused: false, skip: false, hist: [], edits: [], flight: null, voice: null, rec: null, listening: false, stopTour: null };
 const GUIDE_NAME = 'Mira';
 
 /* ---------- camera: smooth moves and cinematic cuts ---------- */
@@ -158,33 +158,54 @@ function localTour() {
   return { intro: `Welcome home. I'm ${GUIDE_NAME}, and I'll walk you through it.`, stops, outro: 'That is the whole home. Ask me to change anything you like.' };
 }
 function chatPrompt(text) {
-  const F = homeFacts({ ids: true }), here = roomAt(player.x, player.z);
-  const hist = GUIDE.hist.slice(-8).map(m => `${m.who === 'you' ? 'VISITOR' : 'GUIDE'}: ${m.text}`).join('\n');
-  return `You are ${GUIDE_NAME}, the guide inside Mirage, a live 3D walkthrough of a home that has not been built yet. You can move the visitor's camera and ask the design engine to change the home. Speak like a warm, sharp interior designer: short (one to three sentences, it is read aloud), specific, honest. Only state facts listed below; never invent views, sunlight, directions, prices or brands. If you don't know, say so.
+  const F = homeFacts({ ids: true }), here = roomAt(player.x, player.z), P = profile();
+  const hist = GUIDE.hist.slice(-10).map(m => `${m.who === 'you' ? 'VISITOR' : 'MIRA'}: ${String(m.text).slice(0, 900)}`).join('\n');
+  const doing = GUIDE.edits.map(e => `"${e.request.slice(0, 280)}" (${e.state === 'working' ? 'being made now' : 'next in line'})`).join('; ');
+  const ahead = lookingAt(), walls = here ? wallsText([here]) : '';
+  return `You are ${GUIDE_NAME}, the designer and guide inside Mirage, a live 3D walkthrough of a home that has not been built yet. You have the eye of a principal at a top interior studio, and you can act: you move the visitor's camera, and you have the design engine change anything, from furniture, materials and lighting to light walls, windows and doors. Your words are read aloud: one to three short sentences, warm, specific and sure of yourself. Only state facts listed below; never invent views, sunlight, prices or brands.
+
+HOW YOU WORK
+- Act on what they say. When the visitor tells you what they want, make it happen in this same reply with an "edit" action. Never answer a clear request with a question, and never describe a change without the action that makes it.
+- "Yes", "go for it", "do it", "that one", "the second one" after you offered ideas means: make the idea they picked (the first if they did not pick), using its full request text.
+- If that change is already listed under CHANGES IN PROGRESS, do not start it again: tell them it is under way. A different change can be asked for straight away; it follows the first.
+- "This", "here", "that wall", "this window" mean the room they are in and what they are facing.
+- If something cannot be done, say why in a few words and offer the nearest thing that can.
+
 HOME: ${project.name || 'the home'}, about ${F.area} sq ft. Style: ${project.style?.summary || ''} Time of day: ${layout.settings.timeOfDay}.
 ROOMS (name — size — pieces with [ids]):
 ${F.text}
-${profile().done ? 'THE CLIENT: ' + spaceText() + ' Budget ' + (BUDGETS[profile().budget]?.name || '') + '. Vastu: ' + profile().vastu + '.\n' : ''}${compassFacts()}
-THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${GUIDE.touring ? ' A guided tour is running.' : ''}
-${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 600)}"
-Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} using at most three actions:
-{"do":"go","room":"<exact room name>"} take them to a room (use when they ask to see or go somewhere, or when showing helps your answer)
+${P.done ? 'THE CLIENT: ' + spaceText() + ' Budget: ' + (BUDGETS[P.budget]?.name || '') + '. Vastu: ' + P.vastu + '.\n' : ''}${compassFacts()}
+THE VISITOR IS IN: ${here ? here.name : 'the overview'}.${ahead ? ' Straight ahead, ' + ahead : ''}${GUIDE.touring ? ' A guided tour is running.' : ''}
+${walls ? `WALLS OF THIS ROOM (id | from→to | size | LIGHT or STRUCTURE | rooms on each side | openings):\n${walls}\n` : ''}${doing ? 'CHANGES IN PROGRESS: ' + doing + '\n' : ''}${hist ? 'CONVERSATION SO FAR:\n' + hist + '\n' : ''}VISITOR SAYS: "${text.slice(0, 700)}"
+
+Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} with at most three actions:
+{"do":"go","room":"<exact room name>"} take them to a room (when they ask to see it, or when showing helps your answer)
 {"do":"look","item":"<id>"} turn to face a piece
 {"do":"time","value":"dusk|golden|night|day"} change the light
-{"do":"edit","request":"<a precise instruction for the design engine, naming the room and pieces>"} for ANY change to furniture, colours, materials, floors, walls or layout. It uses one of their changes; mention that you're making it.
+{"do":"edit","request":"<a complete brief for the design engine: the room by name, the pieces, finishes and colours, the lighting, what to remove, any wall or window change by wall id>"} for ANY change. It uses one of their changes.
 {"do":"real"} when they want a real photo of the view
 {"do":"tour"} start the full guided tour · {"do":"stop"} stop the tour
 {"do":"vastu"} show the Vastu report card (when they ask whether the home is Vastu compliant, about directions, or Vastu in general). Summarise the score and the main points in "say".
-{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls (when they ask to make it Vastu compliant or fix it). It uses one change.
-OPTIONS: when they ask for ideas, what could be done differently, or how a room could be used, do NOT edit yet. Offer 2 to 4 distinct ideas as "options":[{"label":"under 8 words","request":"a precise instruction for the design engine naming the room and pieces"}], go to that room, and keep "say" to one sentence that introduces them. They tap one to make it happen. Ideas can change the room's use (a study, a kids' room, a guest room, a gym, a pooja room), its mood, or its layout.
+{"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls. It uses one change.
+
+WALLS, WINDOWS AND DOORS: you may open up or remove LIGHT partition walls, and add, widen, move or remove windows and doors. STRUCTURE (outside walls, thick walls, columns) and beams stay where they are: when a light wall is opened its beam is kept. If they ask for a structural wall to go, say it is structure and offer what can be done (open a light wall, a wider window or sliding door). The first time you change a wall in a conversation, add that their engineer should confirm it before anything is broken on site. Name a wall by its id when it is in the list above, otherwise by the two rooms it stands between. One exception to acting at once: if opening a wall would expose a bathroom or take the privacy from a bedroom, say what it would mean and offer a better move (a glazed partition, a wider door, a dressing area) as options instead of doing it.
+PLAN CORRECTIONS: if they say the plan was read wrong (a wall that is not there, a room that is really bigger, a missing or misplaced door or window), that is a correction, not a renovation, and it may touch any wall. Start the request with "Plan correction:" and say exactly what is wrong and what is right.
+
+IDEAS: when they ask for ideas, options, what could be different, or for something more premium, do not edit yet. Go to that room and offer three or four concepts as "options":[{"label":"...","why":"...","request":"..."}]. Think like a designer pitching to a client with taste, not like a furniture catalogue. Each concept is a complete point of view:
+- a signature move: a statement piece, a feature wall, a ceiling or lighting scheme, or an architectural change (opening a light wall, a full-height window, a window seat, a partition that makes a dressing room or a study);
+- a palette and two or three real materials (stone, timber, metal, fabric), named;
+- layered light: cove or wall wash, an accent, and a pendant, sconce or lamp.
+Make the concepts different from each other and from what is there now, with at least one bold one, and pitch them at the client's budget. "label" is an evocative name of at most five words. "why" is one line, at most 16 words, on how it will feel to live in. "request" is the full brief, 60 to 120 words. Keep "say" to one sentence that introduces them.
+PIECES THE ENGINE CAN BUILD (any finish or colour): ${Object.values(CAT).map(c => c.label.toLowerCase()).filter((v, i, a) => a.indexOf(v) === i).join(', ')}.
 Questions (sizes, what is in a room) get an answer and usually a go or look.`;
 }
 
 /* ---------- talking to Claude ---------- */
+// quick questions and navigation go to the fast model; anything creative or that leads to a change goes to the stronger one
+const QUICK = /^\s*(show|take|go|walk|where|which room|how (big|large|many)|what('s| is) (in|the size)|make it (night|day|dusk|golden)|(start|stop|end|pause) (the )?tour|hi|hello|hey|thanks|thank you)\b/i;
 async function guideAsk(prompt, kind) {
-  if (SITE) SITE.ctx = { kind, homeId: project.id };
   const sample = await getSample(); if (!sample) throw Object.assign(new Error('The guide needs Claude, which is not available in this view.'), { code: 'no_claude' });
-  return sample.json(prompt, { modelTier: 'default' });
+  return sample.json(prompt, { modelTier: 'default', ctx: SITE ? { kind, homeId: project.id } : undefined });
 }
 
 /* ---------- the tour ---------- */
@@ -229,7 +250,7 @@ async function guideSend(text) {
   if (PRES.on) { PRES.paused = GUIDE.paused = true; $('presentPause').textContent = 'Resume'; } else if (GUIDE.touring) stopTour();
   gSay(text, 'you'); GUIDE.busy = true; const typing = gNote('…', 'guide typing');
   try {
-    const j = await guideAsk(chatPrompt(text), 'guide');
+    const j = await guideAsk(chatPrompt(text), QUICK.test(text) && text.length < 60 ? 'guide' : 'guide_pro');
     typing.remove();
     const line = String(j?.say || '').slice(0, 600) || 'Done.';
     gSay(line); gSpeak(line);
@@ -247,18 +268,29 @@ async function runAction(a) {
   else if (a.do === 'tour') { if (!GUIDE.touring) startTour(); }
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
-  else if (a.do === 'edit' && a.request) await guideEdit(String(a.request).slice(0, 600));
+  else if (a.do === 'edit' && a.request) guideEdit(a.request);   // not awaited: she can keep talking while the change is made
   else if (a.do === 'vastu') await showVastu(true);
   else if (a.do === 'vastu_fix') await vastuFix();
 }
+// A change asked for through Mira. It joins the queue (one change at a time), shows its progress in the chat with a
+// Stop button, and resolves true if the home changed. Asking for the same change twice returns the one already running.
 function guideEdit(request) {
-  return new Promise(res => {
-    const before = project.edits?.length || 0; pinput.value = request; $('pform').requestSubmit();
-    const t0 = Date.now(), iv = setInterval(() => { if ((!editing && Date.now() - t0 > 600) || Date.now() - t0 > 180000) { clearInterval(iv);
-      const ok = (project.edits?.length || 0) > before, pw = SITE?.lastPaywall && SITE.lastPaywall.t >= t0 ? SITE.lastPaywall.reason : '';
-      const why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : ($('pstatus').textContent || 'Nothing was changed.');
-      gNote(ok ? `✓ ${project.edits[0].summary || 'Changed.'}` : why, 'sys'); if (pw) gSpeak(why); if (ok) GUIDE.hist.push({ who: 'guide', text: `(changed: ${project.edits[0].summary})` }); res(ok); } }, 300);
+  request = String(request || '').trim().slice(0, 2400); if (!request) return Promise.resolve(false);
+  const same = GUIDE.edits.find(e => e.request === request); if (same) return same.job;
+  const ac = new AbortController(), t0 = Date.now(), ent = { request, state: editing || GUIDE.edits.length ? 'queued' : 'working' };
+  const note = gNote('', 'sys work'), label = document.createElement('span'), stop = document.createElement('button'); stop.type = 'button'; stop.textContent = 'Stop'; stop.onclick = () => ac.abort(); note.append(label, stop);
+  const paint = () => { ent.state = editNow === request ? 'working' : 'queued'; const s = Math.round((Date.now() - t0) / 1000); label.textContent = ent.state === 'queued' ? `Next in line… ${s}s` : running ? `Furnishing the room… ${s}s` : `Making the change… ${s}s`; };
+  paint(); const iv = setInterval(paint, 500);
+  ent.job = requestEdit(request, { signal: ac.signal }).then(r => {
+    clearInterval(iv); GUIDE.edits = GUIDE.edits.filter(e => e !== ent); note.remove();
+    const pw = r.paywall, why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw === 'credits' ? 'There are not enough credits for a change.' : pw && pw !== 'blocked' ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : '';
+    if (r.ok) { gNote(`✓ ${r.summary || 'Changed.'}`, 'sys'); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
+    else if (why) { gNote(why, 'sys'); gSpeak(why); }
+    else if (r.cancelled) gNote('Stopped. Nothing was changed.', 'sys');
+    else { const t = r.summary || r.reason || 'Nothing was changed.'; gSay(t); gSpeak(t); }
+    return !!r.ok;
   });
+  GUIDE.edits.push(ent); return ent.job;
 }
 
 /* ---------- panel ---------- */
@@ -269,7 +301,7 @@ function gNote(text, cls = 'guide') {
 function setTourUI(on) { $('guideTourBar').hidden = !on; $('guideTour').hidden = on; if (!on) $('guideStep').textContent = ''; $('guidePause').textContent = 'Pause'; }
 function openGuide(v = !GUIDE.open) {
   GUIDE.open = v; $('guidePanel').hidden = !v; document.body.classList.toggle('guide-open', v); $('btnGuide').setAttribute('aria-pressed', v);
-  if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, answer questions, and change anything you ask for. Try “show me the kitchen” or “make the bedroom darker”.`);
+  if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, give you ideas, and change anything: furniture, colours, lighting, even a light wall or a window. If the plan was read wrong, tell me and I'll correct it.`);
   if (v) setTimeout(() => $('guideIn').focus(), 50); else hush();
 }
 $('btnGuide').onclick = () => openGuide();
@@ -283,7 +315,8 @@ $('guideForm').addEventListener('submit', e => { e.preventDefault(); guideSend($
 $('guideIn').addEventListener('keydown', e => e.stopPropagation());
 $('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour()
   : b.dataset.act === 'vastu' ? (gSay(b.textContent, 'you'), showVastu())
-  : b.dataset.act === 'ideas' ? guideSend(`What could be done differently with ${roomAt(player.x, player.z)?.name || 'this room'}? Give me a few options.`)
+  : b.dataset.act === 'fix' ? (() => { const i = $('guideIn'); i.value = 'The plan was read wrong: '; i.focus(); i.setSelectionRange(i.value.length, i.value.length); gNote('Tell me what is different in the real plan: a wall that is not there, a room that is bigger, a missing door or window. I will correct the drawing.', 'guide'); })()
+  : b.dataset.act === 'ideas' ? guideSend(`Give me your best ideas for ${roomAt(player.x, player.z)?.name || 'this room'}.`)
   : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls
 ['keydown', 'pointerdown'].forEach(ev => $('stage').addEventListener(ev, () => { if (GUIDE.flight && !GUIDE.touring) GUIDE.flight = null; }));

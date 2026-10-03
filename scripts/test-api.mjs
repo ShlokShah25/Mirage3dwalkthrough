@@ -162,6 +162,8 @@ r = await ai(F, { kind: 'bogus', homeId: 'f1', prompt: 'x' }); assert.equal(r.st
 // the guide
 r = await ai(F, { kind: 'guide', homeId: 'sample-home', prompt: 'You are Mira, the guide inside Mirage. VISITOR SAYS: "show me the kitchen"' });
 assert.ok(r.done && r.json.actions[0].do === 'go'); assert.equal(calls.at(-1).model, 'claude-haiku-4-5-20251001'); ok('guide chat works on the fast model');
+r = await ai(F, { kind: 'guide_pro', homeId: 'sample-home', prompt: 'You are Mira, the designer and guide inside Mirage. VISITOR SAYS: "give me ideas for this room"\n' });
+assert.ok(r.done && r.json.options.length >= 2 && r.json.options[0].why); assert.equal(calls.at(-1).model, 'claude-sonnet-5'); ok('design ideas come from the stronger model and count as guide messages');
 
 // photo-real renders
 const VIEW = 'data:image/jpeg;base64,' + Buffer.from('view').toString('base64');

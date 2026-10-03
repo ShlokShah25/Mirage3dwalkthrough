@@ -40,6 +40,20 @@ Plan reading and furnishing run on `MODEL_COMPLEX` / `MODEL_DESIGN` (Opus by def
 
 To measure accuracy, `scripts/planlab/` runs the real plan-reading code headless: `lab.mjs` steps a plan through the read with answers from files (any Claude can play the model), and `compare.mjs` scores a tracing against a hand-checked answer key (walls found and their offset, openings, room overlap). A designed home costs more in Claude usage than before (roughly 2 to 3 times), in exchange for layouts that follow the plan.
 
+## Mira and changes
+
+Mira (`app-src/p3e_guide.js`) is the guide and designer in the walkthrough. Quick questions and navigation use the fast model (`guide`); ideas and anything that leads to a change use the default model (`guide_pro`, counted as a guide message). She knows the room the visitor is in, the wall, door or window they are facing, what she has offered and which changes are being made.
+
+Changes run through one queue (`requestEdit` in `app-src/p3c_gen.js`): one at a time, a second request waits its turn, and only the Stop button cancels. Besides furniture, materials, floors and light, the change engine can alter the building (`app-src/p3k_structure.js`):
+
+- **Light walls** (thin interior partitions) can be opened up, removed or moved. **Structure stays**: outside walls, walls much thicker than the partitions, and columns are refused with a note the visitor sees. When a light wall is opened its **beam is kept** at the ceiling unless the visitor says there is none.
+- **Windows and doors** can be added, moved, resized, changed or removed. Windows and sliding doors may go in an outside wall; doors and doorways only in light walls.
+- **Plan corrections**: when the visitor says the plan was read wrong, any wall may be moved, added or removed, a room split or renamed. These carry `"misread": true`, because they correct the drawing rather than change the building.
+
+`app-src/cat4.js` adds statement pieces her concepts can use: RGB LED strips and neon in any colour, acoustic panels, a studio desk and speakers, guitars, cinema recliners and screen, a linear fireplace wall, a glass wine wall, a window seat, a timber slat ceiling and a home gym.
+
+Graphics default to **Auto quality**: full quality to start, stepping down a level whenever most frames over a few seconds are slow, and remembering the level for that device. Shadows are redrawn only when something changes, and the panels over the 3D view no longer blur what is behind them.
+
 ## Pricing and limits
 
 All set in `api/_lib/env.js` (server) and shown by the app from `/api/config`:

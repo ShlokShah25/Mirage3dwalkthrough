@@ -313,8 +313,10 @@ function askNorthInChat(force) {
 function gOptions(opts) {
   const list = (Array.isArray(opts) ? opts : []).filter(o => o?.label && o?.request).slice(0, 4); if (!list.length) return;
   const el = document.createElement('div'); el.className = 'gopts';
-  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}">${esc(String(o.label).slice(0, 80))}</button>`).join('');
-  el.querySelectorAll('button').forEach(b => b.onclick = async () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); await guideEdit(String(o.request).slice(0, 600)); });
+  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}"><b>${esc(String(o.label).slice(0, 60))}</b>${o.why ? `<span>${esc(String(o.why).slice(0, 140))}</span>` : ''}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); GUIDE.hist.push({ who: 'guide', text: `(they chose "${o.label}"; the change is being made)` }); guideEdit(o.request); });
+  // she remembers what she offered, so "go for it" or "the second one" means something
+  GUIDE.hist.push({ who: 'guide', text: '(ideas offered: ' + list.map((o, i) => `${i + 1}. ${o.label} — ${String(o.request).slice(0, 700)}`).join(' | ') + ')' });
   const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
 }
 function compassFacts() {

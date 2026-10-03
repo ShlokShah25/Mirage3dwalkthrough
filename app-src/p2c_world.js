@@ -75,9 +75,10 @@ function buildAllItems() {
 }
 function addItemsLive(list) {
   for (const it of list) { it.id ||= newId(); const g = buildItem(it); if (g) { itemsGroup.add(g); itemGroups.set(it.id, g); } }
-  refreshItemPhysics(); drawMapBaseSoon();
+  refreshItemPhysics(); drawMapBaseSoon(); shadowsDirty();
 }
 function removeItemsWhere(fn) {
+  shadowsDirty();
   const keep = [];
   for (const it of layout.furniture) { if (fn(it)) { const g = itemGroups.get(it.id); if (g) { itemsGroup.remove(g); disposeGroup(g); itemGroups.delete(it.id); } } else keep.push(it); }
   layout.furniture = keep; refreshItemPhysics(); drawMapBaseSoon();
@@ -85,7 +86,7 @@ function removeItemsWhere(fn) {
 function rebuildItem(it) {
   const old = itemGroups.get(it.id); if (old) { itemsGroup.remove(old); disposeGroup(old); itemGroups.delete(it.id); }
   const g = buildItem(it); if (g) { itemsGroup.add(g); itemGroups.set(it.id, g); }
-  refreshItemPhysics(); updateSelBox(); drawMapBaseSoon(); saveSoon();
+  refreshItemPhysics(); updateSelBox(); drawMapBaseSoon(); saveSoon(); shadowsDirty();
 }
 
 /* ================= shell ================= */
@@ -230,7 +231,7 @@ function buildShell() {
   // world-scale UVs on the walls so the plaster texture has a real size (about 9 ft per tile)
   wallGroup.children.forEach(me => { if (me.material !== M.wall) return; const p = me.geometry.attributes.position, n = me.geometry.attributes.normal, uv = me.geometry.attributes.uv; if (!uv) return;
     for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)); const u = ay > .5 ? p.getX(i) : ax > .5 ? p.getZ(i) : p.getX(i), v = ay > .5 ? p.getZ(i) : p.getY(i); uv.setXY(i, u / 9, v / 9); } uv.needsUpdate = true; });
-  if (quality !== 'fast') {
+  if (effQ() !== 'fast') {
     const glaz = [];
     for (const w of layout.walls) {
       const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]); if (L < .05) continue; const ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
@@ -242,7 +243,7 @@ function buildShell() {
         glaz.push({ w: o.end - o.start, h: Math.min(H, o.head || 7) - (o.sill || 0), y: ((o.sill || 0) + Math.min(H, o.head || 7)) / 2, cx, cz, nx, nz, t: w.thickness });
       }
     }
-    glaz.sort((a, b) => b.w * b.h - a.w * a.h).slice(0, quality === 'high' ? 10 : 5).forEach(g => {
+    glaz.sort((a, b) => b.w * b.h - a.w * a.h).slice(0, effQ() === 'high' ? 10 : 5).forEach(g => {
       const l = new THREE.RectAreaLight('#ffffff', 1, g.w * .95, g.h * .95); l.position.set(g.cx + g.nx * (g.t / 2 + .1), g.y, g.cz + g.nz * (g.t / 2 + .1)); l.lookAt(g.cx + g.nx * 8, g.y - 1.2, g.cz + g.nz * 8);
       l.userData.area = g.w * g.h; house.add(l); dayLights.push(l);
     });
@@ -313,7 +314,7 @@ function buildShell() {
   orbit.target.copy(S.center);
   camera.fov = +layout.settings.fieldOfView || 80; camera.updateProjectionMatrix();
 }
-function buildAll() { buildShell(); buildAllItems(); applyTime(); applyCut(); setCeilings(mode === 'walk'); drawMapBase(); updateMeta(); }
+function buildAll() { buildShell(); buildAllItems(); applyTime(); applyCut(); setCeilings(mode === 'walk'); drawMapBase(); updateMeta(); shadowsDirty(4); }
 
 /* ================= time of day ================= */
 const TIMES = {
@@ -325,6 +326,7 @@ TIMES.dusk = { label: 'Dusk', top: '#2b3a63', mid: '#f2b48e', bot: '#1b2436', fo
 TIMES.golden.city = .25; TIMES.night.city = 1.3; TIMES.day.city = 0;
 const TIME_ORDER = ['dusk', 'golden', 'night', 'day'];
 function applyTime() {
+  shadowsDirty();
   const t = TIMES[layout.settings.timeOfDay] || TIMES.golden;
   if (grade) { const du = t === TIMES.dusk || t === TIMES.night; grade.uniforms.warm.value = du ? .03 : .01; grade.uniforms.contrast.value = du ? .2 : .17; grade.uniforms.vig.value = du ? .26 : .2; grade.uniforms.sat.value = du ? .96 : 1.02; }
   skyU.top.value.set(t.top); skyU.mid.value.set(t.mid); skyU.bot.value.set(t.bot); skyU.sunCol.value.set(t.sun).multiplyScalar(t === TIMES.night ? .15 : 1);
@@ -458,8 +460,8 @@ function move(f, s, dt, fast) {
 /* ================= modes ================= */
 const btnWalk = $('btnWalk'), btnOver = $('btnOver'), btnCut = $('btnCut');
 let cut = false;
-function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); }
-function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; }
+function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); shadowsDirty(); }
+function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; shadowsDirty(); }
 function setMode(m) {
   mode = m; btnWalk.setAttribute('aria-pressed', m === 'walk'); btnOver.setAttribute('aria-pressed', m === 'over');
   btnCut.hidden = m !== 'over'; orbit.enabled = m === 'over'; setCeilings(m === 'walk'); applyCut();
@@ -494,10 +496,12 @@ function drawMapBase() {
     for (const [a, b, k] of segs) { if (!k || b <= a) continue; g.globalAlpha = k; g.lineWidth = Math.max(1.2 * mmT.dpr, w.thickness * mmT.s); g.beginPath(); g.moveTo(...P([w.a[0] + ux * a, w.a[1] + uz * a])); g.lineTo(...P([w.a[0] + ux * b, w.a[1] + uz * b])); g.stroke(); }
     g.globalAlpha = 1;
   }
-  mapBase = off;
+  mapBase = off; mapKey = '';
 }
+let mapKey = '';
 function drawMap() {
   if (!mapBase || !mmT) return;
+  const key = Math.round(player.x * 12) + ',' + Math.round(player.z * 12) + ',' + Math.round(player.yaw * 50); if (key === mapKey) return; mapKey = key;   // only when the visitor has moved
   mg.clearRect(0, 0, mm.width, mm.height); mg.drawImage(mapBase, 0, 0);
   const x = player.x * mmT.s + mmT.ox, z = player.z * mmT.s + mmT.oz, d = mmT.dpr, a = Math.atan2(-Math.cos(player.yaw), -Math.sin(player.yaw));
   mg.fillStyle = 'rgba(91,240,209,.4)'; mg.beginPath(); mg.moveTo(x, z); mg.arc(x, z, 26 * d, a - .55, a + .55); mg.closePath(); mg.fill();
@@ -628,7 +632,7 @@ async function enterPhoto() {
         r.autoClear = ac;
       };
     }
-    PT.renderScale = quality === 'high' ? 1 : quality === 'balanced' ? .75 : .5;
+    PT.renderScale = effQ() === 'high' ? 1 : effQ() === 'balanced' ? .75 : .5;
     const t = TIMES[layout.settings.timeOfDay] || TIMES.golden;
     const top = new THREE.Color(t.top), mid = new THREE.Color(t.mid), bot = new THREE.Color(t.bot), sc = new THREE.Color(t.sun), sd = V(...t.sunPos).normalize(), d = new THREE.Vector3();
     const k = t === TIMES.night ? .6 : 1;
@@ -654,6 +658,7 @@ function exitPhoto() {
 $('btnPhoto').onclick = () => photo ? exitPhoto() : enterPhoto();
 $('photoExit').onclick = exitPhoto;
 $('photoSave').onclick = async () => {
+  if (photo && ptReady) PT.renderSample();   // draw, then read the canvas straight away
   const blob = await new Promise(r => renderer.domElement.toBlob(r, 'image/png'));
   if (!blob) return flash('The image could not be captured.', true);
   const room = roomName.textContent.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'view';
@@ -695,5 +700,24 @@ function tick() {
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
   drawMap(); SITE?.frame?.();
+  // shadows: on a change, a few times a second as a safety net, and every frame while Mira's figure is moving in the scene
+  if (shadowTTL > 0 || ++shadowTick % 24 === 0 || PRES.fig?.visible) { renderer.shadowMap.needsUpdate = true; if (shadowTTL > 0) shadowTTL--; }
   if (composer) composer.render(); else renderer.render(scene, camera);
+  govern();
+}
+// keeps the walkthrough smooth: when most frames over a few seconds are slow, auto quality steps down one level
+let shadowTick = 0, gT = performance.now(), gN = 0, gSlow = 0, gHold = 240, gTold = false;
+function govern() {
+  const now = performance.now(), ms = now - gT; gT = now;
+  if (quality !== 'auto' || autoStep >= 3 || document.hidden || running || editing) { gN = gSlow = 0; return; }
+  if (ms > 400) { gHold = 45; return; }            // a rebuild or a tab switch, not the frame rate
+  if (gHold > 0) { gHold--; return; }
+  gN++; if (ms > 29) gSlow++;
+  if (gN < 150) return;
+  if (gSlow > 95) {
+    const before = effQ(); autoStep++; try { localStorage.setItem('mirage-gfx-step', String(autoStep)); } catch { }
+    setupPost(); if (effQ() !== before) buildAll(); resize(); gHold = 300;
+    if (!gTold) { gTold = true; flash('Switched to smoother graphics for this device. You can choose High quality at the top if you prefer.'); }
+  }
+  gN = gSlow = 0;
 }

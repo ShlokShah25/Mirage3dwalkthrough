@@ -75,6 +75,7 @@ export function authorizeGuest(user, b) {
       return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
     }
     case 'refurnish': take(uid, 'edit'); return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', after: j => { if (!items(j)) giveBack(uid, 'edit'); }, onFail: () => giveBack(uid, 'edit') };
+    case 'guide_pro': take(uid, 'guide'); return { homeId, model: MODELS.default(), maxTokens: 6000, effort: 'low' };
     case 'guide': take(uid, 'guide'); return { homeId, model: MODELS.fast(), maxTokens: 3000 };
   }
 }
