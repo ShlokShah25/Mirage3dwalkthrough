@@ -86,7 +86,7 @@ Loophole guards, all enforced on the server:
 
 ### 2. Anthropic (Claude)
 1. console.anthropic.com → create an API key.
-2. Set a monthly spend limit (Settings → Limits). About ₹30 to ₹50 of Claude usage per designed home is typical.
+2. Set a monthly spend limit (Settings → Limits). Estimate (not yet measured on live traffic): a large 4BHK costs roughly ₹350 to ₹900 of Claude usage to read and design in full on Opus, about ₹120 to ₹250 for the plan read and the rest for furnishing (one or two Opus calls per room). Check the `usage` table or the Console for real figures.
 
 ### 3. Razorpay (payments)
 Start with **Test mode** keys, then switch to Live once your KYC is approved.
