@@ -682,6 +682,7 @@ function updateMeta() {
 }
 function tick() {
   requestAnimationFrame(tick);
+  syncStage();
   if (activeView !== '3d') { clock.getDelta(); return; }
   const dt = Math.min(clock.getDelta(), .05);
   if (photo) { if (ptReady) { PT.renderSample(); const n = Math.floor(PT.samples); photoCt.textContent = `${n} sample${n === 1 ? '' : 's'}${n < 48 ? ' · refining' : n < 200 ? ' · looking good' : ' · final quality'}`; } return; }

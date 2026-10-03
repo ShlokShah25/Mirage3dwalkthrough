@@ -161,7 +161,9 @@ if (SITE) (() => {
     const m = modal(`<div class="eyebrow">[ Plan read · ${n} rooms found ]</div><h2>Your bare 3D shell is ready</h2>
       <p class="lead">Walk through it and check the walls. If something looks off, fix it in <b>Fix the layout</b>.</p>
       ${canTease ? `<p class="lead">Want to see it come alive? We'll design your <b>${esc(room.name)}</b> in the ${esc(style)} style, free.</p>` : ''}
-      <div class="mact"><button id="arPhotos">Add room photos</button><button data-close>Walk around first</button>${canTease ? `<button class="primary" id="arTease">Preview ${esc(room.name)} free</button>` : `<button class="primary" id="arDesign">Design my home</button>`}</div>`);
+      <p class="lead">Have it designed for you in one go, or go room by room with Mira and choose each room's direction yourself.</p>
+      <div class="mact"><button id="arPhotos">Add room photos</button><button data-close>Walk around first</button>${canTease ? '' : '<button id="arRooms">Design room by room</button>'}${canTease ? `<button class="primary" id="arTease">Preview ${esc(room.name)} free</button>` : `<button class="primary" id="arDesign">Design it for me</button>`}</div>`, { wide: true });
+    m.el.querySelector('#arRooms')?.addEventListener('click', () => { m.close(); startDesigner(); });
     m.el.querySelector('#arPhotos').onclick = () => { m.close(); askRoomInspo(); };
     m.el.querySelector('#arTease')?.addEventListener('click', () => { m.close(); teaserRoom(); });
     m.el.querySelector('#arDesign')?.addEventListener('click', () => { m.close(); requestGenerate(); });

@@ -123,6 +123,38 @@
   .gen{width:100%;padding:13px;font-size:14.5px;display:flex;justify-content:center;gap:10px;align-items:center}
   .gen .cost{font-family:var(--mono);font-size:12px;opacity:.8;font-weight:500}
   .note{font-size:12px;color:var(--faint);line-height:1.5;margin:8px 0 0}
+  /* progress sits where you are looking: the middle of the page while the plan is read, top centre once the home is up */
+  #progCard{position:absolute;z-index:9;left:50%;top:118px;transform:translateX(-50%);width:min(440px,calc(100% - 28px));padding:14px 16px;display:flex;gap:18px;align-items:flex-start}
+  #progCard[hidden]{display:none}
+  #progCard .pc-body{flex:1;min-width:0}
+  #progCard .pc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+  #progCard .pc-head b{font-family:var(--serif);font-weight:500;font-size:17px;letter-spacing:-.01em}
+  #progCard .pc-head span{display:flex;gap:6px}#progCard .pc-head button{padding:4px 10px;font-size:12px}
+  #progCard .note:empty{display:none}
+  #progPlan{width:46%;max-height:420px;object-fit:contain;background:#f4f1ec;border-radius:12px;border:1px solid var(--line)}
+  body.setup #progCard{top:50%;transform:translate(-50%,-50%);width:min(940px,calc(100% - 32px));padding:22px;gap:26px;align-items:center}
+  body.setup #progCard .pc-head b{font-size:26px}
+  body.setup #progress li{font-size:15px;gap:11px}body.setup #progress li small{font-size:12px}
+  body:not(.setup) #progPlan{display:none}
+  @media (max-width:760px){#progPlan{display:none}}
+  .setup-head{display:none}
+  /* a new home: the three steps take the whole page, and the button to go is always in view */
+  body.setup .ws,body.setup.side-hidden .ws{grid-template-columns:minmax(0,1fr)}
+  body.setup main{display:none}
+  body.setup #side,body.setup.side-hidden #side{visibility:visible;display:grid;position:static;width:100%;max-width:1120px;margin:0 auto;border:0;background:none;box-shadow:none;padding:34px 28px 120px;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr);grid-template-areas:"head head" "plan style" "plan special";column-gap:48px;row-gap:22px;align-content:start}
+  body.setup.busy #side{display:none}
+  body.setup .setup-head{display:block;grid-area:head}
+  .setup-head h2{font-family:var(--serif);font-weight:500;letter-spacing:-.025em;font-size:38px;margin:0 0 6px}
+  .setup-head p{color:var(--muted);margin:0;max-width:62ch;line-height:1.55}
+  body.setup #step1{grid-area:plan}body.setup #step2{grid-area:style}body.setup #step3{grid-area:special}
+  body.setup #step1 .drop{padding:54px 22px;font-size:15px;border-radius:16px}
+  body.setup #step1 .planthumb{max-height:340px;margin-top:12px}
+  body.setup #step2 .presets{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.setup #stepGo{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;padding:30px 20px 14px;background:linear-gradient(180deg,rgba(10,11,12,0),var(--bg) 26px)}
+  body.setup #stepGo .gen{width:min(420px,100%);padding:15px;font-size:16px;border-radius:14px}
+  body.setup #stepGo .note{margin:0;max-width:44ch}
+  body.setup #stepGo #btnReread{display:none}
+  @media (max-width:860px){body.setup #side,body.setup.side-hidden #side{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "plan" "style" "special";padding:22px 16px 150px}.setup-head h2{font-size:30px}body.setup #step2 .presets{grid-template-columns:repeat(2,minmax(0,1fr))}}
   #progress{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
   #progress li{display:grid;grid-template-columns:18px 1fr;gap:9px;font-size:13px;align-items:start}
   #progress li .dot{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--faint);margin-top:3px}
@@ -151,7 +183,8 @@
   .where{padding:10px 15px;min-width:0}
   .where .room{font-family:var(--serif);font-size:24px;line-height:1.1}
   .where .size{font-family:var(--mono);font-size:11.5px;color:var(--gold);margin-top:3px}
-  .modes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .modes{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:0 auto;max-width:calc(100% - 2 * min(240px,22%))}
+  .hud .where{position:absolute;left:0;top:0;max-width:min(240px,22%)}
   .modes .grp{display:flex;padding:3px;gap:3px;border-radius:12px}
   .modes .grp button{border-color:transparent;padding:7px 11px}
   .map{position:absolute;left:14px;bottom:14px;padding:9px;z-index:3}
@@ -227,8 +260,10 @@
   .rcmp .rhandle span{position:absolute;top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(10,11,12,.6);padding:3px 7px;border-radius:6px;white-space:nowrap}
   .rcmp .rhandle span:first-of-type{right:10px}.rcmp .rhandle span:last-of-type{left:10px}
   /* guide */
-  body.guide-open .pbar{display:none}
-  body.guide-open #guideCap{bottom:28px}
+  .pbar{display:none!important}   /* Mira's dock is the one place to ask for anything */
+  body.guide-open #guideCap{display:none}
+  body.photo #guidePanel,body.photo #progCard{display:none!important}
+  #btnGuide{display:none}
   .guidebtn{display:inline-flex;align-items:center;gap:8px}
   .gdot{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:gpulse 2.4s ease-in-out infinite}
   @keyframes gpulse{50%{opacity:.45;transform:scale(.8)}}
@@ -246,30 +281,41 @@
   .presbtn{font-weight:600}
   @media (max-width:760px){body.presenting #guideCap{font-size:15.5px;top:auto}#presentBar{font-size:12px}#presentBar .pb-who span{display:none}}
   #guideFade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:4}
-  #guideCap{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(760px,calc(100% - 40px));z-index:7;padding:12px 18px;border-radius:14px;background:rgba(10,11,12,.86);font-size:17px;line-height:1.45;text-align:center;color:var(--ink);text-wrap:balance;pointer-events:none}
-  #guidePanel{position:absolute;right:14px;bottom:14px;width:370px;max-height:min(560px,calc(100% - 120px));display:flex;flex-direction:column;z-index:8;border-radius:18px;overflow:hidden}
+  #guideCap{position:absolute;left:50%;bottom:148px;transform:translateX(-50%);max-width:min(760px,calc(100% - 40px));z-index:7;padding:12px 18px;border-radius:14px;background:rgba(10,11,12,.86);font-size:17px;line-height:1.45;text-align:center;color:var(--ink);text-wrap:balance;pointer-events:none}
+  /* Mira is the centre of the room: a dock at the bottom middle; the conversation opens above it */
+  #guidePanel{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(700px,calc(100% - 596px));min-width:340px;max-height:calc(100% - 96px);display:flex;flex-direction:column;z-index:8;border-radius:20px;overflow:hidden}
+  #guidePanel:not(.open) > header,#guidePanel:not(.open) > #guideLog{display:none}
+  #guidePanel.open > #guideLast{display:none}
+  #guidePanel:focus-within{border-color:rgba(91,240,209,.5);box-shadow:0 12px 40px rgba(0,0,0,.4),0 0 0 3px rgba(91,240,209,.12)}
+  #guideLast{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent!important;color:var(--muted);font-weight:400;font-size:12.5px;padding:9px 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #guideLast::after{content:"  ⌃";color:var(--gold)}
+  #guideLast:hover{color:var(--ink)}
   #guidePanel header{display:flex;align-items:center;gap:10px;padding:12px 12px 10px 14px;border-bottom:1px solid var(--line)}
   #guidePanel header div{flex:1;display:flex;flex-direction:column;line-height:1.25}
   #guidePanel header small{color:var(--muted);font-size:11.5px}
   .gav{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--gold-hi),var(--gold-lo));box-shadow:0 0 16px rgba(91,240,209,.4);flex:none}
   #guidePanel .icon{padding:6px 9px;font-size:14px;border-radius:9px}
-  #guideTourBar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
-  #guideTourBar span:nth-child(2){flex:1}#guideTourBar b{color:var(--ink)}
-  #guideTourBar button{padding:5px 10px;font-size:12px}
+  #guideTourBar,#designBar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+  #guideTourBar[hidden],#designBar[hidden]{display:none}
+  #guideTourBar span:nth-child(2),#designBar span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#guideTourBar b,#designBar b{color:var(--ink)}
+  #guideTourBar button,#designBar button{padding:5px 10px;font-size:12px;white-space:nowrap}
+  .gmsg .gundo{font-size:11px;padding:2px 8px;border-radius:99px;margin-left:4px}
   .live{width:8px;height:8px;border-radius:50%;background:#F2877A;animation:gpulse 1.2s infinite}
-  #guideLog{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+  #guideLog{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:90px;max-height:36vh}
   .gmsg{max-width:88%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45}
   .gmsg.guide{background:var(--surface2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
   .gmsg.you{background:var(--gold);color:var(--gold-ink);align-self:flex-end;border-bottom-right-radius:4px;font-weight:500}
   .gmsg.sys{align-self:center;background:none;color:var(--muted);font-size:12px;text-align:center;padding:2px 8px}
   .gmsg.typing{color:var(--muted);letter-spacing:3px}
-  #guideChips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px}
+  #guideChips{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:10px 12px 0}
+  #guideChips::-webkit-scrollbar{display:none}#guideChips button{flex:none;white-space:nowrap}
   #guideChips button{font-weight:500;font-size:12px;padding:5px 10px;border-radius:99px;color:var(--muted)}
   #guideChips button.primary{color:var(--gold-ink);font-weight:600}
-  #guideForm{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}
-  #guideForm input{flex:1;min-width:0;font-size:14px;padding:9px 10px}
+  #guideForm{display:flex;gap:8px;padding:10px 10px 10px 12px;align-items:center}
+  #guideForm input{flex:1;min-width:0;font-size:14.5px;padding:10px 6px;border:0;background:transparent}
+  #guideForm input:focus-visible{outline:none}
   #guideMic.on{background:#F2877A;color:#0A0B0C;border-color:transparent;animation:gpulse 1s infinite}
-  @media (max-width:760px){#guidePanel{left:8px;right:8px;width:auto;bottom:8px;max-height:62%}#guideCap{bottom:auto;top:84px;font-size:15px}}
+  @media (max-width:860px){#guidePanel{left:8px;right:8px;width:auto;min-width:0;transform:none;bottom:8px}#guideLog{max-height:32vh}#guideCap{bottom:auto;top:84px;font-size:15px}body:not(.presenting) #guideCap{display:none}#designBar{flex-wrap:wrap}#designBar span:nth-child(2){flex:1 0 calc(100% - 30px)}}
   #photoBar{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:flex;gap:8px;align-items:center;padding:7px 8px 7px 16px;border-radius:14px}
   #photoBar .ct{font-family:var(--mono);font-size:12px;color:var(--gold-hi);min-width:12ch}
   #photoBar .lbl{font-family:var(--serif);font-size:18px;margin-right:4px}
@@ -404,7 +450,8 @@
     #sel{left:14px;right:14px;width:auto;max-height:50%}
     .vtabs .meta{display:none}
     .hud{flex-direction:column}
-    .modes{justify-content:flex-start}
+    .hud .where{position:static;max-width:none}
+    .modes{justify-content:flex-start;margin:0;max-width:none}
     .pbar{left:14px;right:14px;transform:none;width:auto;min-width:0;bottom:14px}
     .map{display:none}
     body.touch #joy{bottom:92px}
@@ -459,7 +506,11 @@
   .vlist .ok i{background:rgba(91,240,209,.16);color:var(--gold)}.vlist .warn i{background:rgba(240,190,90,.18);color:#f0be5a}.vlist .fail i{background:rgba(240,100,90,.18);color:#f0645a}
   .vlist .more{color:var(--faint);padding-left:26px}
   .vact{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.vact button{font-size:12px;padding:6px 11px}
-  .gopts{display:flex;flex-direction:column;gap:6px;align-self:flex-start;max-width:92%}
+  .gopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:stretch}
+  @media (max-width:560px){.gopts{grid-template-columns:minmax(0,1fr)}}
+  #guideActs{display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px 0}
+  #guideActs button{font-size:13px;padding:8px 14px;border-radius:99px}
+  #guidePanel.designing #guideChips{display:none}
   .gopts button{text-align:left;font-size:12.5px;padding:9px 12px;border-radius:12px;font-weight:500;display:flex;flex-direction:column;gap:3px}
   .gopts button b{font-weight:600;font-size:13px}.gopts button span{color:var(--muted);font-weight:400;line-height:1.35}
   .gmsg.work{display:flex;align-items:center;gap:8px;color:var(--gold-hi)}.gmsg.work button{font-size:11px;padding:2px 8px;border-radius:99px}
@@ -527,6 +578,7 @@
 
   <section class="ws" id="workspace" hidden>
     <aside id="side" aria-label="Set up your home">
+      <div class="setup-head"><h2>Start with your floor plan</h2><p>Add the plan and pick a look. Mirage reads every wall, then builds and furnishes the home around it.</p></div>
       <div class="step" id="step1">
         <h3><span class="t"><i>01</i>Your floor plan</span><small id="planMeta"></small></h3>
         <label class="drop" id="planDrop">Drop your floor plan here, or tap to choose<br><small>A photo, screenshot or image of the brochure plan</small><input type="file" id="planFile" accept="image/png,image/jpeg,image/webp,image/gif"></label>
@@ -553,16 +605,23 @@
           <div class="field"><label for="seaSide">View outside</label><select id="seaSide"><option value="sea">Sea</option><option value="city">City</option><option value="garden">Garden</option></select></div>
         </div>
       </div>
-      <div class="step">
+      <div class="step" id="stepGo">
         <button class="primary gen" id="btnGen"><span id="genLabel">Design my home</span><span class="cost" id="genCost">1 credit</span></button>
         <button class="ghost" id="btnReread" style="width:100%;margin-top:6px" hidden>Read the plan again</button>
         <p class="note" id="genNote"></p>
       </div>
-      <ol id="progress" aria-live="polite"></ol>
     </aside>
+    <div id="progCard" class="gpanel" hidden>
+      <img id="progPlan" alt="Your floor plan" hidden>
+      <div class="pc-body">
+        <div class="pc-head"><b id="progTitle">Working on it</b><span><button id="progStop" type="button">Stop</button><button id="progClose" type="button" class="ghost icon" title="Hide" aria-label="Hide progress">✕</button></span></div>
+        <ol id="progress" aria-live="polite"></ol>
+        <p class="note" id="progNote"></p>
+      </div>
+    </div>
     <main>
       <div class="vtabs">
-        <button id="btnSide" aria-label="Show or hide project inputs" title="Project inputs">☰</button>
+        <button id="btnSide" aria-label="Show or hide the plan and style panel" title="Floor plan, style and redesign">☰ Plan &amp; style</button>
         <button id="tab3d" aria-pressed="true">Walk around</button>
         <button id="tabPlan" aria-pressed="false">Fix the layout</button>
         <button id="tabStyle" aria-pressed="false">Colours &amp; materials</button>
@@ -591,12 +650,15 @@
         <div id="guideFade" aria-hidden="true"></div>
         <div id="guideCap" aria-live="polite" hidden></div>
         <div id="presentBar" hidden><span class="gav" aria-hidden="true"></span><span class="pb-who"><b>Mira</b> · <span id="presentRoom">Welcome</span></span><button id="presentPause" type="button">Pause</button><button id="presentAsk" type="button">Ask</button><button id="presentEnd" type="button">End</button></div>
-        <section id="guidePanel" class="gpanel" hidden aria-label="Your guide">
-          <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Your guide · walks, answers, changes</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Close">✕</button></header>
+        <section id="guidePanel" class="gpanel" aria-label="Mira, your guide">
+          <header><span class="gav" aria-hidden="true"></span><div><b>Mira</b><small>Walks you through, answers, and changes anything</small></div><button id="guideVoice" class="ghost icon" aria-pressed="true" title="Voice on">🔊</button><button id="guideClose" class="ghost icon" title="Hide the conversation" aria-label="Hide the conversation">⌄</button></header>
           <div id="guideTourBar" hidden><span class="live"></span><span>Touring · <b id="guideStep"></b></span><button id="guidePause">Pause</button><button id="guideStop">End tour</button></div>
+          <div id="designBar" hidden><span class="live"></span><span>Designing · <b id="designStep"></b></span><button id="designSkip" type="button">Skip room</button><button id="designAuto" type="button">Finish the rest for me</button><button id="designExit" type="button">Exit</button></div>
           <div id="guideLog" role="log"></div>
-          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="vastu">Is my home Vastu compliant?</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button" data-act="fix">The plan is wrong here</button><button type="button">Show me the kitchen</button><button type="button">Make it night</button></div>
-          <form id="guideForm"><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira anything, or say what to change" aria-label="Message your guide"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
+          <button type="button" id="guideLast" hidden title="Show the conversation"></button>
+          <div id="guideActs" hidden></div>
+          <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="design">Design room by room</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button" data-act="vastu">Is it Vastu compliant?</button><button type="button" data-act="fix">The plan is wrong here</button><button type="button">Make it night</button></div>
+          <form id="guideForm"><span class="gav" aria-hidden="true"></span><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira, or say what to change: “make this room moodier”, “open up this wall”" aria-label="Message Mira"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>
         <div id="coach" class="gpanel" hidden></div>

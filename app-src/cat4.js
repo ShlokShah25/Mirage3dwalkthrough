@@ -2,6 +2,8 @@
 const hexOr = (v, d) => /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : d;
 // a surface that glows in any colour (LED strips, neon, flame, screens)
 function ledMat(c, k = 1.25) { const key = `glow:${c}:${k}`; return MC[key] ||= emis(c, c, k); }   // kept under 1.5 so the colour stays a colour and does not burn out to white
+// Faces that look down get almost no light in the scene; a little self-glow keeps timber reading as timber.
+function underLit(spec) { const key = 'under:' + spec; if (MC[key]) return MC[key]; const m = mat(spec).clone(); m.emissive = new THREE.Color(m.map ? '#ffffff' : m.color); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = .2; return MC[key] = m; }
 // the wash of light a strip throws on the wall beside it: brightest at the strip, fading out
 function haloTex(kind) {
   const key = 'halo-' + kind; if (TX[key]) return TX[key];
@@ -139,10 +141,10 @@ Object.assign(CAT, {
     } },
   'ceiling-slats': { label: 'Timber slat ceiling with light', cat: 'Structure', d: { w: 10, d: 8, h: .35, y: 9.3, finish: 'wood-dark', accent: '#ffd9a8' }, nc: true,
     build(it, ctx) {
-      const g = G(), w = it.w, d = it.d, th = Math.max(.25, ctx.H - it.y - .02), m = mat(it.finish), n = Math.max(4, Math.round(w / .5)), c = hexOr(it.accent, '#ffd9a8');
-      bx(g, w, .03, d, mat('#15110e'), 0, th - .03, 0);
+      const g = G(), w = it.w, d = it.d, th = Math.max(.25, ctx.H - it.y - .02), m = underLit(it.finish), n = Math.max(4, Math.round(w / .5)), c = hexOr(it.accent, '#ffd9a8');
+      bx(g, w, .03, d, underLit('#2b221b'), 0, th - .03, 0);
       for (let i = 0; i < n; i++) bx(g, .2, th - .03, d, m, -w / 2 + w * (i + .5) / n, 0, 0);
-      const k = Math.max(1, Math.round(n / 5)); for (let i = k; i < n; i += k) bx(g, .05, .03, d - .3, ledMat(c, 1.5), -w / 2 + w * i / n, th - .09, 0);
+      const k = Math.max(1, Math.round(n / 7)); for (let i = k; i < n; i += k) bx(g, .05, .03, d - .3, ledMat(c, 1.5), -w / 2 + w * i / n, th - .09, 0);
       return g;
     } },
   'gym-set': { label: 'Home gym set', cat: 'Work', d: { w: 9, d: 6.5, h: 5, accent: '#ff5a3c' },

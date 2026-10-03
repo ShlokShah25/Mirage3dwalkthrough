@@ -18,7 +18,6 @@ $('btnReread').onclick = () => {
 async function readPlan() {
   if (running) return; const ok = await ensureImages(); if (!ok) return;
   running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
-  if (innerWidth < 860) document.body.classList.remove('side-hidden');
   project.brief = $('brief').value; const ceiling = clamp(parseFloat($('ceilH').value) || 10, 7, 20), view = $('seaSide').value;
   const PW = project.plan.w, PH = project.plan.h, planBlob = () => dataURLtoBlob(project.plan.image);
   stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'check', label: 'Checking every wall against the drawing' }, { id: 'shell', label: 'Fitting walls to the printed sizes' }]);
@@ -132,7 +131,6 @@ async function runGenerate(ok) {
   let genId = null;
   if (SITE) { try { genId = await SITE.startGen(project); } catch (e) { flash(errText(e), true); SITE.onError?.(e); return; } SITE.ctx = { kind: 'design', genId }; }
   running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();
-  if (innerWidth < 860) document.body.classList.remove('side-hidden');
   project.brief = $('brief').value;
   const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
   const preset = presetById(project.presetId) || PRESETS[0];
@@ -349,7 +347,7 @@ async function runEdit(text, { signal } = {}) {
     if (ok) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
     const done = () => { pstatus.innerHTML = `<span>${esc(summary)}</span>${ok ? '<button type="button" id="undoNow">Undo</button>' : ''}`; $('undoNow')?.addEventListener('click', undoEdit); };
     done(); if (pinput.value.trim() === text) pinput.value = ''; renderPhist(); saveSoon();
-    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; if (innerWidth >= 860) document.body.classList.remove('side-hidden'); await refurnishRoom(r, brief || text, false); done(); }
+    for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; await refurnishRoom(r, brief || text, false); done(); }
     return { ok, n, summary, notes };
   } catch (err) {
     clearInterval(iv); const cancelled = err?.code === 'cancelled', reason = cancelled ? 'Stopped. Nothing was changed.' : errText(err);
@@ -371,7 +369,6 @@ async function teaserRoom() {
   const room = rooms.find(r => /living/i.test(r.type + ' ' + r.name)) || [...rooms].sort((a, b) => polyArea(b.polygon) - polyArea(a.polygon))[0];
   if (!room) { flash('No rooms were found to preview.', true); return; }
   running = true; ctl = new AbortController(); renderGenState();
-  if (innerWidth < 860) document.body.classList.remove('side-hidden');
   stepUI([{ id: 'teaser', label: `Designing ${room.name} as your free preview`, state: 'active' }]);
   let placed = 0;
   try {

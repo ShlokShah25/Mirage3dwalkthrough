@@ -187,6 +187,7 @@ Reply with only JSON: {"say":"what you say","actions":[...],"options":[...]} wit
 {"do":"tour"} start the full guided tour · {"do":"stop"} stop the tour
 {"do":"vastu"} show the Vastu report card (when they ask whether the home is Vastu compliant, about directions, or Vastu in general). Summarise the score and the main points in "say".
 {"do":"vastu_fix"} rearrange the home to follow Vastu without moving walls. It uses one change.
+{"do":"design_rooms"} start designing the home room by room with them (when they ask to design it themselves, room by room, or to go through the rooms one at a time).
 
 WALLS, WINDOWS AND DOORS: you may open up or remove LIGHT partition walls, and add, widen, move or remove windows and doors. STRUCTURE (outside walls, thick walls, columns) and beams stay where they are: when a light wall is opened its beam is kept. If they ask for a structural wall to go, say it is structure and offer what can be done (open a light wall, a wider window or sliding door). The first time you change a wall in a conversation, add that their engineer should confirm it before anything is broken on site. Name a wall by its id when it is in the list above, otherwise by the two rooms it stands between. One exception to acting at once: if opening a wall would expose a bathroom or take the privacy from a bedroom, say what it would mean and offer a better move (a glazed partition, a wider door, a dressing area) as options instead of doing it.
 PLAN CORRECTIONS: if they say the plan was read wrong (a wall that is not there, a room that is really bigger, a missing or misplaced door or window), that is a correction, not a renovation, and it may touch any wall. Start the request with "Plan correction:" and say exactly what is wrong and what is right.
@@ -221,7 +222,7 @@ async function tourScript() {
 }
 async function startTour() {
   if (GUIDE.touring) return; if (!layout.walls.length) return gNote('Open a designed home first.');
-  openGuide(true); GUIDE.touring = true; GUIDE.paused = false; setTourUI(true);
+  openGuide(false); GUIDE.touring = true; GUIDE.paused = false; setTourUI(true);   // the tour is watched, not read: the conversation folds away and her words show as captions
   const script = await tourScript();
   const stop = () => GUIDE.touring = false; GUIDE.stopTour = stop;
   try {
@@ -248,6 +249,8 @@ function stopTour() { if (PRES.on) return endPresent(); GUIDE.touring = false; G
 async function guideSend(text) {
   if (!text) return; if (GUIDE.busy) { GUIDE.queued = text; $('guideIn').value = ''; gNote('Got it, one moment…', 'sys'); return; } $('guideIn').value = '';
   if (PRES.on) { PRES.paused = GUIDE.paused = true; $('presentPause').textContent = 'Resume'; } else if (GUIDE.touring) stopTour();
+  if (!GUIDE.open) openGuide(true);
+  if (DES.on && DES.waiting && !/\?\s*$/.test(text) && !QUICK.test(text)) { const r = DES.waiting; gSay(text, 'you'); designThisRoom(r, `Design ${r.name}: ${text}`); return; }   // in designer mode, what they type is the brief for the room in front of them
   gSay(text, 'you'); GUIDE.busy = true; const typing = gNote('…', 'guide typing');
   try {
     const j = await guideAsk(chatPrompt(text), QUICK.test(text) && text.length < 60 ? 'guide' : 'guide_pro');
@@ -269,6 +272,7 @@ async function runAction(a) {
   else if (a.do === 'stop') stopTour();
   else if (a.do === 'real') { if (SITE?.renderReal) SITE.renderReal(); else gNote('Photo-real renders are available on mirage.', 'sys'); }
   else if (a.do === 'edit' && a.request) guideEdit(a.request);   // not awaited: she can keep talking while the change is made
+  else if (a.do === 'design_rooms') startDesigner();
   else if (a.do === 'vastu') await showVastu(true);
   else if (a.do === 'vastu_fix') await vastuFix();
 }
@@ -284,7 +288,7 @@ function guideEdit(request) {
   ent.job = requestEdit(request, { signal: ac.signal }).then(r => {
     clearInterval(iv); GUIDE.edits = GUIDE.edits.filter(e => e !== ent); note.remove();
     const pw = r.paywall, why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw === 'credits' ? 'There are not enough credits for a change.' : pw && pw !== 'blocked' ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : '';
-    if (r.ok) { gNote(`✓ ${r.summary || 'Changed.'}`, 'sys'); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
+    if (r.ok) { document.querySelectorAll('#guideLog .gundo').forEach(b => b.remove()); const n = gNote(`✓ ${r.summary || 'Changed.'} `, 'sys'), u = document.createElement('button'); u.type = 'button'; u.className = 'gundo'; u.textContent = 'Undo'; u.onclick = () => { undoEdit(); u.remove(); gNote('Undone.', 'sys'); }; n.append(u); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
     else if (why) { gNote(why, 'sys'); gSpeak(why); }
     else if (r.cancelled) gNote('Stopped. Nothing was changed.', 'sys');
     else { const t = r.summary || r.reason || 'Nothing was changed.'; gSay(t); gSpeak(t); }
@@ -293,19 +297,133 @@ function guideEdit(request) {
   GUIDE.edits.push(ent); return ent.job;
 }
 
+/* ---------- interior designer mode: the bare shell, designed room by room with Mira ---------- */
+const DES = { on: false, rooms: [], i: 0, waiting: null, genId: null, pre: new Map() };
+const roomBare = r => !layout.furniture.some(it => it.room === r.name && CAT[it.type]);
+function designerPrompt(r) {
+  const P = profile(), done = layout.rooms.filter(x => x !== r && !roomBare(x) && x.kind !== 'ledge').map(x => `${x.name}: ${layout.furniture.filter(it => it.room === x.name && CAT[it.type]).slice(0, 5).map(it => (it.name || CAT[it.type].label).toLowerCase()).join(', ')}`).join('\n');
+  return `You are ${GUIDE_NAME}, the designer and guide inside Mirage. You are designing a client's new home with them, one room at a time, in a live 3D model. The room in front of you is empty. Offer four complete, different concepts for it; the client picks one or describes their own, and the furnishing engine builds it.
+HOME: ${project.name || 'the home'}. Chosen style: ${project.style?.summary || ''}
+${P.done ? 'THE CLIENT: ' + spaceText() + ' Budget: ' + (BUDGETS[P.budget]?.name || '') + '.' : ''}${project.brief ? '\nTHEIR NOTES: ' + String(project.brief).slice(0, 500) : ''}
+${describeRoom(roomFrame(r), false)}
+${done ? 'ROOMS ALREADY DESIGNED (keep the home feeling like one home):\n' + done + '\n' : ''}
+Think like a principal at a top studio pitching to a client with taste, not like a furniture catalogue. Each concept is a point of view:
+- what the room is for and how it is laid out: which wall the main piece goes on, what faces the window or the door, where people walk;
+- a signature move: a statement piece, a feature wall, a ceiling or lighting scheme;
+- a palette and two or three real materials, named;
+- layered light: cove or wall wash, an accent, and a pendant, sconce or lamp.
+The first concept follows the home's chosen style closely. The others may differ in mood but must sit well with the rooms already designed. One should be bold. For a kitchen or bathroom, keep the room what it is and vary the layout, materials and light. Pitch at the client's budget.
+PIECES THE ENGINE CAN BUILD (any finish or colour): ${Object.values(CAT).map(c => c.label.toLowerCase()).filter((v, i, a) => a.indexOf(v) === i).join(', ')}.
+Reply with only JSON: {"say":"one warm sentence, read aloud, that names the best thing about this room and invites them to pick","options":[{"label":"an evocative name, at most five words","why":"one line, at most 16 words, on how it will feel","request":"the full brief for the furnishing engine, 60 to 120 words: the layout by wall, the key pieces with finishes and colours, the lighting, the signature piece"}]}`;
+}
+function setDesignUI() {
+  const r = DES.rooms[DES.i]; $('designBar').hidden = !DES.on; $('guidePanel').classList.toggle('designing', DES.on);
+  if (DES.on) $('designStep').textContent = r ? `${r.name} · ${DES.i + 1} of ${DES.rooms.length}` : 'finishing';
+  if (!DES.on) guideActions([]);
+}
+// the next steps, as buttons in the dock itself: they stay in reach when the conversation is folded away to show the room
+function guideActions(list) {
+  const el = $('guideActs'); el.innerHTML = ''; el.hidden = !list.length;
+  list.forEach((o, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = o.label; if (!i) b.className = 'primary'; b.onclick = () => { guideActions([]); gSay(o.label, 'you'); o.go(); }; el.append(b); });
+}
+function designConcepts(r) { if (!DES.pre.has(r.name)) DES.pre.set(r.name, guideAsk(designerPrompt(r), 'guide_pro').catch(() => null)); return DES.pre.get(r.name); }
+async function startDesigner() {
+  if (DES.on) return; if (!layout.walls.length) return gNote('Add your floor plan first, then we can design it together.');
+  if (running) return gNote('A design is still being made. We can go room by room as soon as it finishes.');
+  const rooms = tourRooms().filter(roomBare);
+  openGuide(true);
+  if (!rooms.length) { const t = 'Every room is already designed. Walk into any room and ask me for ideas, and I will redo it with you.'; gSay(t); gSpeak(t); return; }
+  if (!profile().done && !(await askProfile())) return;
+  if (SITE) { if (!(await SITE.canDesign?.(project))) return; try { DES.genId = await SITE.startGen(project); } catch (e) { gNote(errText(e), 'sys'); SITE.onError?.(e); return; } }
+  if (!layout.furniture.length) {   // the shell takes on the chosen style before the first room
+    const preset = presetById(project.presetId) || PRESETS[0]; if (!project.customStyle) project.style = normalizeStyle(structuredClone(preset.style));
+    layout.settings.timeOfDay = project.style.time; applyStyleToRooms(layout, project.style); for (const k in MC) delete MC[k]; buildAll(); renderStyle();
+  }
+  if (GUIDE.touring) stopTour();
+  DES.on = true; DES.rooms = rooms; DES.i = 0; DES.pre = new Map();
+  const hi = `Let us design your home together, ${rooms.length} room${rooms.length > 1 ? 's' : ''}, one at a time. For each room I will show you a few directions: pick one, or tell me what you want.`; gSay(hi); gSpeak(hi);
+  designRoom();
+}
+async function designRoom() {
+  const r = DES.rooms[DES.i]; setDesignUI(); if (!DES.on) return; if (!r) return finishDesigner(false);
+  DES.waiting = null; guideActions([]); const typing = gNote('…', 'guide typing');
+  const [j] = await Promise.all([designConcepts(r), goToRoom(r)]); typing.remove();
+  if (!DES.on || DES.rooms[DES.i] !== r) return;
+  const nxt = DES.rooms[DES.i + 1]; if (nxt) designConcepts(nxt);     // the next room's ideas are ready by the time this one is built
+  const opts = (Array.isArray(j?.options) ? j.options : []).filter(o => o?.label && o?.request).slice(0, 4);
+  const line = String(j?.say || '').slice(0, 400) || `This is the ${r.name.toLowerCase()}, ${gRoomSize(r).replace(' × ', ' by ')}. Tell me how you want it to feel.`;
+  gSay(line); gSpeak(line); DES.waiting = r;
+  if (opts.length) designOptions(opts.map(o => ({ label: o.label, why: o.why, go: () => designThisRoom(r, `Design ${r.name}: ${o.request}`, o.label) })));
+  else gNote('Describe the room you want in the box below, and I will build it.', 'sys');
+}
+// a row of choices in the conversation; each runs its own action once
+function designOptions(list) {
+  const el = document.createElement('div'); el.className = 'gopts';
+  el.innerHTML = list.map((o, i) => `<button type="button" data-i="${i}"><b>${esc(String(o.label).slice(0, 60))}</b>${o.why ? `<span>${esc(String(o.why).slice(0, 140))}</span>` : ''}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { const o = list[+b.dataset.i]; el.querySelectorAll('button').forEach(x => x.disabled = true); b.classList.add('chosen'); gSay(o.label, 'you'); o.go(); });
+  if (!GUIDE.open) openGuide(true); const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
+}
+async function designThisRoom(r, brief) {
+  if (running) return gNote('One moment, the last room is still being built.', 'sys');
+  DES.waiting = null; guideActions([]); const note = gNote(`Building ${r.name}…`, 'sys work'); let placed = 0;
+  openGuide(false);   // step back and let them watch the room come together; progress shows at the top
+  running = true; ctl = new AbortController(); stepUI([{ id: 'refurn', label: 'Designing ' + r.name, state: 'active' }]);
+  try {
+    if (SITE) SITE.ctx = DES.genId ? { kind: 'design', genId: DES.genId } : { kind: 'refurnish', homeId: project.id };
+    removeItemsWhere(it => it.room === r.name); select(null);
+    placed = (await furnishRooms([r], ctl.signal, 'refurn', brief)).placed;
+  } catch (e) { if (e?.code !== 'cancelled') gNote(errText(e), 'sys'); }
+  finally { running = false; note.remove(); saveSoon(); }
+  if (placed > 0) { project.status = 'generated'; project.generatedAt ||= Date.now(); project.tour = null; setTimeout(captureCover, 600); await goToRoom(r, { cut: false }); }
+  if (!DES.on) return;
+  const nxt = DES.rooms[DES.i + 1], t = placed > 0 ? `${r.name} is done. Look around: if something is not right, tell me and I will change it.` : `I could not build ${r.name} that way. Try another direction, or skip it for now.`;
+  gSay(t); gSpeak(t); DES.waiting = placed > 0 ? null : r;
+  if (placed > 0) openGuide(false);   // fold the conversation away so the room they just designed is what they see
+  guideActions([
+    ...(placed > 0 ? [{ label: nxt ? `Next room: ${nxt.name}` : 'Finish the home', go: () => { DES.i++; designRoom(); } }] : []),
+    { label: placed > 0 ? 'Try another look for this room' : 'Show me the directions again', go: () => { DES.pre.delete(r.name); designRoom(); } },
+    ...(placed > 0 ? [] : [{ label: 'Skip this room', go: () => { DES.i++; designRoom(); } }]),
+  ]);
+}
+// the rooms nobody needs to choose for (passages, utility, small baths), or everything that is left when they say "finish it for me"
+async function finishDesigner(all) {
+  const left = layout.rooms.filter(r => r.kind !== 'ledge' && r.type !== 'other' && r.polygon?.length > 2 && roomBare(r) && (all || !DES.rooms.includes(r)));
+  DES.waiting = null; DES.i = DES.rooms.length; setDesignUI();
+  if (left.length && !running) {
+    const t = all ? 'I will finish the rest of the home in the same spirit.' : 'I will finish the passages and small rooms to match.'; gSay(t); gSpeak(t);
+    running = true; ctl = new AbortController(); stepUI([{ id: 'refurn', label: all ? 'Designing the rest of the home' : 'Finishing passages and small rooms', state: 'active' }]);
+    try { if (SITE) SITE.ctx = DES.genId ? { kind: 'design', genId: DES.genId } : { kind: 'refurnish', homeId: project.id }; const { placed } = await furnishRooms(left, ctl.signal, 'refurn', ''); if (placed) project.status = 'generated'; }
+    catch (e) { if (e?.code !== 'cancelled') gNote(errText(e), 'sys'); }
+    finally { running = false; saveSoon(); }
+  }
+  endDesigner(layout.furniture.length ? 'That is your home, designed by you. Walk through it, ask me for a tour, or tell me anything you want changed.' : '');
+}
+function endDesigner(say) {
+  const was = DES.on; DES.on = false; DES.waiting = null; setDesignUI();
+  if (SITE && DES.genId) { SITE.finishGen?.(DES.genId); DES.genId = null; }
+  if (was) { renderGenState(); renderPresets?.(); saveSoon(); setTimeout(captureCover, 800); if (say) { gSay(say); gSpeak(say); } }
+}
+$('designSkip').onclick = () => { if (running || !DES.on) return; gNote(`Skipped ${DES.rooms[DES.i]?.name || 'this room'}.`, 'sys'); DES.i++; designRoom(); };
+$('designAuto').onclick = () => { if (!running && DES.on) finishDesigner(true); };
+$('designExit').onclick = () => { if (running) ctl?.abort(); endDesigner('We can pick this up again whenever you like: tap Design room by room.'); };
+
 /* ---------- panel ---------- */
 function gSay(text, who = 'guide') { GUIDE.hist.push({ who, text }); if (GUIDE.hist.length > 30) GUIDE.hist.shift(); return gNote(text, who); }
 function gNote(text, cls = 'guide') {
-  const el = document.createElement('div'); el.className = 'gmsg ' + cls; el.textContent = text; const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight; return el;
+  const el = document.createElement('div'); el.className = 'gmsg ' + cls; el.textContent = text; const log = $('guideLog'); log.appendChild(el); log.scrollTop = log.scrollHeight;
+  if (text && !/typing|work/.test(cls)) { const last = $('guideLast'); last.textContent = (cls === 'you' ? 'You: ' : cls === 'guide' ? GUIDE_NAME + ': ' : '') + text; last.hidden = false; }   // the last line stays readable when the conversation is folded away
+  return el;
 }
 function setTourUI(on) { $('guideTourBar').hidden = !on; $('guideTour').hidden = on; if (!on) $('guideStep').textContent = ''; $('guidePause').textContent = 'Pause'; }
 function openGuide(v = !GUIDE.open) {
-  GUIDE.open = v; $('guidePanel').hidden = !v; document.body.classList.toggle('guide-open', v); $('btnGuide').setAttribute('aria-pressed', v);
+  // the dock (chips and the box to type in) is always there; "open" unfolds the conversation above it
+  GUIDE.open = v; $('guidePanel').classList.toggle('open', v); document.body.classList.toggle('guide-open', v); $('btnGuide').setAttribute('aria-pressed', v);
   if (v && !$('guideLog').children.length) gNote(`Hi, I'm ${GUIDE_NAME}. I can walk you through this home, give you ideas, and change anything: furniture, colours, lighting, even a light wall or a window. If the plan was read wrong, tell me and I'll correct it.`);
-  if (v) setTimeout(() => $('guideIn').focus(), 50); else hush();
+  if (v) { const log = $('guideLog'); log.scrollTop = log.scrollHeight; }
 }
+$('guideLast').onclick = () => openGuide(true);
 $('btnGuide').onclick = () => openGuide();
-$('guideClose').onclick = () => { stopTour(); openGuide(false); };
+$('guideClose').onclick = () => openGuide(false);
 
 $('guideStop').onclick = () => stopTour();
 $('guidePause').onclick = () => { GUIDE.paused = !GUIDE.paused; $('guidePause').textContent = GUIDE.paused ? 'Resume' : 'Pause'; if (GUIDE.paused) window.speechSynthesis?.pause(); else window.speechSynthesis?.resume(); };
@@ -316,6 +434,7 @@ $('guideIn').addEventListener('keydown', e => e.stopPropagation());
 $('guideChips').querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.act === 'tour' || b.dataset.act === 'fly' ? startTour()
   : b.dataset.act === 'vastu' ? (gSay(b.textContent, 'you'), showVastu())
   : b.dataset.act === 'fix' ? (() => { const i = $('guideIn'); i.value = 'The plan was read wrong: '; i.focus(); i.setSelectionRange(i.value.length, i.value.length); gNote('Tell me what is different in the real plan: a wall that is not there, a room that is bigger, a missing door or window. I will correct the drawing.', 'guide'); })()
+  : b.dataset.act === 'design' ? startDesigner()
   : b.dataset.act === 'ideas' ? guideSend(`Give me your best ideas for ${roomAt(player.x, player.z)?.name || 'this room'}.`)
   : guideSend(b.textContent));
 // the guide stops driving the moment you take the controls

@@ -122,7 +122,7 @@ function showHome() {
 }
 function openProject(p) {
   $('home').hidden = true; $('workspace').hidden = false; $('crumbs').hidden = false; document.querySelectorAll('.ws-only').forEach(e => e.hidden = false);
-  if (innerWidth < 860 && p.layout?.walls?.length) document.body.classList.add('side-hidden'); else document.body.classList.remove('side-hidden');
+  document.body.classList.toggle('side-hidden', !!p.layout?.walls?.length);   // a home that exists opens on the home itself; the plan and style panel is one tap away
   hero.stop(); activeView = '3d'; loadProject(p); showView('3d'); resize(); setTimeout(maybeCoach, 600);
 }
 async function renderHome() {
@@ -257,6 +257,26 @@ const ERR = {
 };
 const errText = e => (SITE && e?.message && e.code !== 'cancelled' ? e.message : null) || ERR[e?.code] || (e?.code === 'cancelled' ? 'Stopped.' : 'Something went wrong talking to Claude. Try again.');
 let ctl = null, running = false;
-function stepUI(list) { $('progress').innerHTML = list.map(s => `<li id="st-${s.id}" class="${s.state || ''}"><span class="dot"></span><div>${esc(s.label)}<small></small></div></li>`).join(''); }
+// What the page is doing decides what is in the middle of it: a new home shows the setup steps across the whole page,
+// reading or designing shows the progress card, and a finished home shows the home. Checked every frame; cheap.
+let stageKey = '', runEnd = -1e9, progHidden = false;
+function syncStage() {
+  if (!project || $('workspace').hidden) return;
+  const setup = !layout.walls.length, busy = !!running, now = performance.now();
+  if (busy) { runEnd = now; progHidden = false; }
+  const list = $('progress'), has = list.childElementCount > 0, err = has && !!list.querySelector('li.error');
+  const show = has && !progHidden && (busy || err || (!setup && now - runEnd < 7000));
+  const key = `${setup}|${busy}|${show}|${setup && project.plan?.image ? project.plan.image.length : 0}`; if (key === stageKey) return;
+  const was = stageKey.split('|')[0]; stageKey = key;
+  document.body.classList.toggle('setup', setup); document.body.classList.toggle('busy', busy);
+  if (was === 'true' && !setup) { document.body.classList.add('side-hidden'); setTimeout(() => resize(), 30); }
+  $('progCard').hidden = !show; $('progStop').hidden = !busy; $('progClose').hidden = busy;
+  $('progTitle').textContent = busy ? (setup ? 'Reading your floor plan' : 'Working on your home') : err ? 'Something needs a look' : 'Done';
+  $('progNote').textContent = !busy ? '' : setup ? 'Every wall is checked against your drawing, so this takes a few minutes. Keep this tab open.' : 'Rooms appear as they are finished. You can walk around while it works.';
+  const im = $('progPlan'); im.hidden = !(setup && project.plan?.image); if (!im.hidden && im.src !== project.plan.image) im.src = project.plan.image;
+}
+$('progClose').onclick = () => { progHidden = true; stageKey = ''; };
+$('progStop').onclick = () => { if (running) ctl?.abort(); };
+function stepUI(list) { runEnd = performance.now(); progHidden = false; stageKey = ''; $('progress').innerHTML = list.map(s => `<li id="st-${s.id}" class="${s.state || ''}"><span class="dot"></span><div>${esc(s.label)}<small></small></div></li>`).join(''); }
 function stepSet(id, state, note) { const li = $('st-' + id); if (!li) return; if (state) li.className = state; if (note != null) li.querySelector('small').textContent = note; }
 function ticker(id, verb) { const t0 = performance.now(); let chars = 0; const iv = setInterval(() => stepSet(id, null, `${verb}… ${Math.round((performance.now() - t0) / 1000)}s${chars ? ' · ' + (chars / 1000).toFixed(1) + 'k characters' : ''}`), 1000); return { onText: ({ text }) => { chars = text.length; }, stop: () => clearInterval(iv) }; }
