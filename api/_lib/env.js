@@ -41,11 +41,15 @@ export const MODELS = {
   fast: () => env('MODEL_FAST', 'claude-haiku-4-5-20251001'),
 };
 
-export const LIMITS = { promptChars: 200000, images: 8, imageChars: 5_000_000 };
+export const LIMITS = { promptChars: 200000, images: 10, imageChars: 5_000_000 };
+// The deep plan read: after the first reading, Claude checks its tracing against the drawing in rounds (close-ups, measured
+// lines, printed sizes) until the checks pass. Each round is one call to the strongest model with up to ten images.
+// PLAN_DEEP_ROUNDS sets how many rounds a plan may take (0 turns the deep read off; the quick second look is used instead).
+export const DEEP = { rounds: () => Math.max(0, Math.min(8, Number(env('PLAN_DEEP_ROUNDS', 5)) || 0)) };
 
 export function publicConfig(launch) {
   return {
-    launch, free: freeMode(), guest: guestMode(),
+    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(),
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

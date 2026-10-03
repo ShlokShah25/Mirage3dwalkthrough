@@ -14,7 +14,7 @@ globalThis.__MIRAGE_SITE = (() => {
   };
 
   S.sample = {
-    async limits() { return { maxPromptBytes: 160000, images: { maxCount: 4, maxInputBytes: 2e7, mediaTypes: ['image/jpeg', 'image/png', 'image/webp'] } }; },
+    async limits() { return { maxPromptBytes: 160000, images: { maxCount: 10, maxInputBytes: 2e7, mediaTypes: ['image/jpeg', 'image/png', 'image/webp'] } }; },
     async json(prompt, opts = {}) {
       await S.ensureAuth?.();
       const imgs = opts.images == null ? [] : Array.isArray(opts.images) ? opts.images : [opts.images];

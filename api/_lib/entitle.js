@@ -1,6 +1,6 @@
 // Who may do what, and what it costs them. All checks run on the server.
 import { db, cas } from './db.js';
-import { PRICING, FREE, freeMode } from './env.js';
+import { PRICING, FREE, DEEP, freeMode } from './env.js';
 import { HttpError } from './http.js';
 
 const now = () => new Date();
@@ -102,6 +102,15 @@ export async function allowPlanCheck(uid, homeId, hash) {
   const home = await ownHome(uid, homeId);
   if (home.plan_hash !== hash) throw new HttpError(409, 'no_plan', 'Read the floor plan first.');
   if (await dailyCount(uid, 'plan_check') >= PRICING.free.planReadsPerDay * 2) throw new HttpError(429, 'rate_limited', 'You have read a lot of plans today. Try again tomorrow.');
+  return home;
+}
+
+// one round of the deep read of the plan just read: same home, same image, a bounded number of rounds a day
+export async function allowPlanDeep(uid, homeId, hash) {
+  if (!DEEP.rounds()) throw new HttpError(403, 'not_available', 'The deep plan read is turned off.');
+  const home = await ownHome(uid, homeId);
+  if (home.plan_hash !== hash) throw new HttpError(409, 'no_plan', 'Read the floor plan first.');
+  if (await dailyCount(uid, 'plan_deep') >= PRICING.free.planReadsPerDay * DEEP.rounds()) throw new HttpError(429, 'rate_limited', 'You have read a lot of plans today. Try again tomorrow.');
   return home;
 }
 

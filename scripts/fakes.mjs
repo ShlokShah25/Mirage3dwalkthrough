@@ -14,6 +14,8 @@ export const calls = [];
 function answer(prompt) {
   if (prompt.startsWith('You are an architectural draftsperson')) return TRACE;
   if (prompt.startsWith('You are checking a tracing')) return { ...TRACE, changes: [] };
+  if (prompt.startsWith('You are correcting a tracing') && process.env.MOCK_DEEP) { try { return JSON.parse(readFileSync(`${process.env.MOCK_DEEP}/answer-round-${prompt.match(/round (\d+) of/)[1]}.json`)); } catch { return { edits: [], dismiss: [], done: true }; } }   // MOCK_DEEP=dir replays saved deep-read answers
+  if (prompt.startsWith('You are correcting a tracing')) return /round 1 of/.test(prompt) ? { edits: [], dismiss: [...prompt.matchAll(/^- \[([^\]]+)\]/gm)].map(m => ({ id: m[1], why: 'test' })), zoom: [], ask: [], notes: 'looked at everything', done: false } : { edits: [], dismiss: [], zoom: [], ask: [], notes: 'nothing to change', done: true };
   if (prompt.startsWith('You are an interior designer. The image')) return { summary: 'x', tokens: {}, floors: {} };
   if (/the guide inside Mirage/.test(prompt)) return /Write the script for a guided tour/.test(prompt) ? { intro: 'Welcome.', stops: [...prompt.matchAll(/^(.+?) \((\w+)/gm)].slice(0, 3).map(m => ({ room: m[1], say: `This is the ${m[1]}.`, look: '' })), outro: 'Ask me anything.' } : /lounge chair by the window/.test(prompt) ? { say: 'Adding a leather lounge chair by the window.', actions: [{ do: 'edit', request: 'Add a leather lounge chair by the window in the Master Bedroom' }] } : { say: 'Here is the kitchen.', actions: [{ do: 'go', room: 'Kitchen' }] };
   if (prompt.startsWith('You are editing')) return /NOOP/.test(prompt) ? { summary: 'Nothing to change.', ops: [] } : { summary: 'Switched to night.', ops: [{ op: 'time', value: 'night' }] };

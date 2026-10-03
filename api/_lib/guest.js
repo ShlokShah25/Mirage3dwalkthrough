@@ -1,7 +1,7 @@
 // Guests (no sign-in) are handled without the database: limits live in this server's memory and reset each day
 // (or when the server restarts). Nothing about a guest is stored; their homes stay in their own browser.
 import { randomUUID } from 'node:crypto';
-import { PRICING, FREE, GUEST, MODELS } from './env.js';
+import { PRICING, FREE, GUEST, MODELS, DEEP } from './env.js';
 import { HttpError } from './http.js';
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -14,6 +14,7 @@ const bump = k => counts.set(k, used(k) + 1);
 const CAPS = () => ({
   plan_read: [PRICING.free.planReadsPerDay, GUEST.sitePlanReadsPerDay, 'plans read'],
   plan_check: [PRICING.free.planReadsPerDay * 2, GUEST.sitePlanReadsPerDay * 2, 'plans read'],
+  plan_deep: [PRICING.free.planReadsPerDay * DEEP.rounds(), GUEST.sitePlanReadsPerDay * DEEP.rounds(), 'plans read'],
   design: [FREE.designsPerDay, GUEST.siteDesignsPerDay, 'designs'],
   edit: [FREE.changesPerDay, GUEST.siteDesignsPerDay * 20, 'changes'],
   guide: [PRICING.guide.paidPerDay, 20000, 'messages to Mira'],
@@ -50,6 +51,10 @@ export function authorizeGuest(user, b) {
     case 'plan_check':
       if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
       take(uid, 'plan_check'); return { homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high', onFail: () => giveBack(uid, 'plan_check') };
+    case 'plan_deep':
+      if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
+      if (!DEEP.rounds()) throw new HttpError(403, 'not_available', 'The deep plan read is turned off.');
+      take(uid, 'plan_deep'); return { homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high', onFail: () => giveBack(uid, 'plan_deep') };
     case 'teaser': take(uid, 'edit'); return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
     case 'style': case 'design': {
       const g = gens.get(b.genId);

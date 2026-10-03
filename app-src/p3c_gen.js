@@ -21,7 +21,7 @@ async function readPlan() {
   if (innerWidth < 860) document.body.classList.remove('side-hidden');
   project.brief = $('brief').value; const ceiling = clamp(parseFloat($('ceilH').value) || 10, 7, 20), view = $('seaSide').value;
   const PW = project.plan.w, PH = project.plan.h, planBlob = () => dataURLtoBlob(project.plan.image);
-  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'check', label: 'Checking the tracing against the drawing' }, { id: 'shell', label: 'Fitting walls to the printed sizes' }]);
+  stepUI([{ id: 'plan', label: 'Reading the floor plan', state: 'active' }, { id: 'check', label: 'Checking every wall against the drawing' }, { id: 'shell', label: 'Fitting walls to the printed sizes' }]);
   let done = false;
   try {
     const tp = ticker('plan', 'Tracing walls and rooms');
@@ -30,9 +30,21 @@ async function readPlan() {
     let tr = first; const r1 = refineTrace(tr, P);
     const fixed1 = [r1.stats.dropped ? `${r1.stats.dropped} traced wall${r1.stats.dropped > 1 ? 's' : ''} not on the drawing removed` : '', r1.stats.added ? `${r1.stats.added} undrawn gap${r1.stats.added > 1 ? 's' : ''} opened` : ''].filter(Boolean).join(', ');
     stepSet('plan', 'done', `${(tr.walls || []).length} walls, ${(tr.openings || []).length} openings, ${(tr.rooms || []).length} rooms; ${r1.stats.snapped} walls matched to the drawing${fixed1 ? '; ' + fixed1 : ''}`);
-    // second look: Claude compares its tracing, drawn over the plan, with the plan itself
     stepSet('check', 'active');
-    try {
+    // The deep read: Claude goes over its tracing against the drawing in passes, with close-ups, measured lines and the
+    // printed room sizes, until every check passes. It takes a few minutes and is what makes the walls trustworthy.
+    const deepRounds = SITE ? (SITE.cfg?.deepRounds ?? 5) : 5, deepOK = deepRounds > 0 && ok.max >= 5; let deep = null, tk = null;
+    if (deepOK) try {
+      deep = await deepRead({ tr, P, src: project.plan.image, sample: ok.sample, signal, maxRounds: deepRounds, maxImages: Math.min(10, ok.max),
+        ctx: () => { if (SITE) SITE.ctx = { kind: 'plan_deep', homeId: project.id }; },
+        onRound: ({ round, maxRounds, audit }) => { tk?.stop(); tk = ticker('check', `Pass ${round} of up to ${maxRounds}: ${round === 1 ? 'going over every wall, door and window' : `${audit.open.length} thing${audit.open.length === 1 ? '' : 's'} left to settle`}`); } });
+      tk?.stop(); tr = deep.tr;
+      if (deep.asks.length) { stepSet('check', null, 'A quick question for you'); for (const [q, a] of deep.asks.entries()) { const ans = await askAboutPlan(a, q, deep.asks.length); if (signal.aborted) throw Object.assign(new Error('Stopped.'), { code: 'cancelled' }); if (ans) applyAnswer(tr, a[ans], deep.SEGS, P); } }
+      const left = deep.audit.open, fixedN = deep.log.filter(l => /moved|added|changed|removed|re-outlined/.test(l) && !/were undone/.test(l)).length;
+      stepSet('check', 'done', `${deep.rounds} pass${deep.rounds === 1 ? '' : 'es'}${fixedN ? ', corrections made' : ''}: ${left.length ? `${left.length} thing${left.length === 1 ? '' : 's'} still to look at` : 'every check passes'}${deep.audit.parts.sized ? `; ${deep.audit.parts.sizedOk} of ${deep.audit.parts.sized} sized rooms measure what the plan prints` : ''}`);
+    } catch (e) { tk?.stop(); if (e?.code === 'cancelled') throw e; deep = null; stepSet('check', 'error', errText(e) + ' Kept the first reading.'); }
+    // without it (turned off, or this view cannot send enough images): one second look at the whole plan
+    else try {
       const tc = ticker('check', 'Comparing the tracing with the plan');
       if (SITE) SITE.ctx = { kind: 'plan_check', homeId: project.id };
       const overlay = await traceOverlay(project.plan.image, tr);
@@ -53,6 +65,8 @@ async function readPlan() {
     if (!res.layout.walls.length) { stepSet('shell', 'error', 'No walls could be traced.'); res.warns.forEach(w => flash(w, true)); flash('The plan could not be traced. Try a cleaner image with walls, doors and windows only.', true); return; }
     const off = (fit?.report || []).filter(r => r.after.some((v, i) => v != null && Math.abs(v - r.printed[i]) > .17));
     if (off.length) res.warns.push(`${off.map(r => r.room).join(', ')}: the drawing and its printed size disagree; check ${off.length > 1 ? 'them' : 'it'} in Fix the layout.`);
+    if (deep?.audit.open.length) res.warns.push(`Worth a look in Fix the layout: ${[...new Set(deep.audit.open.map(plainIssue))].slice(0, 3).join('; ')}.`);
+    project.plan.review = deep ? { score: deep.audit.score, first: deep.first, rounds: deep.rounds, open: deep.audit.open.map(i => ({ kind: i.kind, text: plainIssue(i), box: i.box })) } : null;
     project.plan.s = res.s; project.plan.ox = 0; project.plan.oy = 0; project.plan.fit = fit ? { conv: fit.conv, used: fit.used, total: fit.total } : null;
     const keep = new Set(res.layout.rooms.map(r => r.name));
     for (const k of Object.keys(project.roomInspo || {})) if (!keep.has(k)) { delete project.roomInspo[k]; delete project.roomStyles?.[k]; }
@@ -63,6 +77,28 @@ async function readPlan() {
     res.warns.forEach(w => flash(w, true)); done = true; saveSoon();
   } catch (e) { if (e?.code === 'cancelled') flash('Stopped.', true); else flash(errText(e), true); }
   finally { running = false; renderUploads(); if (done) (SITE ? SITE.afterPlanRead?.() : askRoomInspo()); }
+}
+// one tap settles what the drawing alone could not: the plan is shown close up where the question is
+function askAboutPlan(a, n, total) {
+  return new Promise(async resolve => {
+    let pic = '';
+    try {
+      const im = await loadImg(project.plan.image), W = im.naturalWidth, H = im.naturalHeight, b = a.box && a.box.every(Number.isFinite) ? a.box : [0, 0, W, H];
+      const pad = Math.max(40, (b[2] - b[0]) * .7, (b[3] - b[1]) * .7), x0 = clamp(b[0] - pad, 0, W - 2), y0 = clamp(b[1] - pad, 0, H - 2), x1 = clamp(b[2] + pad, x0 + 2, W), y1 = clamp(b[3] + pad, y0 + 2, H);
+      const z = Math.min(5, 900 / (x1 - x0), 620 / (y1 - y0)), c = document.createElement('canvas'); c.width = Math.round((x1 - x0) * z); c.height = Math.round((y1 - y0) * z);
+      const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+      if (a.box) { g.strokeStyle = '#1FB8A6'; g.lineWidth = 3; g.setLineDash([10, 6]); g.strokeRect((b[0] - x0) * z, (b[1] - y0) * z, (b[2] - b[0]) * z, (b[3] - b[1]) * z); }
+      pic = c.toDataURL('image/jpeg', .88);
+    } catch { }
+    let settled = false;
+    const m = modal(`<div class="eyebrow">One quick question${total > 1 ? ` · ${n + 1} of ${total}` : ''}</div><h2>${esc(a.q)}</h2>
+      <p class="lead">This could not be told from the drawing alone. Your answer goes straight into the walls.</p>
+      ${pic ? `<img src="${pic}" alt="The part of your plan the question is about" style="display:block;max-width:100%;max-height:46vh;border-radius:10px;margin:4px auto 16px">` : ''}
+      <div class="mact"><button data-a="">Not sure</button><button data-a="no">No</button><button class="primary" data-a="yes">Yes</button></div>`, { wide: true });
+    const end = v => { if (settled) return; settled = true; mo.disconnect(); resolve(v); m.close(); };
+    const mo = new MutationObserver(() => { if (!m.el.isConnected) end(null); }); mo.observe($('modalRoot'), { childList: true });
+    m.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => end(b.dataset.a || null));
+  });
 }
 function askRoomInspo() {
   const n = inspRooms().length;
@@ -92,7 +128,7 @@ async function requestGenerate() {
   m.el.querySelector('#editBrief').onclick = async () => { m.close(); if (await askProfile()) requestGenerate(); };
 }
 async function runGenerate(ok) {
-  const { sample, max } = ok;
+  const { sample } = ok, max = Math.min(ok.max, 4);
   let genId = null;
   if (SITE) { try { genId = await SITE.startGen(project); } catch (e) { flash(errText(e), true); SITE.onError?.(e); return; } SITE.ctx = { kind: 'design', genId }; }
   running = true; ctl = new AbortController(); const signal = ctl.signal; renderGenState();

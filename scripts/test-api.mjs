@@ -82,6 +82,11 @@ r = await ai(A, { kind: 'plan_check', homeId: 'h1', prompt: 'You are checking a 
 assert.ok(r.done && r.json.walls.length > 0); ok('a second look at the plan just read is allowed');
 r = await ai(A, { kind: 'plan_check', homeId: 'h1', prompt: 'You are checking a tracing', images: [IMG2, IMG] });
 assert.equal(r.status, 409); ok('a second look needs the same plan image');
+r = await ai(A, { kind: 'plan_deep', homeId: 'h1', prompt: 'You are correcting a tracing of a residential floor plan. This is round 1 of up to 5.\n- [size:Bedroom] off\n- [ink:H3] loose', images: [IMG, IMG2, IMG2, IMG2, IMG2, IMG2, IMG2, IMG2, IMG2, IMG2] });
+assert.ok(r.done && Array.isArray(r.json.edits)); assert.deepEqual(r.json.dismiss.map(d => d.id), ['size:Bedroom', 'ink:H3']); assert.equal(calls.at(-1).images, 10); assert.equal(calls.at(-1).model, 'claude-opus-5-5'); ok('a deep-read round takes the plan and nine more images on the strongest model');
+r = await ai(A, { kind: 'plan_deep', homeId: 'h1', prompt: 'You are correcting a tracing', images: [IMG2, IMG] }); assert.equal(r.status, 409); ok('a deep-read round needs the plan that was read as its first image');
+r = await ai(A, { kind: 'plan_deep', homeId: 'h1', prompt: 'You are correcting a tracing', images: Array(11).fill(IMG) }); assert.equal(r.status, 413); ok('eleven images are refused');
+assert.equal((await (await fetch(B + '/api/config', { cache: 'no-store' })).json()).deepRounds, 5); ok('the app is told how many deep-read rounds a plan may take');
 
 r = await ai(A, { kind: 'edit', homeId: 'h1', prompt: 'You are editing: make it night' });
 assert.ok(r.done); assert.ok(r.meta.editId);
@@ -233,6 +238,7 @@ assert.equal((await gcall('short', '/api/me')).status, 401); ok('a weak guest ke
 r = await fetch(B + '/api/ai', { method: 'POST', headers: { authorization: 'Bearer guest:' + S1, 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'plan_read', homeId: 'guest-home', prompt: 'You are an architectural draftsperson', images: ['data:image/png;base64,' + Buffer.from('guest-plan').toString('base64')] }) }); assert.equal(r.status, 200); await r.text();
 r = await gcall(S1, '/api/generate', { action: 'start', homeId: 'guest-home' }); assert.equal(r.status, 200); const ggen = r.body.genId;
 const gai = async (secret, data) => { const x = await fetch(B + '/api/ai', { method: 'POST', headers: { authorization: 'Bearer guest:' + secret, 'content-type': 'application/json' }, body: JSON.stringify(data) }); if (x.headers.get('content-type')?.includes('json')) return { status: x.status, ...(await x.json()) }; const t = await x.text(); let last = null; for (const part of t.split('\n\n')) { const l = part.split('\n').find(y => y.startsWith('data:')); if (l) { const o = JSON.parse(l.slice(5)); if (!o.t) last = o; } } return { status: x.status, ...last }; };
+assert.ok((await gai(S1, { kind: 'plan_deep', homeId: 'guest-home', prompt: 'You are correcting a tracing. This is round 2 of up to 5.', images: ['data:image/png;base64,' + Buffer.from('guest-plan').toString('base64')] })).json.done); ok('a guest gets the deep plan read too');
 r = await gai(S1, { kind: 'design', genId: ggen, prompt: FURNISH }); assert.ok(r.json.items.length > 0);
 assert.equal((await gai(S2, { kind: 'design', genId: ggen, prompt: FURNISH })).status, 409);
 r = await gcall(S1, '/api/generate', { action: 'finish', genId: ggen }); assert.equal(r.body.status, 'done'); ok('a guest can read a plan and design a home, and only on their own run');

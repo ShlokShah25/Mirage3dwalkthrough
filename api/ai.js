@@ -10,7 +10,7 @@ import { streamClaude, extractJSON } from './_lib/claude.js';
 import * as E from './_lib/entitle.js';
 import { authorizeGuest } from './_lib/guest.js';
 
-const KINDS = ['plan_read', 'plan_check', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
+const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
 
 async function authorize(user, b) {
   const { kind } = b, uid = user.id;
@@ -25,6 +25,11 @@ async function authorize(user, b) {
     case 'plan_check': {
       if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
       await E.allowPlanCheck(uid, b.homeId, createHash('sha256').update(b.images[0]).digest('hex'));
+      return { homeId: b.homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high' };
+    }
+    case 'plan_deep': {      // one round of the deep read: the plan itself is always the first image
+      if (!b.images?.length) throw new HttpError(400, 'image_rejected', 'Add a floor plan image first.');
+      await E.allowPlanDeep(uid, b.homeId, createHash('sha256').update(b.images[0]).digest('hex'));
       return { homeId: b.homeId, model: MODELS.complex(), maxTokens: 48000, effort: 'high' };
     }
     case 'teaser': {
@@ -66,7 +71,7 @@ async function authorize(user, b) {
 
 export const POST = route(async req => {
   const user = await requireUser(req);
-  const b = await body(req);
+  const b = await body(req, 24_000_000);   // a deep-read round carries the plan, the tracing over it and up to eight close-ups
   if (!KINDS.includes(b.kind)) throw new HttpError(400, 'bad_request', 'Unknown request type.');
   if (typeof b.prompt !== 'string' || !b.prompt.trim()) throw new HttpError(400, 'bad_request', 'Empty request.');
   if (b.prompt.length > LIMITS.promptChars) throw new HttpError(413, 'prompt_too_large', 'The request was too large. Try a smaller change.');
