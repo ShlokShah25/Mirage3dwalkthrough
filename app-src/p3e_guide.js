@@ -302,11 +302,25 @@ const tourSig = () => layout.rooms.length + ':' + layout.furniture.length + ':' 
 function stopTour() { if (PRES.on) return endPresent(); GUIDE.touring = false; GUIDE.paused = false; hush(); GUIDE.flight = null; setTourUI(false); }
 
 /* ---------- chat ---------- */
+// "Add a reading chair by the window", "paint this room sage", "move the bed to the other wall": an instruction, not a question.
+const DIRECT = /^\s*(please\s+|can you\s+|could you\s+|i want( you)? to\s+|i'd like( you)? to\s+|let'?s\s+|just\s+)*(add|remove|delete|move|swap|replace|change|make|paint|turn|put|rotate|shift|switch|open up|widen|raise|lower|take out|get rid of|clear|install|place|hang|extend|shrink|enlarge|darken|lighten|brighten|redo|redesign|refurnish|convert|push|pull|centre|center|flip|mirror|recolou?r|repaint|resize|shorten|lengthen|knock down|close off)\b/i;
+function isDirectChange(text) {
+  if (!DIRECT.test(text) || /\?\s*$/.test(text) || QUICK.test(text) || text.length < 8) return false;
+  if (/\b(tour|vastu|photo|render|ideas?|suggest|options?|what|which|how|why|should)\b/i.test(text)) return false;
+  // "the second one", "that idea", "it" straight after she offered ideas: only the conversation knows what is meant
+  if (/\b(first|second|third|fourth|last|that|this) (one|idea|option)\b|\boption \d\b/i.test(text)) return false;
+  if (document.querySelector('#guideLog .gopts:last-child button:not(:disabled)') && /\b(it|that|them)\b/i.test(text) && text.length < 40) return false;
+  return true;
+}
 async function guideSend(text) {
   if (!text) return; if (GUIDE.busy) { GUIDE.queued = text; $('guideIn').value = ''; gNote('Got it, one moment…', 'sys'); return; } $('guideIn').value = '';
   if (PRES.on) { PRES.paused = GUIDE.paused = true; $('presentPause').textContent = 'Resume'; } else if (GUIDE.touring) stopTour();
   if (!GUIDE.open) openGuide(true);
   if (DES.on && DES.waiting && !/\?\s*$/.test(text) && !QUICK.test(text)) { const r = DES.waiting; gSay(text, 'you'); designThisRoom(r, `Design ${r.name}: ${text}`); return; }   // in designer mode, what they type is the brief for the room in front of them
+  if (isDirectChange(text)) {   // a plain instruction goes straight to the change engine: one model call, and nothing lost in retelling
+    const context = GUIDE.hist.slice(-4).map(h => `${h.who === 'you' ? 'Homeowner' : GUIDE_NAME}: ${String(h.text).slice(0, 160)}`).join(' | ');
+    gSay(text, 'you'); guideEdit(text, { context, speak: true }); return;
+  }
   gSay(text, 'you'); GUIDE.busy = true; const typing = gNote('…', 'guide typing');
   try {
     const j = await guideAsk(chatPrompt(text), QUICK.test(text) && text.length < 60 ? 'guide' : 'guide_pro');
@@ -334,17 +348,17 @@ async function runAction(a) {
 }
 // A change asked for through Mira. It joins the queue (one change at a time), shows its progress in the chat with a
 // Stop button, and resolves true if the home changed. Asking for the same change twice returns the one already running.
-function guideEdit(request) {
+function guideEdit(request, { context = '', speak = false } = {}) {
   request = String(request || '').trim().slice(0, 2400); if (!request) return Promise.resolve(false);
   const same = GUIDE.edits.find(e => e.request === request); if (same) return same.job;
   const ac = new AbortController(), t0 = Date.now(), ent = { request, state: editing || GUIDE.edits.length ? 'queued' : 'working' };
   const note = gNote('', 'sys work'), label = document.createElement('span'), stop = document.createElement('button'); stop.type = 'button'; stop.textContent = 'Stop'; stop.onclick = () => ac.abort(); note.append(label, stop);
   const paint = () => { ent.state = editNow === request ? 'working' : 'queued'; const s = Math.round((Date.now() - t0) / 1000); label.textContent = ent.state === 'queued' ? `Next in line… ${s}s` : running ? `Furnishing the room… ${s}s` : `Making the change… ${s}s`; };
   paint(); const iv = setInterval(paint, 500);
-  ent.job = requestEdit(request, { signal: ac.signal }).then(r => {
+  ent.job = requestEdit(request, { signal: ac.signal, context }).then(r => {
     clearInterval(iv); GUIDE.edits = GUIDE.edits.filter(e => e !== ent); note.remove();
     const pw = r.paywall, why = pw === 'no_changes_left' ? 'You have used the changes on this home. I opened the options to add more.' : pw === 'pass_expired' ? 'This home is no longer editable on its pass. I opened the options.' : pw === 'credits' ? 'There are not enough credits for a change.' : pw && pw !== 'blocked' ? 'Changes by voice or text come with a Home Pass. I opened the options for you.' : '';
-    if (r.ok) { document.querySelectorAll('#guideLog .gundo').forEach(b => b.remove()); const n = gNote(`✓ ${r.summary || 'Changed.'} `, 'sys'), u = document.createElement('button'); u.type = 'button'; u.className = 'gundo'; u.textContent = 'Undo'; u.onclick = () => { undoEdit(); u.remove(); gNote('Undone.', 'sys'); }; n.append(u); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
+    if (r.ok) { document.querySelectorAll('#guideLog .gundo').forEach(b => b.remove()); const n = speak ? gNote((r.summary || 'Done.') + ' ', 'guide') : gNote(`✓ ${r.summary || 'Changed.'} `, 'sys'), u = document.createElement('button'); if (speak) gSpeak(r.summary || 'Done.'); u.type = 'button'; u.className = 'gundo'; u.textContent = 'Undo'; u.onclick = () => { undoEdit(); u.remove(); gNote('Undone.', 'sys'); }; n.append(u); GUIDE.hist.push({ who: 'guide', text: `(changed: ${r.summary})` }); }
     else if (why) { gNote(why, 'sys'); gSpeak(why); }
     else if (r.cancelled) gNote('Stopped. Nothing was changed.', 'sys');
     else { const t = r.summary || r.reason || 'Nothing was changed.'; gSay(t); gSpeak(t); }

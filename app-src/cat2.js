@@ -91,6 +91,7 @@ Object.assign(CAT, {
       pillow(g, a, 0, 1.92, back + 1.72, 1.3, .55, 0, -.16);
       for (const s of [-1, 1]) { rb(g, 1.6, .15, 1.5, .05, mat('wood-dark'), s * (w / 2 + .95), 1.7, back + .9); bx(g, .02, .02, .02, m, 0, 0, 0);
         cy(g, .012, .012, 2.3, mat('brass'), s * (w / 2 + .95), 4.3, back + .9, 4); PX_(g, .28, mat('lamp-white'), s * (w / 2 + .95), 4.15, back + .9, 1, 1.1, 1); vaseBranch(g, s * (w / 2 + .95) + s * .4, 1.85, back + .9, .45); }
+      if (it.posts) fourPosts(g, w, d, it.posts);
       return g;
     } },
   'lounge-chair': { label: 'Lounge chair', cat: 'Living', d: { w: 2.8, d: 3, h: 2.8, finish: 'fabric-main', accent: 'wood-dark' },
@@ -225,7 +226,7 @@ Object.assign(NOTES, {
   'vanity-luxe': 'floating fluted vanity with vessel basin, brass wall tap, round backlit brass mirror, sconces and a full-height stone wall behind (wall = stone token); back to wall; do NOT add a separate mirror; use in every bathroom instead of vanity',
   'tub-freestanding': 'oval freestanding tub with a brass floor filler; master bathrooms with at least 8 ft free; keep 1.5 ft around it',
   'tv-wall': 'FEATURE WALL for the living room: full-height stone (or fluted:true wood) cladding with LED side reveals, floating console and TV; back flat against the wall, sofa faces it',
-  'bed-luxe': 'panel:"walnut" gives a walnut-panelled headboard wall with a textured upholstered centre (Evening Luxe). Premium bed with a full-width channel-tufted headboard wall, bedside shelves and hanging bedside pendants built in (do NOT add nightstands with it); back against the wall; wall = headboard fabric token',
+  'bed-luxe': 'posts:true (or a finish) makes it a four-poster. panel:"walnut" gives a walnut-panelled headboard wall with a textured upholstered centre (Evening Luxe). Premium bed with a full-width channel-tufted headboard wall, bedside shelves and hanging bedside pendants built in (do NOT add nightstands with it); back against the wall; wall = headboard fabric token',
   'lounge-chair': 'sculptural lounge chair with wood shell; reading corners, beside windows',
   'accent-barrel': 'curved boucle barrel accent chair; pairs of two facing the sofa',
   'coffee-plinth': 'sculptural two-part stone coffee table styled with books and objects; centre of the seating group',

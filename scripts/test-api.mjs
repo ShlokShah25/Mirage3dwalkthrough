@@ -94,7 +94,9 @@ const editId = r.meta.editId;
 assert.equal((await me(A)).homes.h1.changes_left, 29); ok('a change uses one of 30');
 r = await ai(A, { kind: 'edit', homeId: 'h1', prompt: 'You are editing NOOP' });
 assert.equal((await me(A)).homes.h1.changes_left, 29); ok('a change that does nothing is refunded');
-for (let i = 0; i < PRICING.budgets.editFollowups; i++) { r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.ok(r.done); }
+r = await ai(A, { kind: 'edit_fix', editId, prompt: 'You are editing a furnished 3D model' }); assert.ok(r.done);
+assert.equal((await me(A)).homes.h1.changes_left, 29); ok('repairing a change that did not fully apply is part of that change, not a new one');
+for (let i = 0; i < PRICING.budgets.editFollowups - 1; i++) { r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.ok(r.done); }
 r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.equal(r.status, 429); ok(`room redos after a change are capped at ${PRICING.budgets.editFollowups} calls`);
 r = await ai(A, { kind: 'refurnish', homeId: 'h1', prompt: FURNISH }); assert.ok(r.done);
 assert.equal((await me(A)).homes.h1.changes_left, 28); ok('"redo this room" uses a change');
@@ -246,6 +248,7 @@ assert.equal((await gai(S2, { kind: 'design', genId: ggen, prompt: FURNISH })).s
 r = await gcall(S1, '/api/generate', { action: 'finish', genId: ggen }); assert.equal(r.body.status, 'done'); ok('a guest can read a plan and design a home, and only on their own run');
 r = await gai(S1, { kind: 'edit', homeId: 'guest-home', prompt: 'You are editing a furnished 3D model' }); assert.ok(r.done && r.meta.editId);
 assert.ok((await gai(S1, { kind: 'edit_followup', editId: r.meta.editId, prompt: FURNISH })).done); assert.equal((await gai(S2, { kind: 'edit_followup', editId: r.meta.editId, prompt: FURNISH })).status, 404);
+assert.ok((await gai(S1, { kind: 'edit_fix', editId: r.meta.editId, prompt: 'You are editing a furnished 3D model' })).done); assert.equal((await gai(S2, { kind: 'edit_fix', editId: r.meta.editId, prompt: 'You are editing a furnished 3D model' })).status, 404);
 assert.ok((await gai(S1, { kind: 'guide', homeId: 'guest-home', prompt: 'You are Mira, the guide inside Mirage. VISITOR SAYS: "hi"' })).done); ok('a guest can make changes and talk to Mira');
 for (let i = 0; i < 4; i++) assert.equal((await gcall(S1, '/api/generate', { action: 'start', homeId: 'guest-home' })).status, 200);
 assert.equal((await gcall(S1, '/api/generate', { action: 'start', homeId: 'guest-home' })).status, 429); ok('guests are capped at 5 designs a day');

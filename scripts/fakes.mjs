@@ -27,7 +27,9 @@ function answer(prompt) {
     if (/^TESTEDIT /.test(said)) return { say: 'On it.', actions: [{ do: 'edit', request: said.slice(9) }] };
     return { say: 'Here is the kitchen.', actions: [{ do: 'go', room: 'Kitchen' }] };
   }
-  if (prompt.startsWith('You are editing') && /TESTOPS /.test(prompt)) { try { return { summary: 'Test operations applied.', ops: JSON.parse(prompt.match(/TESTOPS (\[[^]*?\])"\nWHERE/)[1]) }; } catch (e) { return { summary: 'bad test ops ' + e.message, ops: [] }; } }
+  // a repair call: "TESTFIX [good ops] TESTOPS [first ops]" answers the first call with TESTOPS and the repair with TESTFIX
+  if (prompt.startsWith('You are editing') && /THESE PARTS DID NOT WORK/.test(prompt) && /TESTFIX /.test(prompt)) { try { return { summary: 'Repaired.', left: '', ops: JSON.parse(prompt.match(/TESTFIX (\[[^]*?\]) TESTOPS/)[1]) }; } catch (e) { return { summary: 'bad test fix ' + e.message, ops: [] }; } }
+  if (prompt.startsWith('You are editing') && /TESTOPS /.test(prompt)) { try { return { summary: 'Test operations applied.', ops: JSON.parse(prompt.match(/TESTOPS (\[[^]*?\])"\n(?:EARLIER|WHERE)/)[1]) }; } catch (e) { return { summary: 'bad test ops ' + e.message, ops: [] }; } }
   if (prompt.startsWith('You are editing')) return /NOOP/.test(prompt) ? { summary: 'Nothing to change.', ops: [] } : { summary: 'Switched to night.', ops: [{ op: 'time', value: 'night' }] };
   if (prompt.includes('placing furniture')) {
     if (/EMPTYROOM/.test(prompt)) return { items: [] };

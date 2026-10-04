@@ -84,6 +84,7 @@ function applyStyleToRooms(L, st) {
   for (const r of L.rooms) {
     if (r.kind === 'ledge') continue;
     const fl = st.floors[roomCat(r.type)]; r.finish = fl.finish; r.floor = fl.color;
+    delete r.wall; delete r.ceil;   // a new style repaints every room
     r.cove = r.kind === 'room' && st.cove && !['staff', 'utility', 'passage', 'other'].includes(r.type);
   }
   L.settings.wallColor = st.walls; L.settings.ceilingColor = st.ceiling;

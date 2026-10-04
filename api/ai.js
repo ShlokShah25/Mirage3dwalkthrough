@@ -10,7 +10,7 @@ import { streamClaude, extractJSON } from './_lib/claude.js';
 import * as E from './_lib/entitle.js';
 import { authorizeGuest } from './_lib/guest.js';
 
-const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_followup', 'refurnish', 'guide'];
+const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_fix', 'edit_followup', 'refurnish', 'guide'];
 
 async function authorize(user, b) {
   const { kind } = b, uid = user.id;
@@ -55,6 +55,10 @@ async function authorize(user, b) {
     case 'edit_followup': {
       const e = await E.useEditFollowup(user, b.editId);
       return { homeId: e.home_id, model: MODELS.design(), maxTokens: 32000, effort: 'high' };
+    }
+    case 'edit_fix': {       // one repair of a change that did not fully apply: part of the same change, never charged again
+      const e = await E.useEditFollowup(user, b.editId);
+      return { homeId: e.home_id, model: MODELS.default(), maxTokens: 24000, effort: 'high' };
     }
     case 'guide_pro': {      // design ideas and anything that leads to a change: the default model, counted as a guide message
       await E.allowGuide(uid);

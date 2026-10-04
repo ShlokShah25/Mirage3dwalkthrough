@@ -225,6 +225,7 @@ const CAT = {
       const mt = bt + .7; rb(g, w + .08, .22, bl - 1.3, .1, white, 0, mt - .12, cz + .62); rb(g, w + .3, .14, 1.9, .06, a, 0, mt + .02, cz + bl / 2 - 1.4);
       const np = w > 4.5 ? 2 : 1; for (let i = 0; i < np; i++) rb(g, (w - .4) / np - .15, .5, 1.0, .22, white, -w / 2 + .2 + (w - .4) / np * (i + .5), mt - .05, bz + hbT + .75, 0, -.45);
       if (w > 4) for (const s of [-1, 1]) rb(g, 1.2, .9, .35, .15, a, s * .85, mt, bz + hbT + 1.4, 0, -.3);
+      if (it.posts) fourPosts(g, w, d, it.posts);
       return g;
     } },
   'nightstand': { label: 'Nightstand', cat: 'Bedroom', d: { w: 1.8, d: 1.5, h: 1.8, finish: 'wood-dark' },
@@ -346,6 +347,13 @@ const CAT = {
 };
 const CAT_ORDER = ['Living', 'Dining', 'Kitchen', 'Bedroom', 'Work', 'Bath', 'Plants', 'Lighting', 'Decor', 'Walls', 'Outdoor', 'Structure'];
 const FINISHES = [['wood-light', 'Style: light wood'], ['wood-dark', 'Style: dark wood'], ['stone', 'Style: stone'], ['marble', 'Style: marble'], ['stone-dark', 'Style: dark stone'], ['fabric-main', 'Style: main fabric'], ['fabric-second', 'Style: second fabric'], ['fabric-accent', 'Style: accent fabric'], ['metal', 'Style: metal'], ['oak', 'Oak'], ['walnut', 'Walnut'], ['teak', 'Teak'], ['travertine', 'Travertine'], ['marble-dark', 'Dark marble'], ['concrete', 'Concrete'], ['terracotta', 'Terracotta'], ['linen', 'Linen'], ['linen-white', 'White linen'], ['felt', 'Green felt'], ['black-metal', 'Black metal'], ['brass', 'Brass'], ['chrome', 'Chrome'], ['white-ceramic', 'White ceramic'], ['plaster', 'Plaster']];
+// four-poster frame for a bed: a post at each corner and a rail around the top ("posts": true, or a finish for the frame)
+function fourPosts(g, w, d, fin) {
+  const m = mat(typeof fin === 'string' ? fin : 'wood-dark'), t = .22, top = 7, x = w / 2 - t / 2, z = d / 2 - t / 2;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) bx(g, t, top, t, m, sx * x, 0, sz * z);
+  for (const sz of [-1, 1]) bx(g, w - t, .16, .16, m, 0, top - .16, sz * z);
+  for (const sx of [-1, 1]) bx(g, .16, .16, d - t, m, sx * x, top - .16, 0);
+}
 const NOTES = {
   'rug': 'floor rug; put under sofas, beds and dining tables',
   'sofa-curved': 'curved C-shaped sofa; front is the open side of the curve',
@@ -362,7 +370,7 @@ const NOTES = {
   'pool-table': 'pool table; top:true adds a dining top (doubles as dining table)', 'dining-chair': 'dining chair; front faces the table',
   'bar-stool': 'counter stool; front faces the island', 'kitchen-counter': 'base cabinets + worktop along a wall; sink: x-offset along its width, hobAt: x-offset, upper:true for wall cabinets, backsplash:true',
   'island': 'kitchen island with waterfall stone ends; its FRONT is the seating overhang side; hob:true', 'tall-unit': 'tall kitchen column; sections: any of "fridge","oven","pantry","wine"',
-  'hood': 'cooker hood above a hob; y≈6.8', 'bed': 'bed; back = headboard against a wall; low:true for a loft/platform bed',
+  'hood': 'cooker hood above a hob; y≈6.8', 'bed': 'bed; back = headboard against a wall; low:true for a loft/platform bed; posts:true (or a finish) makes it a four-poster',
   'nightstand': 'bedside table with lamp; beside the bed at the headboard end', 'wardrobe': 'full-height wardrobe; glass:true for a lit glass walk-in unit',
   'bench': 'upholstered bench, e.g. at the foot of a bed', 'desk': 'desk; monitors: 0-3', 'office-chair': 'desk chair; front faces the desk',
   'bookshelf': 'open bookshelf; lit:true', 'vanity': 'floating bathroom vanity (y≈1.7); basins 1-2', 'wc': 'wall-hung toilet; back against a wall',

@@ -229,7 +229,7 @@ pinput.addEventListener('focus', () => pbar.classList.add('open'));
 document.addEventListener('pointerdown', e => { if (!pbar.contains(e.target)) pbar.classList.remove('open'); });
 pinput.addEventListener('keydown', e => { if (e.key === 'Escape') { pbar.classList.remove('open'); pinput.blur(); } e.stopPropagation(); });
 function dirName(yaw) { const fx = -Math.sin(yaw), fz = -Math.cos(yaw); return Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 'right (+x)' : 'left (-x)') : (fz > 0 ? 'down the plan (+z)' : 'up the plan (-z, north)'); }
-function editPrompt(text) {
+function editPrompt(text, context = '') {
   const low = text.toLowerCase(), here = roomAt(player.x, player.z), selRoom = selected && layout.rooms.find(r => r.name === selected.room);
   let focus = layout.rooms.filter(r => r.kind !== 'ledge' && low.includes(r.name.toLowerCase()));
   if (!focus.length) { const types = [['bedroom', /bedroom|bed room/], ['bath', /bath|toilet|washroom/], ['kitchen', /kitchen/], ['living', /living|lounge/], ['terrace', /terrace|balcon/]]; for (const [t, re] of types) if (re.test(low)) focus.push(...layout.rooms.filter(r => r.type === t || (t === 'bedroom' && r.type === 'master') || (t === 'terrace' && r.kind === 'outdoor'))); }
@@ -240,12 +240,12 @@ function editPrompt(text) {
   const extrasOf = it => Object.entries(it).filter(([k]) => !['id', 'type', 'name', 'room', 'x', 'z', 'rot', 'w', 'd', 'h', 'y', 'finish', 'accent'].includes(k)).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
   let furn = layout.furniture.map(it => { const f = withDefaults(it); return `${it.id} | ${it.type} | ${it.name || ''} | ${it.room || ''} | ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)} | ${f1(f.w)}×${f1(f.d)}×${f1(f.h)}${f.y ? ' y' + f1(f.y) : ''} | ${f.finish || ''} | ${f.accent || ''}${extrasOf(it) ? ' | ' + extrasOf(it) : ''}`; });
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
-  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
+  const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${r.wall ? ' | own wall paint ' + r.wall : ''}${r.ceil ? ' | own ceiling ' + r.ceil : ''}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
   const detail = focus.map(r => { const F = roomFrame(r); return `${describeRoom(F, false)}\nThis room's coordinates start at whole-home (${f1(F.ox)},${f1(F.oz)}).`; }).join('\n\n');
-  const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
+  const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}${typeOptions(k).size ? ` [options: ${optionList(k)}]` : ''}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
-HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 1800)}"
+HOMEOWNER'S REQUEST: "${text.slice(0, vReq ? 2400 : 1800)}"${context ? `\nEARLIER IN THE CONVERSATION (only to understand what they mean; do not act on it): ${String(context).slice(0, 700)}` : ''}
 WHERE THEY ARE: standing in ${here ? here.name : 'no room'} at (${f1(player.x)},${f1(player.z)}), looking ${dirName(player.yaw)}. Selected item: ${selected ? `${selected.id} (${selected.name || selected.type})` : 'none'}. ${lookingAt() ? 'Straight ahead, ' + lookingAt() : ''} Words like "this", "here", "that wall" or "this window" refer to these.
 STYLE: ${project.style.summary} Tokens now: ${JSON.stringify(project.style.tokens)}. Walls ${layout.settings.wallColor}, ceiling ${layout.settings.ceilingColor}. Time of day: ${layout.settings.timeOfDay}.${Object.keys(project.roomStyles || {}).length ? ' Rooms with their own style (their items resolve style tokens to these): ' + Object.entries(project.roomStyles).map(([k, v]) => `${k}: ${v.summary}`).join(' | ') : ''}
 CEILING HEIGHT: ${layout.settings.ceilingHeight} ft.${profile().done ? '\n' + spaceText() : ''}
@@ -262,61 +262,183 @@ ${wallsText()}
 FURNITURE (id | type | name | room | x,z rot | w×d×h y | finish | accent | extras):
 ${furn.join('\n')}
 
-CATALOG for new items (type: default w×d×h — notes):
+CATALOG for new items (type: default w×d×h — notes [options: the only extra fields that type has]):
 ${cat}
 
-Reply with only JSON: {"summary":"one short sentence saying what you changed","ops":[ ... ]}. Operations:
-{"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, or a type's extra fields }}
+Reply with only JSON: {"summary":"one short sentence, as the designer speaking to the homeowner, saying what you changed","left":"anything they asked for that these operations do not do, and why, in a few plain words; empty when everything asked for is done","ops":[ ... ]}. Operations:
+{"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, "type" (to turn the piece into another catalog type where it stands), or one of that type's options }}
 {"op":"add","item":{"room":"<room>","type":"<catalog type>","name":"<label>", ...placement..., "w":0,"d":0,"h":0,"y":0,"finish":"<token or #hex>","accent":"<token or #hex>"}} — placement is either whole-home "x","z","rot", or, for a room described in detail above, its room terms: "wall":"W2","along":ft,"off":ft (against that wall, facing into the room) or "at":[X,Z] with "rot" (room coordinates). Prefer the wall form for anything that stands against or hangs on a wall.
 {"op":"remove","id":"<id>"}
 {"op":"style","token":"wood-light|wood-dark|stone|marble|stone-dark|fabric-main|fabric-second|fabric-accent|metal","value":"#hex"} (for stone, marble, stone-dark the value may be {"look":"travertine|marble|limestone|concrete|terrazzo","color":"#hex"}; for metal "brass|black|chrome"). This changes the material everywhere it is used.
 {"op":"floor","rooms":["<room>"],"finish":"stone-large|wood|tile-2ft|tile-1ft|terrazzo|stone","color":"#hex"}
-{"op":"paint","walls":"#hex","ceiling":"#hex"}
+{"op":"paint","walls":"#hex","ceiling":"#hex","rooms":["<room>"]} — with "rooms", paints only those rooms' walls and ceilings; without it, the whole home.
 {"op":"time","value":"golden|day|night"}
 {"op":"refurnish","rooms":["<room>"],"brief":"what the room should become"} — only when the request asks to redo or repurpose a whole room.
 ${STRUCT_HELP}
 {"op":"swap","a":"<room>","b":"<room>"} swap what two rooms are used for (their names and types trade places; walls stay). Always follow it with a refurnish op for both rooms, using the names after the swap.
 Finish tokens: wood-light, wood-dark, stone, marble, stone-dark, fabric-main, fabric-second, fabric-accent, metal; also linen, linen-white, white-ceramic, black-metal, brass, chrome, felt, terracotta, concrete, plaster, teak, or "#rrggbb".
-RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. A wall marked STRUCTURE is never opened or removed as a design change: say so in the summary and do the nearest thing that is possible (open a LIGHT wall, widen a window, re-plan the furniture). If the home already is the way they ask, or the request cannot be done, return an empty ops list and say so in summary. "paint" recolours the walls of the whole home; to darken or colour one room use wall panels, acoustic panels or feature walls on its walls.`;
+RULES: make the smallest set of changes that fully does what was asked. To recolour one piece, set that item's finish or accent; change a style token only when the request is about a material across the home. Keep items inside their room, clear of walls, doors and other furniture; wall-backed items (beds, sofas on walls, wardrobes, consoles, desks, vanities, TVs, art, mirrors, wall panels, curtains) keep their back on a wall face. A wall marked STRUCTURE is never opened or removed as a design change: say so in the summary and do the nearest thing that is possible (open a LIGHT wall, widen a window, re-plan the furniture). If the home already is the way they ask, or the request cannot be done, return an empty ops list and say so in summary. To paint or recolour the walls of one room, use "paint" with "rooms"; panels and feature walls are for when they ask for cladding.
+DO IT ALL, IN THIS ONE REPLY. There is no second turn: nobody can answer a question, and anything left out stays undone. Before you answer:
+1. List to yourself every separate thing the request asks for. Each needs operations that make it visibly true in the home, or a line in "left". The summary may only claim what the operations do.
+2. An option not listed for a type does not exist: setting it changes nothing. If the catalog has no piece or option for what they want, use the nearest real one and say so in "left".
+3. Replacing a piece means removing or re-typing the old one; never leave the old piece under the new one. Moving a piece means moving what belongs with it (its rug, side tables, chairs, lamps, the art above it).
+4. For every piece you add or move, check its footprint (x ± w/2 and z ± d/2, swapped when rot is ±90) against the room's bounds, the door clear zones and every piece that stays. Leave a walkway of 2.5 ft. If it does not fit where asked, put it in the nearest place it does fit and say so.
+5. Use ids exactly as listed, and room names exactly as listed (after a room_set rename, the new name).
+6. Work in the room they mean. "This room", "here", or a kind of room that fits the room they are standing in ("the living room" while standing in a living room) means that room. Touch another room only when the request names it or plainly needs it; if the room they mean has no space for what they want, say so in "left" rather than putting it somewhere else.`;
 }
+/* ---------- applying a change, and checking it as built ---------- */
+// What the model meant when a name is slightly off: a catalog type, a room, or a piece.
+function nearType(t) {
+  t = String(t || '').toLowerCase().trim().replace(/[\s_]+/g, '-'); if (CAT[t]) return t; if (!t) return null;
+  const keys = Object.keys(CAT), flat = x => x.replace(/-/g, '');
+  const hit = keys.find(k => flat(k) === flat(t)) || keys.find(k => k.startsWith(t + '-') || t.startsWith(k + '-')); if (hit) return hit;
+  const tok = new Set(t.split('-')); let best = null, bs = 0;
+  for (const k of keys) { const kt = k.split('-'), sc = kt.filter(x => tok.has(x)).length / Math.max(kt.length, tok.size); if (sc > bs) { bs = sc; best = k; } }
+  return bs >= .5 ? best : null;
+}
+function nearRoom(nm) {
+  const q = String(nm || '').toLowerCase().trim(); if (!q) return null;
+  return layout.rooms.find(r => r.name.toLowerCase() === q) || layout.rooms.find(r => r.kind !== 'ledge' && (r.name.toLowerCase().includes(q) || q.includes(r.name.toLowerCase()))) || null;
+}
+function nearItem(op) {
+  const id = String(op.id ?? ''); let it = layout.furniture.find(x => x.id === id) || layout.furniture.find(x => x.id.toLowerCase() === id.toLowerCase().trim()); if (it) return it;
+  const q = id.toLowerCase().trim(); if (q.length < 3) return null;
+  const pool = layout.furniture.filter(x => (x.name || '').toLowerCase() === q || x.type === q); return pool.length === 1 ? pool[0] : null;   // only when it can mean one piece
+}
+// The options a catalog type really has: its defaults, its declared extras and every field its builder reads.
+const CORE_FIELDS = new Set(['id', 'type', 'name', 'room', 'x', 'z', 'rot', 'w', 'd', 'h', 'y', 'finish', 'accent']);
+const TYPE_OPTS = {};
+function typeOptions(type) {
+  if (TYPE_OPTS[type]) return TYPE_OPTS[type]; const def = CAT[type], set = new Set(); if (!def) return set;
+  for (const k of Object.keys(def.d || {})) set.add(k); for (const e of def.extras || []) set.add(e[0]);
+  for (const m of String(def.build || '').matchAll(/\bit\.([A-Za-z_]\w*)/g)) set.add(m[1]);
+  for (const k of CORE_FIELDS) set.delete(k); for (const k of ['_anchor', '_group', '_ref', '_float']) set.delete(k);
+  return TYPE_OPTS[type] = set;
+}
+const optionList = type => [...typeOptions(type)].join(', ');
+const ADD_TERMS = new Set(['wall', 'along', 'off', 'at', 'rel', 'side', 'gap', 'shift', 'on', 'over', 'face', 'turn', 'chairs', 'chair', 'nightstands', 'lamps', 'stools', 'item', 'op']);
+const TUCKS = /table|desk|counter|island|vanity|bar/;
+const standsOnFloor = it => isSolid(it) && (+withDefaults(it).y || 0) < .9;
+const tucked = (A, B) => (SEATING.test(A.type) && TUCKS.test(B.type)) || (SEATING.test(B.type) && TUCKS.test(A.type));
+// Pieces a change moved are nudged clear of doorways, walls and their neighbours, the way newly added pieces are.
+function settleTouched(ids) {
+  const its = layout.furniture.filter(it => ids.has(it.id) && CAT[it.type] && standsOnFloor(it)); if (!its.length) return;
+  const wallBoxes = wallCols.filter(c => c.wall && c.y0 < 1).map(c => ({ cx: c.cx, cz: c.cz, hx: c.hx, hz: c.hz, c: c.c, s: c.s })), doors = doorZones();
+  for (let pass = 0; pass < 3; pass++) {
+    for (const it of its) { for (const dz of doors) doorFix(it, dz); for (const wb of wallBoxes) { const m = sat(itemOBB(it), wb); if (m && m.ov < 2.5) { it.x = r2(it.x - m.ax * m.sg * (m.ov + .02)); it.z = r2(it.z - m.az * m.sg * (m.ov + .02)); } } }
+    for (const A of its) for (const B of layout.furniture) {
+      if (B === A || B.room !== A.room || !CAT[B.type] || !standsOnFloor(B) || (ids.has(B.id) && B.id < A.id)) continue;
+      const m = sat(itemOBB(A), itemOBB(B)); if (!m || m.ov > 3 || m.ov <= (tucked(A, B) ? 1.1 : .05)) continue;
+      const fa = withDefaults(A), fb = withDefaults(B), mv = ids.has(B.id) && fb.w * fb.d < fa.w * fa.d ? B : A, sg = mv === A ? -1 : 1;
+      mv.x = r2(mv.x + sg * m.ax * m.sg * (m.ov + .02)); mv.z = r2(mv.z + sg * m.az * m.sg * (m.ov + .02));
+    }
+  }
+}
+// The nearest spot where a piece fits: inside its room, off the doors and clear of its neighbours. Wall-backed pieces
+// only slide along their wall. Returns true if it was moved there; a piece with no such spot within reach is left alone.
+function rehome(it) {
+  const r = layout.rooms.find(x => x.name === it.room); if (!r || !CAT[it.type] || WALLMOUNT.has(it.type) || !standsOnFloor(it)) return false;
+  let F; try { F = roomFrame(r); } catch { return false; }
+  const ok = () => insideRoom(it, F, .25) && !F.clear.some(z => { const m = sat(itemOBB(it), z); return m && m.ov > .3; }) &&
+    !layout.furniture.some(o => { if (o === it || o.room !== it.room || !CAT[o.type] || !standsOnFloor(o)) return false; const m = sat(itemOBB(it), itemOBB(o)); return m && m.ov > (tucked(it, o) ? 1.1 : .3); });
+  if (ok()) return false;
+  const x0 = it.x, z0 = it.z, th = (it.rot || 0) * D2R, ax = Math.cos(th), az = -Math.sin(th), backed = BACKED.has(it.type) && !it._float, reach = backed ? 6 : 5;
+  for (let d = .5; d <= reach; d += .5) {
+    const ring = backed ? [[ax * d, az * d], [-ax * d, -az * d]] : Array.from({ length: 12 }, (_, k) => [Math.cos(k * Math.PI / 6) * d, Math.sin(k * Math.PI / 6) * d]);
+    for (const [dx, dz] of ring) { it.x = r2(x0 + dx); it.z = r2(z0 + dz); if (roomAt(it.x, it.z) === r && ok()) return true; }
+  }
+  it.x = x0; it.z = z0; return false;
+}
+// What is still wrong with the pieces a change added or moved. Each entry has the words for the model and for the homeowner.
+function fitIssues(ids) {
+  const out = [], frames = new Map(), F = nm => { if (!frames.has(nm)) { const r = layout.rooms.find(x => x.name === nm); let f = null; try { f = r && r.polygon?.length > 2 ? roomFrame(r) : null; } catch { } frames.set(nm, f); } return frames.get(nm); };
+  const lab = it => `${it.id} (${it.name || it.type})`, nm = it => (it.name || CAT[it.type]?.label || it.type).toLowerCase(), seen = new Set();
+  const push = (key, text, say, ...ids) => { if (!seen.has(key)) { seen.add(key); out.push({ key, text, say, ids }); } };
+  for (const it of layout.furniture) {
+    if (!ids.has(it.id) || !CAT[it.type]) continue;
+    const f = F(it.room), df = withDefaults(it); if (!f) { push('room:' + it.id, `${lab(it)} is not inside any room`, `the ${nm(it)} has no room to stand in`, it.id); continue; }
+    if (!WALLMOUNT.has(it.type) && !CAT[it.type].nc && (+df.y || 0) <= 6 && !insideRoom(it, f, /^rug/.test(it.type) ? .6 : .25)) {
+      const xs = f.r.polygon.map(q => q[0]), zs = f.r.polygon.map(q => q[1]);
+      push('out:' + it.id, `${lab(it)}, ${f1(df.w)}×${f1(df.d)} ft at ${f1(it.x)},${f1(it.z)} rot ${Math.round(it.rot || 0)}, sticks out of ${it.room} (x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))}) or into a wall`, `the ${nm(it)} does not quite fit in ${it.room}`, it.id);
+    }
+    if (!standsOnFloor(it)) continue;
+    for (const z of f.clear) { const m = sat(itemOBB(it), z); if (m && m.ov > .3) push('door:' + it.id + ':' + z.face, `${lab(it)} stands in the clear zone of the ${z.o.main ? 'main entrance' : z.o.type}${z.o.to ? ' to ' + z.o.to : ''} of ${it.room} (wall ${z.face})`, `the ${nm(it)} is in the way of a door`, it.id); }
+    for (const o of layout.furniture) {
+      if (o === it || o.room !== it.room || !CAT[o.type] || !standsOnFloor(o)) continue;
+      const m = sat(itemOBB(it), itemOBB(o)); if (!m || m.ov <= (tucked(it, o) ? 1.1 : .3)) continue;
+      const fo = withDefaults(o);
+      push('hit:' + [it.id, o.id].sort().join('+'), `${lab(it)} at ${f1(it.x)},${f1(it.z)} (${f1(df.w)}×${f1(df.d)}) overlaps ${lab(o)} at ${f1(o.x)},${f1(o.z)} (${f1(fo.w)}×${f1(fo.d)}) by ${f1(m.ov)} ft`, `the ${nm(it)} runs into the ${nm(o)}`, it.id, o.id);
+    }
+  }
+  return out;
+}
+// Applies a change. Returns what was done, the operations that could not be applied (failed) and what does not fit (issues).
 function applyOps(res) {
   const ops = Array.isArray(res?.ops) ? res.ops.slice(0, 120) : [];
-  let n = 0, shell = false, mats = false, struct = false; const added = [], refurn = [], notes = [];
-  const roomByName = nm => layout.rooms.find(r => r.name.toLowerCase() === String(nm || '').toLowerCase());
+  let n = 0, shell = false, mats = false, struct = false; const added = [], refurn = [], notes = [], failed = [], touched = new Set();
+  const fail = (text, say) => failed.push({ text, say });
   for (const op of ops) {
     if (!op || typeof op !== 'object') continue;
     if (op.op === 'update') {
-      const it = layout.furniture.find(x => x.id === op.id); if (!it) continue; const set = op.set || {};
-      for (const [k, v] of Object.entries(set)) { if (['id', 'type'].includes(k)) continue; if (['x', 'z', 'rot', 'w', 'd', 'h', 'y'].includes(k)) { const x = +v; if (isFinite(x) && (!['w', 'd', 'h'].includes(k) || x > 0)) it[k] = x; } else it[k] = v; }
-      if (('x' in set || 'z' in set || 'rot' in set) && BACKED.has(it.type)) snapBack(it);
-      const r = roomAt(it.x, it.z); if (r) it.room = r.name; rebuildItem(it); n++;
-    } else if (op.op === 'remove') { const before = layout.furniture.length; removeItemsWhere(x => x.id === op.id); if (layout.furniture.length < before) n++; }
-    else if (op.op === 'add') { if (op.item || op.type) added.push(op.item || op); }
-    else if (op.op === 'style' && TOKEN_NAMES.includes(op.token)) {
+      const it = nearItem(op); if (!it) { fail(`update: there is no piece with id "${op.id}"`, 'one piece I meant to change was not found'); continue; } const set = op.set && typeof op.set === 'object' ? op.set : {};
+      let geo = false;
+      if (set.type && set.type !== it.type) { const t = nearType(set.type); if (t) { it.type = t; for (const k of ['w', 'd', 'h', 'y']) if (!(k in set)) delete it[k]; if (!set.name) it.name = CAT[t].label; geo = true; } else fail(`update ${it.id}: "${set.type}" is not a catalog type`, `there is no ${String(set.type).replace(/-/g, ' ')} in the catalogue`); }
+      const opts = typeOptions(it.type), bad = [];
+      for (const [k, v] of Object.entries(set)) {
+        if (['id', 'type', 'room'].includes(k)) continue;
+        if (['x', 'z', 'rot', 'w', 'd', 'h', 'y'].includes(k)) { const x = +v; if (isFinite(x) && (!['w', 'd', 'h'].includes(k) || x > 0)) { if (it[k] !== x && k !== 'h' && k !== 'y') geo = true; it[k] = x; } }
+        else if (CORE_FIELDS.has(k) || opts.has(k) || k in it) it[k] = v;
+        else bad.push(k);
+      }
+      // an invented option changes nothing; it only counts as a failure when the whole operation came to nothing
+      if (bad.length && bad.length === Object.keys(set).filter(k => !['id', 'room', 'name'].includes(k)).length) { fail(`update ${it.id}: a ${it.type} has no option called ${bad.map(k => '"' + k + '"').join(', ')}, so this did nothing${opts.size ? ` (its options: ${optionList(it.type)})` : ' (it has no options beyond size, finish and accent)'}`, `the ${(it.name || it.type).toLowerCase()} cannot be changed that way`); continue; }
+      if (geo && BACKED.has(it.type)) snapBack(it);
+      const r = roomAt(it.x, it.z); if (r) it.room = r.name; if (geo) touched.add(it.id); rebuildItem(it); n++;
+    } else if (op.op === 'remove') { const it = nearItem(op); if (!it) { fail(`remove: there is no piece with id "${op.id}"`, 'one piece I meant to remove was not found'); continue; } removeItemsWhere(x => x === it); n++; }
+    else if (op.op === 'add') {
+      const src = op.item && typeof op.item === 'object' ? op.item : op, t = nearType(src.type);
+      if (!t) { fail(`add: "${src.type}" is not a catalog type`, `there is no ${String(src.type || 'such piece').replace(/-/g, ' ')} in the catalogue`); continue; }
+      const opts = typeOptions(t), bad = Object.keys(src).filter(k => !CORE_FIELDS.has(k) && !opts.has(k) && !ADD_TERMS.has(k)), item = { ...src, type: t }; for (const k of bad) delete item[k];
+      added.push({ item, room: nearRoom(src.room), named: src.room });   // the room itself, not its name: a later op may rename it
+    }
+    else if (op.op === 'style') {
+      if (!TOKEN_NAMES.includes(op.token)) { fail(`style: "${op.token}" is not a style token`, 'one material change did not apply'); continue; }
       const cur = project.style.tokens[op.token], v = op.value;
-      if (op.token === 'metal') { if (['brass', 'black', 'chrome'].includes(v)) project.style.tokens.metal = v; }
-      else if (typeof cur === 'object') { if (typeof v === 'object') { if (['travertine', 'marble', 'limestone', 'concrete', 'terrazzo'].includes(v.look)) cur.look = v.look; cur.color = hexOk(v.color, cur.color); } else cur.color = hexOk(v, cur.color); }
+      if (op.token === 'metal') { if (['brass', 'black', 'chrome'].includes(v)) project.style.tokens.metal = v; else { fail(`style metal: "${v}" is not brass, black or chrome`, 'the metal finish was not one I can use'); continue; } }
+      else if (typeof cur === 'object') { if (v && typeof v === 'object') { if (['travertine', 'marble', 'limestone', 'concrete', 'terrazzo'].includes(v.look)) cur.look = v.look; cur.color = hexOk(v.color, cur.color); } else cur.color = hexOk(v, cur.color); }
       else project.style.tokens[op.token] = hexOk(v, cur);
       mats = true; n++;
     } else if (op.op === 'floor') {
       const names = Array.isArray(op.rooms) ? op.rooms : [op.room];
-      for (const nm of names) { const r = roomByName(nm); if (!r) continue; if (['stone-large', 'wood', 'tile-2ft', 'tile-1ft', 'terrazzo', 'stone', 'plain'].includes(op.finish)) r.finish = op.finish; r.floor = hexOk(op.color, r.floor); shell = true; n++; }
-    } else if (op.op === 'paint') { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; } shell = true; n++; }
-    else if (op.op === 'time' && TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; }
-    else if (op.op === 'swap') { const a = roomByName(op.a), b = roomByName(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } }
-    else if (STRUCT_OPS.has(op.op)) { const r = applyStructOp(op); if (r.ok) { shell = true; n++; struct = true; } if (r.note) notes.push(r.note); }
-    else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = roomByName(nm); if (r) refurn.push({ r, brief: op.brief || '' }); } }
+      for (const nm of names) { const r = nearRoom(nm); if (!r) { fail(`floor: there is no room called "${nm}"`, `I could not find the room "${nm}"`); continue; } if (['stone-large', 'wood', 'tile-2ft', 'tile-1ft', 'terrazzo', 'stone', 'plain'].includes(op.finish)) r.finish = op.finish; r.floor = hexOk(op.color, r.floor); shell = true; n++; }
+    } else if (op.op === 'paint') {
+      const names = Array.isArray(op.rooms) ? op.rooms : op.room ? [op.room] : null;
+      if (names) { for (const nm of names) { const r = nearRoom(nm); if (!r) { fail(`paint: there is no room called "${nm}"`, `I could not find the room "${nm}"`); continue; } if (op.walls) r.wall = hexOk(op.walls, r.wall || layout.settings.wallColor); if (op.ceiling) r.ceil = hexOk(op.ceiling, r.ceil || layout.settings.ceilingColor); shell = true; n++; } }
+      else { if (op.walls) { layout.settings.wallColor = hexOk(op.walls, layout.settings.wallColor); project.style.walls = layout.settings.wallColor; for (const r of layout.rooms) delete r.wall; } if (op.ceiling) { layout.settings.ceilingColor = hexOk(op.ceiling, layout.settings.ceilingColor); project.style.ceiling = layout.settings.ceilingColor; for (const r of layout.rooms) delete r.ceil; } shell = true; n++; }
+    }
+    else if (op.op === 'time') { if (TIMES[op.value]) { layout.settings.timeOfDay = op.value; n++; } else fail(`time: "${op.value}" is not golden, day or night`, 'the time of day was not one I can set'); }
+    else if (op.op === 'swap') { const a = nearRoom(op.a), b = nearRoom(op.b); if (a && b && a !== b && !FIXED_TYPES.has(a.type) && !FIXED_TYPES.has(b.type)) { const na = a.name, nb = b.name, ta = a.type; renameRoom(a, '\u0000swap'); renameRoom(b, na); renameRoom(a, nb); a.type = b.type; b.type = ta; shell = true; n++; } else fail(`swap: "${op.a}" and "${op.b}" cannot trade places${a && b ? ' (kitchens, baths and outdoor rooms stay where their plumbing is)' : ''}`, 'those two rooms cannot trade places'); }
+    else if (STRUCT_OPS.has(op.op)) { const r = applyStructOp(op); if (r.ok) { shell = true; n++; struct = true; } else fail(`${op.op}${op.wall ? ' ' + op.wall : ''}: ${r.note || 'could not be done'}`, ''); if (r.note) notes.push(r.note); }
+    else if (op.op === 'refurnish') { for (const nm of (Array.isArray(op.rooms) ? op.rooms : [op.room])) { const r = nearRoom(nm); if (r) refurn.push({ r, brief: op.brief || '' }); else fail(`refurnish: there is no room called "${nm}"`, `I could not find the room "${nm}"`); } }
+    else fail(`"${op.op}" is not an operation`, '');
   }
   if (added.length) {
-    const byName = Object.fromEntries(layout.rooms.map(r => [r.name, r])), frames = [...new Set(added.map(a => byName[a.room]).filter(Boolean))].map(roomFrame);
-    const { items: placedNew } = resolveItems(added.map(a => ({ ...a })), frames, byName); placedNew.forEach(it => { if (it._anchor && !it._anchor.global && !(it._anchor.face && (it._anchor.off || 0) <= .3)) it._float = true; delete it._anchor; delete it._group; delete it._ref; });
-    const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length;
+    const list = added.map(a => { const r = a.room && layout.rooms.includes(a.room) ? a.room : nearRoom(a.named); return { ...a.item, ...(r ? { room: r.name } : {}) }; });
+    const byName = Object.fromEntries(layout.rooms.map(r => [r.name, r])), frames = [...new Set(list.map(a => byName[a.room]).filter(Boolean))].map(roomFrame);
+    const { items: placedNew, notes: rn } = resolveItems(list, frames, byName); placedNew.forEach(it => { if (it._anchor && !it._anchor.global && !(it._anchor.face && (it._anchor.off || 0) <= .3)) it._float = true; delete it._anchor; delete it._group; delete it._ref; });
+    for (const t of rn || []) fail('add: ' + t, 'one new piece had nowhere to go');
+    const items = settleItems(placedNew, layout.rooms); layout.furniture.push(...items); addItemsLive(items); n += items.length; items.forEach(it => touched.add(it.id));
+    if (items.length < placedNew.length) { const kept = items.map(it => it.name), lost = placedNew.filter(it => { const i = kept.indexOf(String(it.name || CAT[it.type].label).slice(0, 40)); if (i >= 0) { kept.splice(i, 1); return false; } return true; });
+      fail(`add: ${lost.map(it => `${it.type} "${it.name || ''}" at ${f1(+it.x)},${f1(+it.z)}`).join('; ') || 'a new piece'} lies outside every room (check the room's bounds) and was dropped`, `the ${String(lost[0]?.name || 'new piece').toLowerCase()} landed outside the room`); }
   }
+  if (touched.size) { const was = new Map(layout.furniture.filter(it => touched.has(it.id)).map(it => [it.id, [it.x, it.z, it.w]])); settleTouched(touched); for (const it of layout.furniture) { const w = was.get(it.id); if (w && (w[0] !== it.x || w[1] !== it.z || w[2] !== it.w)) { const r = roomAt(it.x, it.z); if (r) it.room = r.name; rebuildItem(it); } } }
   if (mats) for (const k in MC) delete MC[k];
   if (struct) afterStructChange();
   if (shell || mats) buildAll(); else { applyTime(); updateMeta(); }
   saveSoon();
-  return { n, refurn, notes: [...new Set(notes)].slice(0, 4) };
+  let issues = touched.size ? fitIssues(touched) : [];
+  if (issues.length) { let moved = false; for (const id of new Set(issues.flatMap(i => i.ids))) { const it = layout.furniture.find(x => x.id === id); if (it && touched.has(id) && rehome(it)) { rebuildItem(it); moved = true; } } if (moved) issues = fitIssues(touched); }
+  return { n, refurn, notes: [...new Set(notes)].slice(0, 4), failed, issues };
 }
 function undoEdit() {
   const snap = undoStack.pop(); if (!snap) return;
@@ -326,8 +448,22 @@ function undoEdit() {
 let editing = false, editCtl = null, editNow = null, editTail = Promise.resolve();
 // One change at a time. A second request waits its turn; it never cancels the first. Only the Stop button cancels.
 function requestEdit(text, opts = {}) { const job = editTail.then(() => runEdit(text, opts)); editTail = job.catch(() => { }); return job; }
-// Makes one change. Returns { ok, n, summary, notes, cancelled, paywall, reason } and never throws.
-async function runEdit(text, { signal } = {}) {
+function restoreSnap(snap) { project.layout = layout = structuredClone(snap.layout); project.style = structuredClone(snap.style); for (const k in MC) delete MC[k]; select(null); buildAll(); }
+const changeScore = rep => rep.failed.length * 3 + rep.issues.length;
+function fixPrompt(prompt, first, rep) {
+  return `${prompt}
+
+YOUR FIRST ANSWER:
+${JSON.stringify(first)}
+
+IT WAS APPLIED TO THE HOME AND CHECKED. THESE PARTS DID NOT WORK:
+- ${[...rep.failed.map(f => f.text), ...rep.issues.map(i => i.text)].slice(0, 30).join('\n- ')}
+
+The home has been put back exactly as it is listed above. Answer again with the complete, corrected JSON: every operation, not only the changed ones. Keep what worked. Fix each problem: use ids, room names, catalog types and options exactly as listed; move, turn or resize pieces so they fit; if a part cannot be done, leave it out and say so in "left". The same checks will be run on this answer.`;
+}
+// Makes one change, checks it as built, and repairs it once if something did not work.
+// Returns { ok, n, summary, notes, left, open, fixed, cancelled, paywall, reason } and never throws.
+async function runEdit(text, { signal, context = '' } = {}) {
   text = String(text || '').trim(); if (!text) return { ok: false, reason: 'Nothing to change.' };
   if (running) return { ok: false, reason: 'A design is still being made. This can be done as soon as it finishes.' };
   if (signal?.aborted) return { ok: false, cancelled: true, reason: 'Stopped. Nothing was changed.' };
@@ -336,21 +472,43 @@ async function runEdit(text, { signal } = {}) {
   const sample = await getSample(); if (!sample) return { ok: false, reason: 'Changes need Claude, which is not available in this view.' };
   editing = true; editNow = text; editCtl = new AbortController(); signal?.addEventListener('abort', () => editCtl.abort());
   $('pgo').textContent = 'Stop'; pinput.disabled = true; pbar.classList.remove('open');
-  const t0 = performance.now(), iv = setInterval(() => { pstatus.textContent = `Working on it… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
+  let phase = 'Working on it';
+  const t0 = performance.now(), iv = setInterval(() => { pstatus.textContent = `${phase}… ${Math.round((performance.now() - t0) / 1000)}s`; }, 500);
   const snap = { layout: structuredClone(layout), style: structuredClone(project.style) };
+  let applied = false;
   try {
-    const res = await sample.json(editPrompt(text), { modelTier: 'default', signal: editCtl.signal, ctx: SITE ? { kind: 'edit', homeId: project.id } : undefined });
+    const prompt = editPrompt(text, context);
+    const ask = (p, fix) => sample.json(p, { modelTier: 'default', signal: editCtl.signal, ctx: SITE ? (fix ? { kind: 'edit_fix', editId: SITE.lastEditId } : { kind: 'edit', homeId: project.id }) : undefined });
+    let res;
+    try { res = await ask(prompt); }
+    catch (e) { if (!['invalid_json', 'upstream_error', 'network', 'server_error'].includes(e?.code)) throw e; console.info('[change] the answer could not be read; asking once more', e?.code); res = await ask(prompt); }   // an unreadable answer is asked for again, once, without troubling the homeowner
+    let rep = applyOps(res), fixed = false; applied = true;
+    if (rep.failed.length || rep.issues.length) {
+      console.info('[change] did not fully work, repairing once', { failed: rep.failed.map(f => f.text), issues: rep.issues.map(i => i.text) });
+      phase = 'Checking it fits';
+      try {
+        const res2 = await ask(fixPrompt(prompt, res, rep), true);
+        restoreSnap(snap); const rep2 = applyOps(res2);
+        if (changeScore(rep2) <= changeScore(rep) && (rep2.n || rep2.refurn.length)) { res = res2; rep = rep2; fixed = true; }
+        else { restoreSnap(snap); rep = applyOps(res); }
+        if (rep.failed.length || rep.issues.length) console.info('[change] still open after the repair', { failed: rep.failed.map(f => f.text), issues: rep.issues.map(i => i.text) });
+      } catch (e) { if (e?.code === 'cancelled') throw e; console.info('[change] repair not available, keeping the first answer', e?.code || e); }
+    }
     clearInterval(iv);
-    const { n, refurn, notes } = applyOps(res);
-    const summary = [String(res?.summary || '').slice(0, 260) || (n ? 'Done.' : 'No changes were made.'), ...notes].join(' ');
-    const ok = !!(n || refurn.length);
+    const { n, refurn, notes } = rep, ok = !!(n || refurn.length);
+    const left = String(res?.left || '').trim().slice(0, 260), open = [...new Set([...rep.failed.map(f => f.say), ...rep.issues.map(i => i.say)].filter(Boolean))].slice(0, 2);
+    // never claim a change that did not happen: when nothing could be applied, say what went wrong instead of the model's summary
+    const summary = !ok && rep.failed.length ? [`I could not make that change${open.length ? ': ' + open.join('; ') : ''}. Nothing was changed.`, ...notes].join(' ')
+      : [String(res?.summary || '').slice(0, 260) || (n ? 'Done.' : 'No changes were made.'), left, ok && open.length ? `One thing to look at: ${open.join('; ')}.` : '', ...notes].filter(Boolean).join(' ');
     if (ok) { if (!SITE) charge(`Change · ${text.slice(0, 60)}`, BILLING.perChange); undoStack.push(snap); if (undoStack.length > 10) undoStack.shift(); project.edits.unshift({ t: Date.now(), text: /^Vastu fix\./.test(text) ? 'Make it Vastu compliant' : text, summary, by: SITE?.me?.user?.email || undefined }); project.edits = project.edits.slice(0, 50); }
     const done = () => { pstatus.innerHTML = `<span>${esc(summary)}</span>${ok ? '<button type="button" id="undoNow">Undo</button>' : ''}`; $('undoNow')?.addEventListener('click', undoEdit); };
     done(); if (pinput.value.trim() === text) pinput.value = ''; renderPhist(); saveSoon();
     for (const { r, brief } of refurn) { pstatus.innerHTML = `<span>Refurnishing ${esc(r.name)}…</span>`; await refurnishRoom(r, brief || text, false); done(); }
-    return { ok, n, summary, notes };
+    return { ok, n, summary, notes, left, open, fixed };
   } catch (err) {
-    clearInterval(iv); const cancelled = err?.code === 'cancelled', reason = cancelled ? 'Stopped. Nothing was changed.' : errText(err);
+    clearInterval(iv); const cancelled = err?.code === 'cancelled';
+    if (applied && cancelled) restoreSnap(snap);          // stopped part-way through a repair: the home goes back as it was
+    const reason = cancelled ? 'Stopped. Nothing was changed.' : errText(err);
     pstatus.textContent = reason; return { ok: false, cancelled, reason, paywall: SITE?.lastPaywall && Date.now() - SITE.lastPaywall.t < 4000 ? SITE.lastPaywall.reason : '' };
   } finally { clearInterval(iv); editing = false; editNow = null; pinput.disabled = false; $('pgo').textContent = 'Apply'; renderCredits(); }
 }

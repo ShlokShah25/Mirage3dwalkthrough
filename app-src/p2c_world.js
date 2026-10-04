@@ -92,12 +92,26 @@ function rebuildItem(it) {
 /* ================= shell ================= */
 const M = {};
 function shellMats() {
-  const s = layout.settings; for (const k in M) M[k].dispose?.();
+  const s = layout.settings; for (const k in M) M[k].dispose?.(); for (const m of PAINT.values()) m.dispose(); PAINT.clear();
   M.wall = std({ color: s.wallColor || '#e8dfd2', map: plasterTex(), roughness: .92, envMapIntensity: .35 }); M.wall.map.repeat.set(1, 1);
   M.ceil = std({ color: s.ceilingColor || '#f5f0e8', roughness: .95, envMapIntensity: .3 });
   M.frame = std({ color: '#3d3935', roughness: .45, metalness: .6 });
   M.doorFrame = std({ color: shade(s.wallColor || '#e8dfd2', .93), roughness: .6 });
   M.skirt = std({ color: shade(s.wallColor || '#e8dfd2', .9), roughness: .5 });
+}
+// A room may have its own paint (r.wall, r.ceil). Its walls get a thin painted skin on the faces that look into that room.
+const PAINT = new Map();
+function roomPaint(col, base) { const key = (base === M.ceil ? 'c' : 'w') + col; let m = PAINT.get(key); if (!m) { m = base.clone(); m.color.set(col); m.userData.paint = true; PAINT.set(key, m); } return m; }
+function wallRun(g, W, s0, s1, y0, y1, t, collide) {
+  along(g, W, s0, s1, y0, y1, t, M.wall, 0, collide);
+  if (s1 - s0 < .05 || !layout.rooms.some(r => r.wall)) return;
+  for (const sd of [1, -1]) {
+    const colAt = q => { const d = sd * (t / 2 + .45), r = roomAt(W.ax + W.ux * q + W.nx * d, W.az + W.uz * q + W.nz * d); return r?.wall && r.wall !== layout.settings.wallColor ? r.wall : ''; };
+    let a = s0, cur = null;
+    const flush = b => { if (cur && b - a > .02) along(g, W, a, b, y0, y1, .03, roomPaint(cur, M.wall), sd * (t / 2 + .008)); };
+    for (let q = s0 + .125; q < s1; q += .25) { const c = colAt(q); if (cur === null) cur = c; else if (c !== cur) { flush(q - .125); a = q - .125; cur = c; } }
+    flush(s1);
+  }
 }
 function along(parent, W, s0, s1, y0, y1, depth, m, off = 0, collide = false) {
   const len = s1 - s0; if (len < .01 || y1 - y0 < .01) return;
@@ -113,10 +127,10 @@ function buildWall(w, g) {
   let cur = -ext; const solid = [];
   for (const o of [...(w.openings || [])].sort((p, q) => p.start - q.start)) {
     const s0 = Math.max(o.start, cur), s1 = Math.min(o.end, L); if (s1 <= s0) continue;
-    along(g, W, cur, s0, 0, H, t, M.wall, 0, true); solid.push([cur, s0]);
+    wallRun(g, W, cur, s0, 0, H, t, true); solid.push([cur, s0]);
     const sill = o.sill || 0, head = Math.min(o.head ?? 7, H);
-    if (sill > 0) { along(g, W, s0, s1, 0, sill, t, M.wall, 0, true); solid.push([s0, s1]); }
-    if (head < H) along(g, W, s0, s1, head, H, t, M.wall);
+    if (sill > 0) { wallRun(g, W, s0, s1, 0, sill, t, true); solid.push([s0, s1]); }
+    if (head < H) wallRun(g, W, s0, s1, head, H, t, false);
     const len = s1 - s0, fw = .16;
     if (o.type === 'window') {
       along(g, W, s0, s1, sill, head, .04, glass);
@@ -149,7 +163,7 @@ function buildWall(w, g) {
     }
     cur = s1;
   }
-  along(g, W, cur, L + ext, 0, H, t, M.wall, 0, true); solid.push([cur, L + ext]);
+  wallRun(g, W, cur, L + ext, 0, H, t, true); solid.push([cur, L + ext]);
   // skirting on both faces of solid runs
   for (const [a, b] of solid) for (const sd of [-1, 1]) along(g, W, Math.max(a, -ext + .02), Math.min(b, L + ext - .02), 0, .33, .05, M.skirt, sd * (t / 2 + .025));
 }
@@ -229,7 +243,7 @@ function buildShell() {
   }
   mergeGroup(wallGroup);
   // world-scale UVs on the walls so the plaster texture has a real size (about 9 ft per tile)
-  wallGroup.children.forEach(me => { if (me.material !== M.wall) return; const p = me.geometry.attributes.position, n = me.geometry.attributes.normal, uv = me.geometry.attributes.uv; if (!uv) return;
+  wallGroup.children.forEach(me => { if (me.material !== M.wall && !(me.material?.userData?.paint)) return; const p = me.geometry.attributes.position, n = me.geometry.attributes.normal, uv = me.geometry.attributes.uv; if (!uv) return;
     for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)); const u = ay > .5 ? p.getX(i) : ax > .5 ? p.getZ(i) : p.getX(i), v = ay > .5 ? p.getZ(i) : p.getY(i); uv.setXY(i, u / 9, v / 9); } uv.needsUpdate = true; });
   if (effQ() !== 'fast') {
     const glaz = [];
@@ -258,7 +272,7 @@ function buildShell() {
     house.add(m); floorMeshes.push(m);
     const [cx, cz] = centroid(r.polygon);
     if (r.kind === 'room') {
-      const top = new THREE.Mesh(geo, M.ceil); top.position.y = H + slab + i * .0015; top.castShadow = true; top.receiveShadow = true; house.add(top); ceilings.push(top);
+      const top = new THREE.Mesh(geo, r.ceil && r.ceil !== layout.settings.ceilingColor ? roomPaint(r.ceil, M.ceil) : M.ceil); top.position.y = H + slab + i * .0015; top.castShadow = true; top.receiveShadow = true; house.add(top); ceilings.push(top);
       const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]), spanX = Math.max(...xs) - Math.min(...xs), spanZ = Math.max(...zs) - Math.min(...zs);
       const spots = spanX > 18 ? [[cx - spanX / 4, cz], [cx + spanX / 4, cz]] : spanZ > 18 ? [[cx, cz - spanZ / 4], [cx, cz + spanZ / 4]] : [[cx, cz]];
       for (const [lx, lz] of spots) if (pip([lx, lz], r.polygon)) { const lamp = new THREE.PointLight('#ffe0c2', 14, 0, 1.6); lamp.position.set(lx, H - 2.6, lz); /* hung low enough not to burn a hot spot into the ceiling */ house.add(lamp); lamps.push(lamp); }
