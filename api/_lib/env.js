@@ -49,7 +49,7 @@ export const DEEP = { rounds: () => Math.max(0, Math.min(8, Number(env('PLAN_DEE
 
 export function publicConfig(launch) {
   return {
-    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(),
+    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(), voiceOn: !!env('FAL_KEY'),
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

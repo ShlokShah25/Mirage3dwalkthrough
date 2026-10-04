@@ -5710,11 +5710,15 @@ async function lookAtItem(it) {
 }
 
 /* ---------- voice ---------- */
+// The device voice is only the fallback, and it must still sound like Mira: a woman's voice wins over the "right" accent.
+const V_FEMALE = /female|samantha|karen|moira|tessa|veena|isha|fiona|kate|serena|allison|ava\b|susan|victoria|zira|aria|jenny|sonia|libby|neerja|heera|swara|natasha|michelle|catherine|martha|stephanie|emma|clara|molly|maisie|\bsara\b|nancy|\bjane\b|amber|ashley|\bcora\b|elizabeth|monica|google us english/i;
+const V_MALE = /\bmale\b|rishi|daniel|alex\b|fred|aaron|arthur|gordon|oliver|\btom\b|david|\bmark\b|ravi|prabhat|george|\bguy\b|ryan|james|thomas|eddy|reed|rocko|grandpa|albert|bruce|junior|ralph|christopher|\beric\b|roger|william|liam|brian|andrew|steffan|davis|\btony\b|jason|brandon|jacob/i;
 function pickVoice() {
   if (!('speechSynthesis' in window)) return null;
-  const vs = speechSynthesis.getVoices(); if (!vs.length) return null;
-  const pref = [/en-IN/i, /en-GB/i, /en-US/i];
-  for (const re of pref) { const v = vs.find(v => re.test(v.lang) && /female|samantha|serena|veena|google uk english female|aria|jenny|natural/i.test(v.name)) || vs.find(v => re.test(v.lang)); if (v) return v; }
+  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); if (!vs.length) return speechSynthesis.getVoices()[0] || null;
+  const pref = [/en[-_]IN/i, /en[-_]GB/i, /en[-_]US/i, /en[-_]AU/i, /^en/i];
+  for (const re of pref) { const v = vs.find(v => re.test(v.lang) && V_FEMALE.test(v.name) && !V_MALE.test(v.name)); if (v) return v; }
+  for (const re of pref) { const v = vs.find(v => re.test(v.lang) && !V_MALE.test(v.name)); if (v) return v; }
   return vs[0];
 }
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { GUIDE.voice = pickVoice(); };
@@ -5723,24 +5727,76 @@ function gSpeak(text) {
   const words = text.split(/\s+/).length, est = 900 + words * 360;
   const say = PRES.say = { text, t0: performance.now() + 150, ci: 0, cps: text.length / Math.max(1, (est - 900) / 1000) };   // her lips follow the words
   const clear = () => { if (PRES.say === say) PRES.say = null; };
-  if (GUIDE.speak && SITE?.token && !GUIDE.voiceOff) {   // Mira's own voice (premium), falling back to the device voice
+  if (GUIDE.speak && SITE?.token && premiumOK()) {   // Mira's own voice (premium), falling back to the device voice
     return premiumSpeak(text, say).then(ok => { if (ok) { clear(); return; } return deviceSpeak(text, say, est, clear); });
   }
   return deviceSpeak(text, say, est, clear);
 }
+// One audio element for every line. Safari and iPhones only let a page start sound from a tap, so the first tap or key
+// plays a moment of silence on it; after that it may speak whenever Mira has something to say.
+const VOICE_EL = new Audio(); VOICE_EL.preload = 'auto';
+let voiceSeq = 0, voiceUnlocked = false;
+const SILENCE = (() => {
+  const n = 400, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+  let t = ''; for (const c of b) t += String.fromCharCode(c); return 'data:audio/wav;base64,' + btoa(t);
+})();
+function unlockVoice() {
+  if (voiceUnlocked || GUIDE.audio) return; voiceUnlocked = true;
+  try { VOICE_EL.src = SILENCE; const p = VOICE_EL.play(); p?.catch?.(() => { voiceUnlocked = false; }); } catch { voiceUnlocked = false; }
+}
+for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, unlockVoice, { capture: true, passive: true });
+// When her own voice cannot be reached, stop asking for a while so every line does not wait on a failure first.
+function premiumOK() { if (SITE?.cfg?.voiceOn === false) return false; return !(GUIDE.voiceOff && Date.now() < GUIDE.voiceOff); }
+function voiceFailed(e) {
+  const st = e?.status || 0; console.warn('[voice] Mira\'s own voice was not used:', st || '', e?.code || e?.name || e?.message || e || '');
+  if (st === 429) GUIDE.voiceOff = Date.now() + 6 * 3600e3;                                   // today's lines are used up
+  else if (st === 503) GUIDE.voiceOff = Date.now() + 3600e3;                                  // not switched on
+  else if (st >= 500) { GUIDE.voiceFails = (GUIDE.voiceFails || 0) + 1; if (GUIDE.voiceFails >= 2) { GUIDE.voiceOff = Date.now() + 5 * 60e3; GUIDE.voiceFails = 0; } }
+}
+// A long line is spoken in parts, cut at sentence ends, so it never runs past what one voice request may carry.
+function voiceParts(text, max = 380) {
+  if (text.length <= max) return [text];
+  const out = []; let cur = '';
+  for (const s of text.match(/[^.!?;:]+[.!?;:]*\s*/g) || [text]) {
+    if ((cur + s).length > max && cur) { out.push(cur.trim()); cur = ''; }
+    if (s.length > max) { for (const w of s.split(/\s+/)) { if ((cur + ' ' + w).length > max && cur) { out.push(cur.trim()); cur = ''; } cur += (cur ? ' ' : '') + w; } cur += ' '; }
+    else cur += s;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out.flatMap(p => { const r = []; for (let i = 0; i < p.length; i += max + 30) r.push(p.slice(i, i + max + 30)); return r; }).filter(Boolean);
+}
 const VOICE_CACHE = new Map();
+async function voiceURL(text) {
+  let url = VOICE_CACHE.get(text);
+  if (!url) { url = (await SITE.api('/api/voice', { text })).url; VOICE_CACHE.set(text, url); if (VOICE_CACHE.size > 80) VOICE_CACHE.delete(VOICE_CACHE.keys().next().value); }
+  return url;
+}
 async function premiumSpeak(text, say) {
+  let started = false, my = 0;
   try {
-    let url = VOICE_CACHE.get(text);
-    if (!url) { url = (await SITE.api('/api/voice', { text })).url; VOICE_CACHE.set(text, url); if (VOICE_CACHE.size > 80) VOICE_CACHE.delete(VOICE_CACHE.keys().next().value); }
-    hush(); PRES.say = say; const a = new Audio(url); GUIDE.audio = a; a.preload = "auto";
-    await new Promise((res, rej) => { a.oncanplay = res; a.onerror = rej; setTimeout(rej, 8000); });
-    await a.play();
-    return await new Promise(res => {
-      const tick = () => { if (GUIDE.audio !== a) return res(true); if (a.duration) { say.ci = Math.floor(a.currentTime / a.duration * text.length); say.t0 = performance.now(); } if (!a.ended && !a.paused) requestAnimationFrame(tick); };
-      a.onended = () => res(true); a.onpause = () => res(true); tick();
-    });
-  } catch (e) { if (e?.status === 429) GUIDE.voiceOff = true; return false; }
+    const parts = voiceParts(text), urls = await Promise.all(parts.map(voiceURL)); GUIDE.voiceFails = 0;
+    hush(); PRES.say = say; const a = VOICE_EL; my = ++voiceSeq; GUIDE.audio = a; let at = 0;
+    for (let i = 0; i < parts.length; i++) {
+      if (voiceSeq !== my || GUIDE.audio !== a) return true;                                   // something newer is being said
+      a.src = urls[i];
+      await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('audio_timeout')), 8000); a.oncanplay = () => { clearTimeout(t); res(); }; a.onerror = () => { clearTimeout(t); rej(new Error('audio_error')); }; a.load(); });
+      a.oncanplay = a.onerror = null; if (voiceSeq !== my) return true;
+      await a.play(); started = true; voiceUnlocked = true;
+      const base = at, len = parts[i].length;
+      await new Promise(res => {
+        const tick = () => { if (voiceSeq !== my || GUIDE.audio !== a) return res(); if (a.duration) { say.ci = base + Math.floor(a.currentTime / a.duration * len); say.t0 = performance.now(); } if (a.ended || a.paused) return res(); requestAnimationFrame(tick); };
+        a.onended = res; tick();
+      });
+      a.onended = null; at += len + 1;
+      if (!a.ended) return true;                                                               // paused or hushed part-way: do not carry on
+    }
+    return true;
+  } catch (e) {
+    if (my && (voiceSeq !== my || GUIDE.audio !== VOICE_EL)) return true;                       // hushed or overtaken by a newer line: say nothing more
+    voiceFailed(e); if (!started) GUIDE.audio = null; return started;
+  }
 }
 function deviceSpeak(text, say, est, clear) {
   if (!GUIDE.speak || !('speechSynthesis' in window)) return new Promise(r => setTimeout(() => { clear(); r(); }, est));
@@ -7117,7 +7173,7 @@ setupPost(); renderCredits();
   showHome();
 })();
 tick();
-window.__studio = { startDesigner, DES, designerPrompt, chatPrompt, editPrompt, goToRoom, applyOps, wallsText, wallClass, lookingAt, requestEdit, guideEdit, get gfx() { return { quality, autoStep, eff: effQ() }; }, clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
+window.__studio = { gSpeak, voiceParts, pickVoice, GUIDE, startDesigner, DES, designerPrompt, chatPrompt, editPrompt, goToRoom, applyOps, wallsText, wallClass, lookingAt, requestEdit, guideEdit, get gfx() { return { quality, autoStep, eff: effQ() }; }, clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
 
 /* ================= website: accounts, plans, paywall, meter (website build only) ================= */
 if (SITE) (() => {
