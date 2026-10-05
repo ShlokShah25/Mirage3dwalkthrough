@@ -242,6 +242,12 @@ function editPrompt(text, context = '') {
   if (furn.join('\n').length > 26000) { const keep = new Set(focus.map(r => r.name)); furn = layout.furniture.filter(it => keep.has(it.room)).map(it => furn[layout.furniture.indexOf(it)]); }
   const rooms = layout.rooms.filter(r => r.kind !== 'ledge').map(r => { const xs = r.polygon.map(p => p[0]), zs = r.polygon.map(p => p[1]); return `${r.name} | ${r.type} | ${Math.round(polyArea(r.polygon))} sq ft | x ${f1(Math.min(...xs))}–${f1(Math.max(...xs))}, z ${f1(Math.min(...zs))}–${f1(Math.max(...zs))} | floor ${r.finish} ${r.floor}${r.wall ? ' | own wall paint ' + r.wall : ''}${r.ceil ? ' | own ceiling ' + r.ceil : ''}${hasNorth() ? ' | ' + DIRNAME[roomZone(r)] : ''}`; }).join('\n');
   const detail = focus.map(r => { const F = roomFrame(r); return `${describeRoom(F, false)}\nThis room's coordinates start at whole-home (${f1(F.ox)},${f1(F.oz)}).`; }).join('\n\n');
+  // what the architect drew on the plan: the rooms in question, or every room when they ask about the plan itself
+  const asksPlan = /\b(plan|drawn|drawing|architect|blueprint|layout shown|as shown)\b/i.test(text), fwd_ = { 0: 'down (+z)', 90: 'right (+x)', 180: 'up (-z)', '-90': 'left (-x)' }, focusNames = new Set(focus.map(r => r.name));
+  const drawnList = (layout.planFurniture || []).filter(p => asksPlan || focusNames.has(p.room)).sort((a, b) => focusNames.has(b.room) - focusNames.has(a.room)).slice(0, 90);
+  const drawn = (layout.planFurniture || []).length
+    ? `FURNITURE DRAWN ON THE FLOOR PLAN (room | piece | x range, z range in whole-home ft | size | front facing). This is what the architect drew, whether or not it stands in the home now:\n${drawnList.map(p => `${p.room} | ${p.kind} | x ${f1(p.x0)}–${f1(p.x1)}, z ${f1(p.z0)}–${f1(p.z1)} | ${f1(p.x1 - p.x0)}×${f1(p.z1 - p.z0)}${p.rot != null ? ' | ' + fwd_[p.rot] : ''}`).join('\n') || '(nothing is drawn in the room they mean)'}`
+    : 'FURNITURE DRAWN ON THE FLOOR PLAN: none was read from this plan.';
   const cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}${typeOptions(k).size ? ` [options: ${optionList(k)}]` : ''}`).join('\n');
   return `You are editing a furnished 3D model of a home for a homeowner. Units are feet. x increases to the right on the plan, z increases downward. rot is degrees: an item's front faces +z at 0, +x at 90, -z at 180, -x at -90. x,z is an item's centre; w is its width across the front, d its depth, h its height, y its lift off the floor.
 
@@ -255,6 +261,8 @@ ROOMS (name | type | area | bounds | floor${hasNorth() ? ' | position in the hom
 ${rooms}
 
 ${detail}
+
+${drawn}
 
 WALLS (id | from→to in whole-home ft | size | LIGHT or STRUCTURE | the rooms on each side | its doors and windows):
 ${wallsText()}
@@ -284,7 +292,8 @@ DO IT ALL, IN THIS ONE REPLY. There is no second turn: nobody can answer a quest
 3. Replacing a piece means removing or re-typing the old one; never leave the old piece under the new one. Moving a piece means moving what belongs with it (its rug, side tables, chairs, lamps, the art above it).
 4. For every piece you add or move, check its footprint (x ± w/2 and z ± d/2, swapped when rot is ±90) against the room's bounds, the door clear zones and every piece that stays. Leave a walkway of 2.5 ft. If it does not fit where asked, put it in the nearest place it does fit and say so.
 5. Use ids exactly as listed, and room names exactly as listed (after a room_set rename, the new name).
-6. Work in the room they mean. "This room", "here", or a kind of room that fits the room they are standing in ("the living room" while standing in a living room) means that room. Touch another room only when the request names it or plainly needs it; if the room they mean has no space for what they want, say so in "left" rather than putting it somewhere else.`;
+6. Furniture "from the plan", "as drawn" or "as per the architect" means the list FURNITURE DRAWN ON THE FLOOR PLAN. To furnish a whole room that way, use one refurnish op for it with the brief "exactly as drawn on the floor plan: same pieces, places, sizes and orientations" (the furnishing engine sees the same drawing); at most six rooms in one change, the rooms they are in or named first, and say in "left" which rooms remain. To add only a piece or two, add them yourself at the drawn place, size and orientation, using the nearest catalog type. If nothing was drawn where they mean, say so in "left".
+7. Work in the room they mean. "This room", "here", or a kind of room that fits the room they are standing in ("the living room" while standing in a living room) means that room. Touch another room only when the request names it or plainly needs it; if the room they mean has no space for what they want, say so in "left" rather than putting it somewhere else.`;
 }
 /* ---------- applying a change, and checking it as built ---------- */
 // What the model meant when a name is slightly off: a catalog type, a room, or a piece.
