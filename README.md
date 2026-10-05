@@ -40,6 +40,10 @@ Plan reading and furnishing run on `MODEL_COMPLEX` / `MODEL_DESIGN` (Opus by def
 
 To measure accuracy, `scripts/planlab/` runs the real plan-reading code headless: `lab.mjs` steps a plan through the read with answers from files (any Claude can play the model), and `compare.mjs` scores a tracing against a hand-checked answer key (walls found and their offset, openings, room overlap). A designed home costs more in Claude usage than before (roughly 2 to 3 times), in exchange for layouts that follow the plan.
 
+## The hand (walkthrough interactions)
+
+`app-src/p2d_hand.js`. In walk mode, whatever is in the middle of the view can be acted on, as in a game: **E** opens or shuts a door, **X** picks a piece up. A carried piece follows where you look (it stays on your side of the walls; beds, sofas and wardrobes turn their back to a wall as they near one; art, mirrors and screens go on the wall you look at), **X** or a click puts it down, **R** turns it, **Esc** puts it back. What stands on a piece comes along with it. The same actions are buttons under the aim dot, which is how touch screens use it. Door leaves hang on pivots (`placeDoor`, `toggleDoor`, `stepDoors` in `p2c_world.js`); a shut door blocks walking, its state is saved with the home (`swing.open`, `swing.max`), and a guided tour or presentation opens the doors in its way.
+
 ## Mira and changes
 
 Mira (`app-src/p3e_guide.js`) is the guide and designer in the walkthrough. Quick questions and navigation use the fast model (`guide`); ideas and anything that leads to a change use the default model (`guide_pro`, counted as a guide message). She knows the room the visitor is in, the wall, door or window they are facing, what she has offered and which changes are being made.

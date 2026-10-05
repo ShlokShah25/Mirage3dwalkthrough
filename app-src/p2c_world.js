@@ -33,7 +33,7 @@ function mergeGroup(g) {
 let house = new THREE.Group(); scene.add(house);
 const itemsGroup = new THREE.Group(); scene.add(itemsGroup);
 const itemGroups = new Map();
-let wallCols = [], itemCols = [], allCols = [], surfaces = [], floorMeshes = [], ceilings = [], labels = [], lamps = [], dayLights = [], wallGroup, bounds = null, H = 10;
+let wallCols = [], itemCols = [], allCols = [], surfaces = [], floorMeshes = [], ceilings = [], labels = [], lamps = [], dayLights = [], wallGroup, doorGroup, doors = [], bounds = null, H = 10;
 const S = { center: new THREE.Vector3() };
 const WALLMOUNT = new Set(['tv', 'artwork', 'mirror', 'panel-slats', 'panel-stone', 'panel-upholstered', 'curtain', 'sconce', 'wall-molding', 'wall-panel-wood', 'feature-stone']);
 
@@ -120,6 +120,27 @@ function along(parent, W, s0, s1, y0, y1, depth, m, off = 0, collide = false) {
   me.position.set(cx, (y0 + y1) / 2, cz); me.rotation.y = W.rot; parent.add(me);
   if (collide) wallCols.push({ cx, cz, hx: len / 2, hz: depth / 2, c: W.ux, s: W.uz, y0: y0 < .5 ? -1 : y0, y1, wall: true });
 }
+// A door leaf at its current angle: 0 is shut, in the frame; the hinge steps out to the wall face as it opens.
+function placeDoor(D) {
+  const a = D.ang, k = Math.min(1, a / .35), hx = D.hx0 + D.nx * D.side * D.t / 2 * k, hz = D.hz0 + D.nz * D.side * D.t / 2 * k;
+  const dx = D.ux * D.sgn * Math.cos(a) + D.nx * D.side * Math.sin(a), dz = D.uz * D.sgn * Math.cos(a) + D.nz * D.side * Math.sin(a);
+  D.pivot.position.set(hx, 0, hz); D.pivot.rotation.y = Math.atan2(-dz, dx);
+  const c = D.col; c.cx = hx + dx * D.lw / 2; c.cz = hz + dz * D.lw / 2; c.c = dx; c.s = dz;
+}
+function toggleDoor(D, want) {
+  D.to = (want ?? D.to < .15) ? D.full : 0;
+  D.o.swing = { hinge: 'start', side: 1, ...(D.o.swing || {}), open: Math.round(D.to / D2R), max: Math.round(D.full / D2R) }; saveSoon();
+}
+// doors swing a little each frame; a guided tour or presentation opens the ones in its way
+function stepDoors(dt) {
+  if (!doors.length) return;
+  const touring = GUIDE.touring || GUIDE.flight || PRES.on;
+  for (const D of doors) {
+    if (touring && D.to < D.full) D.to = D.full;
+    const d = D.to - D.ang; if (Math.abs(d) < .002) continue;
+    D.ang = Math.abs(d) < dt * 3.4 ? D.to : D.ang + Math.sign(d) * dt * 3.4; placeDoor(D); shadowsDirty();
+  }
+}
 function buildWall(w, g) {
   const [ax, az] = w.a, [bx_, bz] = w.b, L = Math.hypot(bx_ - ax, bz - az); if (L < .05) return;
   const ux = (bx_ - ax) / L, uz = (bz - az) / L, W = { ax, az, ux, uz, nx: -uz, nz: ux, rot: Math.atan2(-uz, ux) };
@@ -152,14 +173,15 @@ function buildWall(w, g) {
       const d = t + .1, jw = .22;
       along(g, W, s0, s0 + jw, 0, head, d, M.doorFrame); along(g, W, s1 - jw, s1, 0, head, d, M.doorFrame); along(g, W, s0, s1, head - jw, head, d, M.doorFrame);
       const sw = o.swing || { hinge: 'start', side: 1, open: 90 }, main = /main/i.test(o.name || '');
-      const lw = len - 2 * jw, lh = head - jw - .02, ang = (sw.open ?? 90) * D2R, sgn = sw.hinge === 'end' ? -1 : 1, side = sw.side || 1;
+      const lw = len - 2 * jw, lh = head - jw - .02, sgn = sw.hinge === 'end' ? -1 : 1, side = sw.side || 1;
       const hs = sw.hinge === 'end' ? s1 - jw : s0 + jw;
-      const hx = ax + ux * hs + W.nx * side * (ang ? t / 2 : 0), hz = az + uz * hs + W.nz * side * (ang ? t / 2 : 0);
-      const dx = ux * sgn * Math.cos(ang) + W.nx * side * Math.sin(ang), dz = uz * sgn * Math.cos(ang) + W.nz * side * Math.sin(ang);
-      const lf = new THREE.Mesh(new THREE.BoxGeometry(lw, lh, .15), main ? mat('wood-dark') : mat('wood-light')); const cx = hx + dx * lw / 2, cz = hz + dz * lw / 2;
-      lf.position.set(cx, lh / 2, cz); lf.rotation.y = Math.atan2(-dz, dx); g.add(lf);
-      const hd = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .5), mat('metal')); hd.position.set(hx + dx * (lw - .35), 3.3, hz + dz * (lw - .35)); hd.rotation.y = Math.atan2(-dz, dx) + Math.PI / 2; g.add(hd);
-      wallCols.push({ cx, cz, hx: lw / 2, hz: .1, c: dx, s: dz, y0: -1, y1: lh });
+      // the leaf hangs on a pivot at its hinge, so it can swing open and shut (see placeDoor, toggleDoor)
+      const pivot = new THREE.Group(), lf = new THREE.Mesh(new THREE.BoxGeometry(lw, lh, .15), main ? mat('wood-dark') : mat('wood-light'));
+      lf.position.set(lw / 2, lh / 2, 0); lf.castShadow = lf.receiveShadow = true; pivot.add(lf);
+      for (const sd of [-1, 1]) { const hd = new THREE.Mesh(new THREE.BoxGeometry(.42, .06, .06), mat('metal')); hd.position.set(lw - .42, 3.3, sd * .16); pivot.add(hd); const st = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .1), mat('metal')); st.position.set(lw - .25, 3.3, sd * .1); pivot.add(st); }
+      const col = { cx: 0, cz: 0, hx: lw / 2, hz: .1, c: 1, s: 0, y0: -1, y1: lh }; wallCols.push(col);
+      const open = (sw.open ?? 90) * D2R, D = { pivot, col, o, main, hx0: ax + ux * hs, hz0: az + uz * hs, ux, uz, nx: W.nx, nz: W.nz, sgn, side, t, lw, full: (+sw.max || (sw.open > 5 ? +sw.open : 90)) * D2R, ang: open, to: open };
+      pivot.traverse(m => { m.userData.door = D; }); placeDoor(D); doors.push(D); (doorGroup || g).add(pivot);
     }
     cur = s1;
   }
@@ -225,10 +247,10 @@ function makeLabel(text, sub) {
 function buildShell() {
   scene.remove(house); house.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.isSprite) o.material.map.dispose(); });
   house = new THREE.Group(); scene.add(house);
-  wallCols = []; floorMeshes = []; ceilings = []; labels = []; lamps = []; dayLights = [];
+  wallCols = []; floorMeshes = []; ceilings = []; labels = []; lamps = []; dayLights = []; doors = [];
   shellMats();
   H = +layout.settings.ceilingHeight || 10; const slab = +layout.settings.slabThickness || .5;
-  wallGroup = new THREE.Group(); house.add(wallGroup);
+  wallGroup = new THREE.Group(); house.add(wallGroup); doorGroup = new THREE.Group(); house.add(doorGroup);
   for (const w of layout.walls) buildWall(w, wallGroup);
   for (const rl of layout.railings || []) {
     const h = rl.height || 3.5, rg = new THREE.Group();
@@ -427,7 +449,7 @@ cv.addEventListener('pointermove', e => {
 function endPointer(e) {
   if (dragItem && e.pointerId === dragItem.id) { const moved = dragItem.moved; dragItem = null; orbit.enabled = mode === 'over'; if (moved) { rebuildItem(selected); renderSel(); } press = null; return; }
   if (look && e.pointerId === look.id) look = null;
-  if (press && e.pointerId === press.id && e.type === 'pointerup' && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6 && performance.now() - press.t < 600) { const hit = pick(e); select(hit?.item || null); }
+  if (press && e.pointerId === press.id && e.type === 'pointerup' && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6 && performance.now() - press.t < 600) { if (HAND.carry) handDrop(); else { const hit = pick(e); select(hit?.item || null); } }
   press = null;
 }
 cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
@@ -475,7 +497,7 @@ function move(f, s, dt, fast) {
 const btnWalk = $('btnWalk'), btnOver = $('btnOver'), btnCut = $('btnCut');
 let cut = false;
 function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); shadowsDirty(); }
-function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; shadowsDirty(); }
+function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; if (doorGroup) doorGroup.scale.y = wallGroup.scale.y; shadowsDirty(); }
 function setMode(m) {
   mode = m; btnWalk.setAttribute('aria-pressed', m === 'walk'); btnOver.setAttribute('aria-pressed', m === 'over');
   btnCut.hidden = m !== 'over'; orbit.enabled = m === 'over'; setCeilings(m === 'walk'); applyCut();
@@ -701,6 +723,7 @@ function tick() {
   const dt = Math.min(clock.getDelta(), .05);
   if (photo) { if (ptReady) { PT.renderSample(); const n = Math.floor(PT.samples); photoCt.textContent = `${n} sample${n === 1 ? '' : 's'}${n < 48 ? ' · refining' : n < 200 ? ' · looking good' : ' · final quality'}`; } return; }
   if (grade) grade.uniforms.time.value = performance.now() / 1000;
+  stepDoors(dt);
   if (mode === 'walk') {
     const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - jv.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + jv.x;
     if (keys.ArrowLeft) player.yaw += 1.8 * dt; if (keys.ArrowRight) player.yaw -= 1.8 * dt;
@@ -708,10 +731,11 @@ function tick() {
     const eye = Math.min(PRES.on ? 5.75 : +layout.settings.eyeHeight || 5.1, H - player.y - .45);
     camera.position.set(player.x, player.y + eye, player.z);
     camera.rotation.order = 'YXZ'; camera.rotation.set(-player.pitch, player.yaw, 0);
+    handStep(dt);
     const cur = gr.room, key = (cur?.name || '') + (player.y > 3 ? 'L' : '');
     if (key !== lastKey) { lastKey = key; roomName.textContent = cur ? cur.name + (player.y > 3 ? ' · loft' : '') : 'Outside'; roomSize.textContent = cur?.size || ''; }
   } else {
-    orbit.update();
+    orbit.update(); handStep(dt);
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
   drawMap(); SITE?.frame?.();

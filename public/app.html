@@ -218,6 +218,20 @@
   #joy{position:absolute;left:22px;bottom:22px;width:116px;height:116px;border-radius:50%;border:1px solid var(--line2);background:rgba(17,19,21,.45);touch-action:none;display:none;z-index:3}
   #joy .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo))}
   body.touch #joy{display:block}
+  /* the hand: an aim dot in the middle of the view and, under it, what can be done with the thing you are looking at */
+  #aim{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:1.5px solid rgba(255,255,255,.92);box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 10px rgba(91,240,209,.5);z-index:4;pointer-events:none}
+  #hand{position:absolute;left:50%;top:50%;transform:translate(-50%,24px);display:flex;gap:8px;z-index:6;pointer-events:none;max-width:calc(100% - 24px)}
+  #hand[hidden],#aim[hidden],#hand button[hidden]{display:none}
+  #hand button{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:999px;background:rgba(10,11,12,.88);border:1px solid var(--line2);color:var(--ink);font-size:13.5px;font-weight:600;white-space:nowrap;box-shadow:0 8px 26px rgba(0,0,0,.35)}
+  #hand button:hover{border-color:var(--gold)}
+  #hand #handGo{border-color:rgba(91,240,209,.55)}
+  #hand .hic{display:none;color:var(--gold)}
+  #hand kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:7px;background:var(--gold);color:var(--gold-ink);font:700 12px/1 var(--mono);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+  #hand #handTurn kbd,#hand #handBack kbd{background:rgba(255,255,255,.14);color:var(--ink)}
+  body.touch #hand{transform:translate(-50%,34px)}
+  body.touch #hand kbd{display:none}
+  body.touch #hand .hic{display:inline-flex}
+  body.touch #hand button{padding:12px 18px 12px 14px;font-size:15px}
   body.touch .map{left:auto;right:14px;bottom:auto;top:120px}
   #empty3d{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:28px 30px;max-width:420px;width:calc(100% - 32px);text-align:center;z-index:5}
   #empty3d h2{font-family:var(--serif);font-weight:500;letter-spacing:-.02em;font-size:30px;margin:0 0 8px}
@@ -276,7 +290,7 @@
   @keyframes gpulse{50%{opacity:.45;transform:scale(.8)}}
   /* present mode: full-bleed, letterboxed, captions only */
   body.presenting #view3d{position:fixed;inset:0;z-index:60;background:#000}
-  body.presenting .hud,body.presenting #mapPanel,body.presenting #pbar,body.presenting #joy,body.presenting #coach{display:none!important}
+  body.presenting .hud,body.presenting #mapPanel,body.presenting #pbar,body.presenting #joy,body.presenting #coach,body.presenting #hand,body.presenting #aim{display:none!important}
   body.presenting:not(.present-ask) #guidePanel{display:none!important}
   body.presenting #view3d::before,body.presenting #view3d::after{content:"";position:absolute;left:0;right:0;height:6.5vh;background:#000;z-index:3;pointer-events:none}
   body.presenting #view3d::before{top:0}body.presenting #view3d::after{bottom:0}
@@ -326,7 +340,7 @@
   #photoBar{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:flex;gap:8px;align-items:center;padding:7px 8px 7px 16px;border-radius:14px}
   #photoBar .ct{font-family:var(--mono);font-size:12px;color:var(--gold-hi);min-width:12ch}
   #photoBar .lbl{font-family:var(--serif);font-size:18px;margin-right:4px}
-  body.photo .hud,body.photo .map,body.photo .pbar,body.photo #sel,body.photo #joy{display:none !important}
+  body.photo .hud,body.photo .map,body.photo .pbar,body.photo #sel,body.photo #joy,body.photo #hand,body.photo #aim{display:none !important}
   /* plan */
   #planCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0c0b0a;touch-action:none}
   .ptools{position:absolute;left:14px;top:14px;display:flex;gap:4px;flex-wrap:wrap;padding:6px;max-width:calc(100% - 360px);z-index:2}
@@ -657,6 +671,8 @@
           <div class="hist" id="phist"></div>
         </div>
         <div id="joy"><div class="knob"></div></div>
+        <div id="aim" hidden aria-hidden="true"></div>
+        <div id="hand" hidden><button id="handGo" type="button"></button><button id="handTurn" type="button" hidden></button><button id="handBack" type="button" hidden></button></div>
         <div id="guideFade" aria-hidden="true"></div>
         <div id="guideCap" aria-live="polite" hidden></div>
         <div id="presentBar" hidden><span class="gav" aria-hidden="true"></span><span class="pb-who"><b>Mira</b> · <span id="presentRoom">Welcome</span></span><button id="presentPause" type="button">Pause</button><button id="presentAsk" type="button">Ask</button><button id="presentEnd" type="button">End</button></div>
@@ -2323,7 +2339,7 @@ function mergeGroup(g) {
 let house = new THREE.Group(); scene.add(house);
 const itemsGroup = new THREE.Group(); scene.add(itemsGroup);
 const itemGroups = new Map();
-let wallCols = [], itemCols = [], allCols = [], surfaces = [], floorMeshes = [], ceilings = [], labels = [], lamps = [], dayLights = [], wallGroup, bounds = null, H = 10;
+let wallCols = [], itemCols = [], allCols = [], surfaces = [], floorMeshes = [], ceilings = [], labels = [], lamps = [], dayLights = [], wallGroup, doorGroup, doors = [], bounds = null, H = 10;
 const S = { center: new THREE.Vector3() };
 const WALLMOUNT = new Set(['tv', 'artwork', 'mirror', 'panel-slats', 'panel-stone', 'panel-upholstered', 'curtain', 'sconce', 'wall-molding', 'wall-panel-wood', 'feature-stone']);
 
@@ -2410,6 +2426,27 @@ function along(parent, W, s0, s1, y0, y1, depth, m, off = 0, collide = false) {
   me.position.set(cx, (y0 + y1) / 2, cz); me.rotation.y = W.rot; parent.add(me);
   if (collide) wallCols.push({ cx, cz, hx: len / 2, hz: depth / 2, c: W.ux, s: W.uz, y0: y0 < .5 ? -1 : y0, y1, wall: true });
 }
+// A door leaf at its current angle: 0 is shut, in the frame; the hinge steps out to the wall face as it opens.
+function placeDoor(D) {
+  const a = D.ang, k = Math.min(1, a / .35), hx = D.hx0 + D.nx * D.side * D.t / 2 * k, hz = D.hz0 + D.nz * D.side * D.t / 2 * k;
+  const dx = D.ux * D.sgn * Math.cos(a) + D.nx * D.side * Math.sin(a), dz = D.uz * D.sgn * Math.cos(a) + D.nz * D.side * Math.sin(a);
+  D.pivot.position.set(hx, 0, hz); D.pivot.rotation.y = Math.atan2(-dz, dx);
+  const c = D.col; c.cx = hx + dx * D.lw / 2; c.cz = hz + dz * D.lw / 2; c.c = dx; c.s = dz;
+}
+function toggleDoor(D, want) {
+  D.to = (want ?? D.to < .15) ? D.full : 0;
+  D.o.swing = { hinge: 'start', side: 1, ...(D.o.swing || {}), open: Math.round(D.to / D2R), max: Math.round(D.full / D2R) }; saveSoon();
+}
+// doors swing a little each frame; a guided tour or presentation opens the ones in its way
+function stepDoors(dt) {
+  if (!doors.length) return;
+  const touring = GUIDE.touring || GUIDE.flight || PRES.on;
+  for (const D of doors) {
+    if (touring && D.to < D.full) D.to = D.full;
+    const d = D.to - D.ang; if (Math.abs(d) < .002) continue;
+    D.ang = Math.abs(d) < dt * 3.4 ? D.to : D.ang + Math.sign(d) * dt * 3.4; placeDoor(D); shadowsDirty();
+  }
+}
 function buildWall(w, g) {
   const [ax, az] = w.a, [bx_, bz] = w.b, L = Math.hypot(bx_ - ax, bz - az); if (L < .05) return;
   const ux = (bx_ - ax) / L, uz = (bz - az) / L, W = { ax, az, ux, uz, nx: -uz, nz: ux, rot: Math.atan2(-uz, ux) };
@@ -2442,14 +2479,15 @@ function buildWall(w, g) {
       const d = t + .1, jw = .22;
       along(g, W, s0, s0 + jw, 0, head, d, M.doorFrame); along(g, W, s1 - jw, s1, 0, head, d, M.doorFrame); along(g, W, s0, s1, head - jw, head, d, M.doorFrame);
       const sw = o.swing || { hinge: 'start', side: 1, open: 90 }, main = /main/i.test(o.name || '');
-      const lw = len - 2 * jw, lh = head - jw - .02, ang = (sw.open ?? 90) * D2R, sgn = sw.hinge === 'end' ? -1 : 1, side = sw.side || 1;
+      const lw = len - 2 * jw, lh = head - jw - .02, sgn = sw.hinge === 'end' ? -1 : 1, side = sw.side || 1;
       const hs = sw.hinge === 'end' ? s1 - jw : s0 + jw;
-      const hx = ax + ux * hs + W.nx * side * (ang ? t / 2 : 0), hz = az + uz * hs + W.nz * side * (ang ? t / 2 : 0);
-      const dx = ux * sgn * Math.cos(ang) + W.nx * side * Math.sin(ang), dz = uz * sgn * Math.cos(ang) + W.nz * side * Math.sin(ang);
-      const lf = new THREE.Mesh(new THREE.BoxGeometry(lw, lh, .15), main ? mat('wood-dark') : mat('wood-light')); const cx = hx + dx * lw / 2, cz = hz + dz * lw / 2;
-      lf.position.set(cx, lh / 2, cz); lf.rotation.y = Math.atan2(-dz, dx); g.add(lf);
-      const hd = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .5), mat('metal')); hd.position.set(hx + dx * (lw - .35), 3.3, hz + dz * (lw - .35)); hd.rotation.y = Math.atan2(-dz, dx) + Math.PI / 2; g.add(hd);
-      wallCols.push({ cx, cz, hx: lw / 2, hz: .1, c: dx, s: dz, y0: -1, y1: lh });
+      // the leaf hangs on a pivot at its hinge, so it can swing open and shut (see placeDoor, toggleDoor)
+      const pivot = new THREE.Group(), lf = new THREE.Mesh(new THREE.BoxGeometry(lw, lh, .15), main ? mat('wood-dark') : mat('wood-light'));
+      lf.position.set(lw / 2, lh / 2, 0); lf.castShadow = lf.receiveShadow = true; pivot.add(lf);
+      for (const sd of [-1, 1]) { const hd = new THREE.Mesh(new THREE.BoxGeometry(.42, .06, .06), mat('metal')); hd.position.set(lw - .42, 3.3, sd * .16); pivot.add(hd); const st = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .1), mat('metal')); st.position.set(lw - .25, 3.3, sd * .1); pivot.add(st); }
+      const col = { cx: 0, cz: 0, hx: lw / 2, hz: .1, c: 1, s: 0, y0: -1, y1: lh }; wallCols.push(col);
+      const open = (sw.open ?? 90) * D2R, D = { pivot, col, o, main, hx0: ax + ux * hs, hz0: az + uz * hs, ux, uz, nx: W.nx, nz: W.nz, sgn, side, t, lw, full: (+sw.max || (sw.open > 5 ? +sw.open : 90)) * D2R, ang: open, to: open };
+      pivot.traverse(m => { m.userData.door = D; }); placeDoor(D); doors.push(D); (doorGroup || g).add(pivot);
     }
     cur = s1;
   }
@@ -2515,10 +2553,10 @@ function makeLabel(text, sub) {
 function buildShell() {
   scene.remove(house); house.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.isSprite) o.material.map.dispose(); });
   house = new THREE.Group(); scene.add(house);
-  wallCols = []; floorMeshes = []; ceilings = []; labels = []; lamps = []; dayLights = [];
+  wallCols = []; floorMeshes = []; ceilings = []; labels = []; lamps = []; dayLights = []; doors = [];
   shellMats();
   H = +layout.settings.ceilingHeight || 10; const slab = +layout.settings.slabThickness || .5;
-  wallGroup = new THREE.Group(); house.add(wallGroup);
+  wallGroup = new THREE.Group(); house.add(wallGroup); doorGroup = new THREE.Group(); house.add(doorGroup);
   for (const w of layout.walls) buildWall(w, wallGroup);
   for (const rl of layout.railings || []) {
     const h = rl.height || 3.5, rg = new THREE.Group();
@@ -2717,7 +2755,7 @@ cv.addEventListener('pointermove', e => {
 function endPointer(e) {
   if (dragItem && e.pointerId === dragItem.id) { const moved = dragItem.moved; dragItem = null; orbit.enabled = mode === 'over'; if (moved) { rebuildItem(selected); renderSel(); } press = null; return; }
   if (look && e.pointerId === look.id) look = null;
-  if (press && e.pointerId === press.id && e.type === 'pointerup' && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6 && performance.now() - press.t < 600) { const hit = pick(e); select(hit?.item || null); }
+  if (press && e.pointerId === press.id && e.type === 'pointerup' && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6 && performance.now() - press.t < 600) { if (HAND.carry) handDrop(); else { const hit = pick(e); select(hit?.item || null); } }
   press = null;
 }
 cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
@@ -2765,7 +2803,7 @@ function move(f, s, dt, fast) {
 const btnWalk = $('btnWalk'), btnOver = $('btnOver'), btnCut = $('btnCut');
 let cut = false;
 function setCeilings(v) { ceilings.forEach(c => c.visible = v); labels.forEach(l => l.visible = !v); shadowsDirty(); }
-function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; shadowsDirty(); }
+function applyCut() { if (wallGroup) wallGroup.scale.y = (cut && mode === 'over') ? .42 : 1; if (doorGroup) doorGroup.scale.y = wallGroup.scale.y; shadowsDirty(); }
 function setMode(m) {
   mode = m; btnWalk.setAttribute('aria-pressed', m === 'walk'); btnOver.setAttribute('aria-pressed', m === 'over');
   btnCut.hidden = m !== 'over'; orbit.enabled = m === 'over'; setCeilings(m === 'walk'); applyCut();
@@ -2991,6 +3029,7 @@ function tick() {
   const dt = Math.min(clock.getDelta(), .05);
   if (photo) { if (ptReady) { PT.renderSample(); const n = Math.floor(PT.samples); photoCt.textContent = `${n} sample${n === 1 ? '' : 's'}${n < 48 ? ' · refining' : n < 200 ? ' · looking good' : ' · final quality'}`; } return; }
   if (grade) grade.uniforms.time.value = performance.now() / 1000;
+  stepDoors(dt);
   if (mode === 'walk') {
     const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - jv.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + jv.x;
     if (keys.ArrowLeft) player.yaw += 1.8 * dt; if (keys.ArrowRight) player.yaw -= 1.8 * dt;
@@ -2998,10 +3037,11 @@ function tick() {
     const eye = Math.min(PRES.on ? 5.75 : +layout.settings.eyeHeight || 5.1, H - player.y - .45);
     camera.position.set(player.x, player.y + eye, player.z);
     camera.rotation.order = 'YXZ'; camera.rotation.set(-player.pitch, player.yaw, 0);
+    handStep(dt);
     const cur = gr.room, key = (cur?.name || '') + (player.y > 3 ? 'L' : '');
     if (key !== lastKey) { lastKey = key; roomName.textContent = cur ? cur.name + (player.y > 3 ? ' · loft' : '') : 'Outside'; roomSize.textContent = cur?.size || ''; }
   } else {
-    orbit.update();
+    orbit.update(); handStep(dt);
     if (lastKey !== 'over') { lastKey = 'over'; roomName.textContent = 'Whole house'; roomSize.textContent = $('metaLine').textContent.split(' · ').slice(-1)[0]; }
   }
   drawMap(); SITE?.frame?.();
@@ -3026,6 +3066,130 @@ function govern() {
   }
   gN = gSlow = 0;
 }
+
+
+/* ================= the hand: look at something and act on it ================= */
+// In the walkthrough, whatever sits in the middle of the view can be acted on, as in a game. E opens or shuts a door.
+// X picks a piece up and carries it: it follows where you look, X (or a click) puts it down, R turns it, Esc puts it back.
+// The same actions are buttons under the aim dot, for touch screens and for anyone who would rather click.
+const HAND = { target: null, carry: null, t: 0, key: null, hi: null, ray: new THREE.Raycaster(), mid: new THREE.Vector2(0, 0) };
+const handEl = $('hand'), handGo = $('handGo'), handTurn = $('handTurn'), handBack = $('handBack'), aimEl = $('aim');
+const HAND_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>';
+const FIXED_PIECES = new Set(['ceiling-cove', 'loft-platform', 'stair-curved', 'ceiling-slats']);   // part of the room, not something to carry
+const canCarry = it => !!CAT[it.type] && !FIXED_PIECES.has(it.type);
+function handActive() { return mode === 'walk' && !photo && activeView === '3d' && !PRES.on && !GUIDE.touring && !GUIDE.flight && !running && !document.body.classList.contains('setup'); }
+
+// What the middle of the view rests on: a door within reach, a piece within reach, or nothing (a wall, the floor).
+function handLook() {
+  const R = HAND.ray; R.setFromCamera(HAND.mid, camera); R.far = 16;
+  for (const h of R.intersectObjects([house, itemsGroup], true)) {
+    const o = h.object; if (o.isSprite || o.isLine || !visibleDeep(o)) continue;
+    const m = o.material; if (m && !Array.isArray(m) && (m.blending === THREE.AdditiveBlending || (m.transparent && m.depthWrite === false))) continue;   // glows and washes of light are not things
+    if (o.userData.door) return h.distance <= 9 ? { kind: 'door', D: o.userData.door } : null;
+    let g = o; while (g && !g.userData.item) g = g.parent;
+    if (g) { const it = g.userData.item; return h.distance <= 13 && canCarry(it) && layout.furniture.includes(it) ? { kind: 'item', it } : null; }
+    return null;
+  }
+  return null;
+}
+const handName = it => String(it.name || CAT[it.type]?.label || 'this').replace(/[<>&]/g, '').slice(0, 26).toLowerCase();
+function handOutline(g, color) { if (HAND.hi) { scene.remove(HAND.hi); HAND.hi.geometry.dispose(); HAND.hi = null; } if (g) { HAND.hi = new THREE.BoxHelper(g, color); HAND.hi.material.depthTest = false; HAND.hi.material.transparent = true; HAND.hi.material.opacity = .75; scene.add(HAND.hi); } }
+function handShow() {
+  const T = HAND.target, C = HAND.carry, on = !!(T || C), key = C ? 'c' + C.it.id : !T ? '' : T.kind === 'door' ? 'd' + doors.indexOf(T.D) + (T.D.to > .15) : 'i' + T.it.id;
+  if (key === HAND.key) { HAND.hi?.update(); return; } HAND.key = key;
+  handEl.hidden = !on; aimEl.hidden = !on; handTurn.hidden = handBack.hidden = !C;
+  const cap = k => `<span class="hic">${HAND_ICON}</span><kbd>${k}</kbd>`;
+  if (C) { handGo.innerHTML = cap('X') + 'Place here'; handTurn.innerHTML = '<kbd>R</kbd>Turn'; handBack.innerHTML = '<kbd>Esc</kbd>Put back'; handTurn.hidden = !!C.mount; handOutline(itemGroups.get(C.it.id), 0x5bf0d1); }
+  else if (T?.kind === 'door') { handGo.innerHTML = cap('E') + (T.D.to > .15 ? 'Close ' : 'Open ') + (T.D.main ? 'front door' : 'door'); handOutline(null); }
+  else if (T) { handGo.innerHTML = cap('X') + 'Move ' + handName(T.it); handOutline(itemGroups.get(T.it.id), 0xffffff); }
+  else handOutline(null);
+}
+
+/* ---- carrying a piece ---- */
+const inFootprint = (it, f, x, z) => { const th = (it.rot || 0) * D2R, dx = x - it.x, dz = z - it.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); return Math.abs(lx) <= f.w / 2 + .1 && Math.abs(lz) <= f.d / 2 + .1; };
+function handPick(it) {
+  const g = itemGroups.get(it.id); if (!g || HAND.carry) return; select(null);
+  const f = withDefaults(it), top = (+f.y || 0) + (+f.h || 0);
+  // what stands on it comes along: the lamp on a side table, the vase on a console
+  const riders = layout.furniture.filter(o => { if (o === it || o.room !== it.room || WALLMOUNT.has(o.type) || !CAT[o.type]) return false; const y = +withDefaults(o).y || 0; return y >= .9 && Math.abs(y - top) <= .7 && inFootprint(it, f, o.x, o.z); })
+    .map(o => ({ o, dx: o.x - it.x, dz: o.z - it.z, rot: o.rot || 0 }));
+  HAND.carry = { it, riders, was: { x: it.x, z: it.z, rot: it.rot || 0, room: it.room }, rot: it.rot || 0, mount: WALLMOUNT.has(it.type), backed: BACKED.has(it.type) && !WALLMOUNT.has(it.type), free: false, walls: wallCols.filter(c => c.wall && c.y0 < 1).map(c => ({ cx: c.cx, cz: c.cz, hx: c.hx, hz: c.hz, c: c.c, s: c.s })) };
+  for (const x of [it, ...riders.map(r => r.o)]) { const q = itemGroups.get(x.id); if (q) { q.userData.cols = []; q.userData.surf = []; } }   // nothing to bump into while it is in your hands
+  refreshItemPhysics(); HAND.target = null; HAND.key = null; handShow(); shadowsDirty();
+}
+// the wall a piece would back onto, if one is close behind where it is being held
+function wallBehind(x, z, f) {
+  let best = null;
+  for (const w of layout.walls) {
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]); if (L < 1) continue;
+    const ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L, s = (x - w.a[0]) * ux + (z - w.a[1]) * uz, off = (x - w.a[0]) * -uz + (z - w.a[1]) * ux, side = Math.sign(off) || 1, t = (+w.thickness || .5) / 2;
+    const gap = Math.abs(off) - t - f.d / 2; if (gap > 1.3 || gap < -f.d || s < f.w / 2 - .6 || s > L - f.w / 2 + .6) continue;
+    if ((w.openings || []).some(o => o.type !== 'window' && s + f.w / 2 > o.start + .2 && s - f.w / 2 < o.end - .2)) continue;   // never across a doorway
+    const sc = clamp(s, f.w / 2, Math.max(f.w / 2, L - f.w / 2));
+    if (!best || gap < best.gap) best = { gap, rot: rotOf([-uz * side, ux * side]), x: r2(w.a[0] + ux * sc - uz * side * (t + f.d / 2 + .01)), z: r2(w.a[1] + uz * sc + ux * side * (t + f.d / 2 + .01)) };
+  }
+  return best;
+}
+// how far a straight line from (px,pz) runs before it meets a wall; doorways are gaps between the wall boxes
+function clearAhead(px, pz, fx, fz, walls) {
+  let best = 40;
+  for (const b of walls) {
+    const ox = (px - b.cx) * b.c + (pz - b.cz) * b.s, oz = -(px - b.cx) * b.s + (pz - b.cz) * b.c, dx = fx * b.c + fz * b.s, dz = -fx * b.s + fz * b.c; let t0 = -1e9, t1 = 1e9, miss = false;
+    for (const [o, d, h] of [[ox, dx, b.hx], [oz, dz, b.hz]]) { if (Math.abs(d) < 1e-6) { if (Math.abs(o) > h) miss = true; continue; } const a = (-h - o) / d, c = (h - o) / d; t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c)); }
+    if (!miss && t1 >= Math.max(t0, 0)) best = Math.min(best, Math.max(0, t0));
+  }
+  return best;
+}
+function carryStep() {
+  const C = HAND.carry, it = C.it, f = withDefaults(it), g = itemGroups.get(it.id); if (!g || !layout.furniture.includes(it)) { HAND.carry = null; HAND.key = null; return; }
+  const px = it.x, pz = it.z;
+  if (C.mount) {          // art, mirrors, screens and curtains go where you look on a wall
+    const R = HAND.ray; R.setFromCamera(HAND.mid, camera); R.far = 40;
+    const h = R.intersectObject(wallGroup, true).find(h => h.face && Math.abs(h.face.normal.y) < .3 && (h.object.material === M.wall || h.object.material?.userData?.paint));
+    if (h) { let nx = h.face.normal.x, nz = h.face.normal.z; const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l; if (R.ray.direction.x * nx + R.ray.direction.z * nz > 0) { nx = -nx; nz = -nz; }
+      it.rot = rotOf([nx, nz]); it.x = r2(h.point.x + nx * (f.d / 2 + .01)); it.z = r2(h.point.z + nz * (f.d / 2 + .01)); }
+  } else {                // everything else stands on the floor, where your eyes meet it
+    const eye = camera.position.y - player.y, reach = player.pitch > .06 ? eye / Math.tan(player.pitch) : 12, near = player.r + Math.max(f.w, f.d) / 2 + .6;
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), d = Math.max(.6, Math.min(Math.max(near, Math.min(12, reach)), clearAhead(player.x, player.z, fx, fz, C.walls) - .3));   // never through a wall into the next room
+    const x = player.x + fx * d, z = player.z + fz * d;
+    it.x = r2(x); it.z = r2(z); it.rot = C.rot;
+    if (C.backed && !C.free) { const wb = wallBehind(it.x, it.z, f); if (wb) { it.rot = wb.rot; it.x = wb.x; it.z = wb.z; } }   // beds, sofas and wardrobes turn their back to a wall as they come near one
+    for (let k = 0; k < 2; k++) for (const wb of C.walls) { const m = sat(itemOBB(it), wb); if (m && m.ov < 3) { it.x = r2(it.x - m.ax * m.sg * (m.ov + .02)); it.z = r2(it.z - m.az * m.sg * (m.ov + .02)); } }
+    const rm = roomAt(it.x, it.z); if (!rm || rm.kind === 'ledge') { it.x = px; it.z = pz; }       // never out of the home
+  }
+  g.position.set(it.x, g.position.y, it.z); g.rotation.y = (it.rot || 0) * D2R;
+  const da = ((it.rot || 0) - C.was.rot) * D2R, c = Math.cos(da), s = Math.sin(da);
+  for (const q of C.riders) { q.o.x = r2(it.x + q.dx * c + q.dz * s); q.o.z = r2(it.z - q.dx * s + q.dz * c); q.o.rot = q.rot + (it.rot || 0) - C.was.rot; const qg = itemGroups.get(q.o.id); if (qg) { qg.position.set(q.o.x, qg.position.y, q.o.z); qg.rotation.y = q.o.rot * D2R; } }
+  if (it.x !== px || it.z !== pz) shadowsDirty(1);
+}
+function handEnd(C) { HAND.carry = null; HAND.key = null; HAND.target = null; const r = roomAt(C.it.x, C.it.z); if (r) C.it.room = r.name; for (const q of C.riders) { q.o.room = C.it.room; rebuildItem(q.o); } rebuildItem(C.it); handShow(); }
+function handDrop() { const C = HAND.carry; if (C) handEnd(C); }
+function handCancel() { const C = HAND.carry; if (!C) return; C.it.x = C.was.x; C.it.z = C.was.z; C.it.rot = C.was.rot; for (const q of C.riders) { q.o.x = C.was.x + q.dx; q.o.z = C.was.z + q.dz; q.o.rot = q.rot; } handEnd(C); C.it.room = C.was.room; }
+function handTurnBy(deg) { const C = HAND.carry; if (!C || C.mount) return; C.rot = ((C.rot + deg) % 360 + 540) % 360 - 180; C.free = true; }   // once turned by hand it stops turning itself to the walls
+function handAct() {
+  if (HAND.carry) return handDrop();
+  const T = HAND.target; if (!T || !handActive()) return;
+  if (T.kind === 'door') { toggleDoor(T.D); HAND.key = null; handShow(); } else handPick(T.it);
+}
+function handStep(dt) {
+  if (HAND.carry) { if (handActive()) carryStep(); else handDrop(); handShow(); return; }
+  if (!handActive()) { if (HAND.target || HAND.key) { HAND.target = null; handShow(); } return; }
+  if ((HAND.t += dt) < .12) return; HAND.t = 0;
+  HAND.target = handLook(); handShow();
+}
+handGo.onclick = handAct; handTurn.onclick = () => handTurnBy(BACKED.has(HAND.carry?.it.type) ? 90 : 45); handBack.onclick = handCancel;
+addEventListener('keydown', e => {
+  if (typing(e) || activeView !== '3d' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (HAND.carry) {
+    if (e.code === 'KeyX' || e.code === 'Enter') { e.preventDefault(); handDrop(); }
+    else if (e.code === 'KeyR') handTurnBy((e.shiftKey ? -1 : 1) * (BACKED.has(HAND.carry.it.type) ? 90 : 15));
+    else if (e.code === 'Escape') { e.stopPropagation(); handCancel(); }
+    return;
+  }
+  if (!handActive() || e.repeat) return;
+  if (e.code === 'KeyE' && HAND.target?.kind === 'door') handAct();
+  else if (e.code === 'KeyX' && HAND.target?.kind === 'item') handAct();
+}, true);
 
 
 /* ================= pricing (edit these) ================= */
@@ -4668,7 +4832,7 @@ function roomFrame(r) {
         const P0 = [w.a[0] + c.wu[0] * o.start, w.a[1] + c.wu[1] * o.start], P1 = [w.a[0] + c.wu[0] * o.end, w.a[1] + c.wu[1] * o.end];
         let a0 = along(P0), a1 = along(P1); if (a0 > a1) [a0, a1] = [a1, a0]; if (a1 < -.2 || a0 > len + .2) continue;
         const mid = [(P0[0] + P1[0]) / 2, (P0[1] + P1[1]) / 2], other = roomAt(mid[0] - e.n[0] * (w.thickness / 2 + 1.2), mid[1] - e.n[1] * (w.thickness / 2 + 1.2));
-        let swingsIn = false; if (o.type === 'door' && (o.swing?.open ?? 90) !== 0 || /main/i.test(o.name || '')) { const sd = o.swing?.side || 1, wn = [-c.wu[1] * sd, c.wu[0] * sd]; swingsIn = dot2(wn, e.n) > 0; }
+        let swingsIn = false; if (o.type === 'door' && (o.swing?.max ?? o.swing?.open ?? 90) !== 0 || /main/i.test(o.name || '')) { const sd = o.swing?.side || 1, wn = [-c.wu[1] * sd, c.wu[0] * sd]; swingsIn = dot2(wn, e.n) > 0; }
         if (o.type === 'door' && o.swing && o.swing.open === 0 && !/main/i.test(o.name || '')) swingsIn = false;
         ops.push({ type: o.type, a0: clamp(a0, 0, len), a1: clamp(a1, 0, len), sill: o.sill || 0, head: o.head || 7, to: other && other !== r ? other.name : (other ? null : 'outside'), main: /main/i.test(o.name || ''), swingsIn });
       }
@@ -5765,7 +5929,7 @@ $('btnSampleHome').onclick = async () => { const list = await store.all(); const
 function maybeCoach() {
   if (!layout.walls.length) return; let seen = false; try { seen = localStorage.getItem('ws-coach') === '1'; } catch { }
   if (seen) return; const el = $('coach');
-  el.innerHTML = `<div class="eyebrow">Your home in 3D</div><h3>Take a walk</h3><ul>${TOUCH ? `<li><kbd>Joystick</kbd><span>Walk with the pad at the bottom left</span></li><li><kbd>Swipe</kbd><span>Look around</span></li>` : `<li><kbd>W A S D</kbd><span>Walk (arrow keys work too)</span></li><li><kbd>Drag</kbd><span>Look around</span></li>`}<li><kbd>Tap map</kbd><span>Jump to any room</span></li><li><kbd>Click</kbd><span>Any furniture to change it</span></li><li><kbd>Ask</kbd><span>Type a change in the bar below</span></li></ul><button class="primary" id="coachOk">Start walking</button>`;
+  el.innerHTML = `<div class="eyebrow">Your home in 3D</div><h3>Take a walk</h3><ul>${TOUCH ? `<li><kbd>Joystick</kbd><span>Walk with the pad at the bottom left</span></li><li><kbd>Swipe</kbd><span>Look around</span></li>` : `<li><kbd>W A S D</kbd><span>Walk (arrow keys work too)</span></li><li><kbd>Drag</kbd><span>Look around</span></li>`}<li><kbd>Tap map</kbd><span>Jump to any room</span></li>${TOUCH ? `<li><kbd>Hand</kbd><span>Look at a door or a piece and tap the hand to open it or move it</span></li>` : `<li><kbd>E</kbd><span>Look at a door to open or close it</span></li><li><kbd>X</kbd><span>Look at a piece to pick it up and move it</span></li>`}<li><kbd>Click</kbd><span>Any furniture to change it</span></li><li><kbd>Ask</kbd><span>Type a change in the bar below</span></li></ul><button class="primary" id="coachOk">Start walking</button>`;
   el.hidden = false; $('coachOk').onclick = () => { el.hidden = true; try { localStorage.setItem('ws-coach', '1'); } catch { } };
 }
 
@@ -7382,7 +7546,7 @@ setupPost(); renderCredits();
   showHome();
 })();
 tick();
-window.__studio = { CAT, NOTES, withDefaults, typeOptions, labApply: (a, text) => { const prompt = text ? editPrompt(text) : '', r = applyOps(a); return { n: r.n, refurn: r.refurn.map(x => x.r.name), notes: r.notes, failed: r.failed.map(f => f.text), issues: r.issues.map(i => i.text), say: [...r.failed.map(f => f.say), ...r.issues.map(i => i.say)], fix: text && (r.failed.length || r.issues.length) ? fixPrompt(prompt, a, r) : null }; }, isDirectChange, gSpeak, voiceParts, pickVoice, GUIDE, startDesigner, DES, designerPrompt, chatPrompt, editPrompt, goToRoom, applyOps, wallsText, wallClass, lookingAt, requestEdit, guideEdit, get gfx() { return { quality, autoStep, eff: effQ() }; }, clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
+window.__studio = { HAND, getDoors: () => doors, labStep: (dt = .05, n = 1) => { for (let i = 0; i < n; i++) { camera.position.set(player.x, player.y + 5.1, player.z); camera.rotation.order = 'YXZ'; camera.rotation.set(-player.pitch, player.yaw, 0); camera.updateMatrixWorld(true); scene.updateMatrixWorld(true); stepDoors(dt); HAND.t = 1; handStep(dt); } }, handAct, handPick, handDrop, handCancel, handTurnBy, getCols: () => [wallCols.length, itemCols.length], CAT, NOTES, withDefaults, typeOptions, labApply: (a, text) => { const prompt = text ? editPrompt(text) : '', r = applyOps(a); return { n: r.n, refurn: r.refurn.map(x => x.r.name), notes: r.notes, failed: r.failed.map(f => f.text), issues: r.issues.map(i => i.text), say: [...r.failed.map(f => f.say), ...r.issues.map(i => i.say)], fix: text && (r.failed.length || r.issues.length) ? fixPrompt(prompt, a, r) : null }; }, isDirectChange, gSpeak, voiceParts, pickVoice, GUIDE, startDesigner, DES, designerPrompt, chatPrompt, editPrompt, goToRoom, applyOps, wallsText, wallClass, lookingAt, requestEdit, guideEdit, get gfx() { return { quality, autoStep, eff: effQ() }; }, clearDoorways, move, player, setMode, select, get layout() { return layout; }, get project() { return project; }, get wallet() { return wallet; }, traceToLayout, settleItems, furnishPrompt, roomFrame, describeRoom, resolveItems, auditRoom, refineTrace, fitToDims, editPrompt, applyOps, loadProject, openProject, showHome, showView, buildAll, placeSpawn, cycleTime, enterPhoto, exitPhoto, store, get PT() { return PT; }, presetById, normalizeStyle, applyStyleToRooms, captureCover, persistNow, get camera() { return camera; }, get orbit() { return orbit; }, get S() { return S; }, applyTime, get labels() { return labels; }, get renderer() { return renderer; }, get scene() { return scene; }, get composer() { return composer; }, THREE, choosePreset, setQuality: q => { quality = q; setupPost(); buildAll(); resize(); } };
 
 /* ================= website: accounts, plans, paywall, meter (website build only) ================= */
 if (SITE) (() => {

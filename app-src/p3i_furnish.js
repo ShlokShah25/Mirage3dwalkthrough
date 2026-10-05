@@ -58,7 +58,7 @@ function roomFrame(r) {
         const P0 = [w.a[0] + c.wu[0] * o.start, w.a[1] + c.wu[1] * o.start], P1 = [w.a[0] + c.wu[0] * o.end, w.a[1] + c.wu[1] * o.end];
         let a0 = along(P0), a1 = along(P1); if (a0 > a1) [a0, a1] = [a1, a0]; if (a1 < -.2 || a0 > len + .2) continue;
         const mid = [(P0[0] + P1[0]) / 2, (P0[1] + P1[1]) / 2], other = roomAt(mid[0] - e.n[0] * (w.thickness / 2 + 1.2), mid[1] - e.n[1] * (w.thickness / 2 + 1.2));
-        let swingsIn = false; if (o.type === 'door' && (o.swing?.open ?? 90) !== 0 || /main/i.test(o.name || '')) { const sd = o.swing?.side || 1, wn = [-c.wu[1] * sd, c.wu[0] * sd]; swingsIn = dot2(wn, e.n) > 0; }
+        let swingsIn = false; if (o.type === 'door' && (o.swing?.max ?? o.swing?.open ?? 90) !== 0 || /main/i.test(o.name || '')) { const sd = o.swing?.side || 1, wn = [-c.wu[1] * sd, c.wu[0] * sd]; swingsIn = dot2(wn, e.n) > 0; }
         if (o.type === 'door' && o.swing && o.swing.open === 0 && !/main/i.test(o.name || '')) swingsIn = false;
         ops.push({ type: o.type, a0: clamp(a0, 0, len), a1: clamp(a1, 0, len), sill: o.sill || 0, head: o.head || 7, to: other && other !== r ? other.name : (other ? null : 'outside'), main: /main/i.test(o.name || ''), swingsIn });
       }

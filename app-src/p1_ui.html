@@ -211,6 +211,20 @@
   #joy{position:absolute;left:22px;bottom:22px;width:116px;height:116px;border-radius:50%;border:1px solid var(--line2);background:rgba(17,19,21,.45);touch-action:none;display:none;z-index:3}
   #joy .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo))}
   body.touch #joy{display:block}
+  /* the hand: an aim dot in the middle of the view and, under it, what can be done with the thing you are looking at */
+  #aim{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:1.5px solid rgba(255,255,255,.92);box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 10px rgba(91,240,209,.5);z-index:4;pointer-events:none}
+  #hand{position:absolute;left:50%;top:50%;transform:translate(-50%,24px);display:flex;gap:8px;z-index:6;pointer-events:none;max-width:calc(100% - 24px)}
+  #hand[hidden],#aim[hidden],#hand button[hidden]{display:none}
+  #hand button{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:999px;background:rgba(10,11,12,.88);border:1px solid var(--line2);color:var(--ink);font-size:13.5px;font-weight:600;white-space:nowrap;box-shadow:0 8px 26px rgba(0,0,0,.35)}
+  #hand button:hover{border-color:var(--gold)}
+  #hand #handGo{border-color:rgba(91,240,209,.55)}
+  #hand .hic{display:none;color:var(--gold)}
+  #hand kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:7px;background:var(--gold);color:var(--gold-ink);font:700 12px/1 var(--mono);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+  #hand #handTurn kbd,#hand #handBack kbd{background:rgba(255,255,255,.14);color:var(--ink)}
+  body.touch #hand{transform:translate(-50%,34px)}
+  body.touch #hand kbd{display:none}
+  body.touch #hand .hic{display:inline-flex}
+  body.touch #hand button{padding:12px 18px 12px 14px;font-size:15px}
   body.touch .map{left:auto;right:14px;bottom:auto;top:120px}
   #empty3d{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:28px 30px;max-width:420px;width:calc(100% - 32px);text-align:center;z-index:5}
   #empty3d h2{font-family:var(--serif);font-weight:500;letter-spacing:-.02em;font-size:30px;margin:0 0 8px}
@@ -269,7 +283,7 @@
   @keyframes gpulse{50%{opacity:.45;transform:scale(.8)}}
   /* present mode: full-bleed, letterboxed, captions only */
   body.presenting #view3d{position:fixed;inset:0;z-index:60;background:#000}
-  body.presenting .hud,body.presenting #mapPanel,body.presenting #pbar,body.presenting #joy,body.presenting #coach{display:none!important}
+  body.presenting .hud,body.presenting #mapPanel,body.presenting #pbar,body.presenting #joy,body.presenting #coach,body.presenting #hand,body.presenting #aim{display:none!important}
   body.presenting:not(.present-ask) #guidePanel{display:none!important}
   body.presenting #view3d::before,body.presenting #view3d::after{content:"";position:absolute;left:0;right:0;height:6.5vh;background:#000;z-index:3;pointer-events:none}
   body.presenting #view3d::before{top:0}body.presenting #view3d::after{bottom:0}
@@ -319,7 +333,7 @@
   #photoBar{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:flex;gap:8px;align-items:center;padding:7px 8px 7px 16px;border-radius:14px}
   #photoBar .ct{font-family:var(--mono);font-size:12px;color:var(--gold-hi);min-width:12ch}
   #photoBar .lbl{font-family:var(--serif);font-size:18px;margin-right:4px}
-  body.photo .hud,body.photo .map,body.photo .pbar,body.photo #sel,body.photo #joy{display:none !important}
+  body.photo .hud,body.photo .map,body.photo .pbar,body.photo #sel,body.photo #joy,body.photo #hand,body.photo #aim{display:none !important}
   /* plan */
   #planCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0c0b0a;touch-action:none}
   .ptools{position:absolute;left:14px;top:14px;display:flex;gap:4px;flex-wrap:wrap;padding:6px;max-width:calc(100% - 360px);z-index:2}
@@ -647,6 +661,8 @@
           <div class="hist" id="phist"></div>
         </div>
         <div id="joy"><div class="knob"></div></div>
+        <div id="aim" hidden aria-hidden="true"></div>
+        <div id="hand" hidden><button id="handGo" type="button"></button><button id="handTurn" type="button" hidden></button><button id="handBack" type="button" hidden></button></div>
         <div id="guideFade" aria-hidden="true"></div>
         <div id="guideCap" aria-live="polite" hidden></div>
         <div id="presentBar" hidden><span class="gav" aria-hidden="true"></span><span class="pb-who"><b>Mira</b> · <span id="presentRoom">Welcome</span></span><button id="presentPause" type="button">Pause</button><button id="presentAsk" type="button">Ask</button><button id="presentEnd" type="button">End</button></div>
