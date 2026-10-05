@@ -34,7 +34,12 @@ export async function falSpeech(text, { voice = env('MIRA_VOICE', 'Charlotte'), 
     const r = await fetch(url, { method: 'POST', signal: ac.signal, headers: { authorization: 'Key ' + key, 'content-type': 'application/json' }, body: JSON.stringify({ text, voice, stability: .45, similarity_boost: .8, style: .3, speed: 1 }) });
     const j = await r.json().catch(() => ({}));
     const out = j.audio?.url || j.audio_url?.url || j.audio_url;
-    if (!r.ok || !out) { console.error('fal tts', r.status, JSON.stringify(j).slice(0, 300)); throw new HttpError(502, 'voice_failed', 'Voice unavailable right now.'); }
+    if (!r.ok || !out) {
+      // say which kind of failure it is, so the app can tell the owner why her voice is off (never the provider's own words)
+      const said = JSON.stringify(j).slice(0, 300); console.error('fal tts', r.status, said);
+      const code = /balance|exhaust|locked|credit|payment|billing/i.test(said) || r.status === 402 ? 'voice_credit' : r.status === 401 || r.status === 403 ? 'voice_key' : r.status === 429 ? 'voice_busy' : 'voice_failed';
+      throw new HttpError(502, code, 'Voice unavailable right now.');
+    }
     return out;
   } catch (e) { if (e?.name === 'AbortError') throw new HttpError(504, 'voice_failed', 'Voice took too long.'); throw e; }
   finally { clearTimeout(t); }

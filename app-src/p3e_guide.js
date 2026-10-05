@@ -70,7 +70,7 @@ const V_MALE = /\bmale\b|rishi|daniel|alex\b|fred|aaron|arthur|gordon|oliver|\bt
 function pickVoice() {
   if (!('speechSynthesis' in window)) return null;
   const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); if (!vs.length) return speechSynthesis.getVoices()[0] || null;
-  const pref = [/en[-_]IN/i, /en[-_]GB/i, /en[-_]US/i, /en[-_]AU/i, /^en/i];
+  const pref = [/en[-_]GB/i, /en[-_]US/i, /en[-_]AU/i, /en[-_]IN/i, /^en/i];   // nearest to her own voice first
   for (const re of pref) { const v = vs.find(v => re.test(v.lang) && V_FEMALE.test(v.name) && !V_MALE.test(v.name)); if (v) return v; }
   for (const re of pref) { const v = vs.find(v => re.test(v.lang) && !V_MALE.test(v.name)); if (v) return v; }
   return vs[0];
@@ -105,6 +105,9 @@ for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, un
 function premiumOK() { if (SITE?.cfg?.voiceOn === false) return false; return !(GUIDE.voiceOff && Date.now() < GUIDE.voiceOff); }
 function voiceFailed(e) {
   const st = e?.status || 0; console.warn('[voice] Mira\'s own voice was not used:', st || '', e?.code || e?.name || e?.message || e || '');
+  // tell them once why she sounds different, in plain words: whoever runs the site needs to know, and a visitor deserves the reason
+  const why = { voice_credit: 'the voice service has run out of credit', voice_key: 'the voice service refused its key', voice_off: 'the voice service is not switched on', voice_busy: 'the voice service is busy', rate_limited: "today's spoken lines are used up" }[e?.code] || (st >= 500 ? 'the voice service is not answering' : '');
+  if (why && !GUIDE.voiceTold) { GUIDE.voiceTold = true; try { gNote(`Mira's own voice is off right now: ${why}. She is using this device's voice until it is back.`, 'sys'); } catch { } }
   if (st === 429) GUIDE.voiceOff = Date.now() + 6 * 3600e3;                                   // today's lines are used up
   else if (st === 503) GUIDE.voiceOff = Date.now() + 3600e3;                                  // not switched on
   else if (st >= 500) { GUIDE.voiceFails = (GUIDE.voiceFails || 0) + 1; if (GUIDE.voiceFails >= 2) { GUIDE.voiceOff = Date.now() + 5 * 60e3; GUIDE.voiceFails = 0; } }
