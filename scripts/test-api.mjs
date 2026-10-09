@@ -98,10 +98,14 @@ r = await ai(A, { kind: 'edit_fix', editId, prompt: 'You are editing a furnished
 assert.equal((await me(A)).homes.h1.changes_left, 29); ok('repairing a change that did not fully apply is part of that change, not a new one');
 for (let i = 0; i < PRICING.budgets.editFollowups - 1; i++) { r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.ok(r.done); }
 r = await ai(A, { kind: 'edit_followup', editId, prompt: FURNISH }); assert.equal(r.status, 429); ok(`room redos after a change are capped at ${PRICING.budgets.editFollowups} calls`);
+r = await ai(A, { kind: 'reference', homeId: 'h1', prompt: 'You are a senior interior designer. A client has given you reference photos', images: [IMG] });
+assert.ok(r.done && r.meta.editId); assert.equal(r.json.recipes[0].pieces[0].type, 'custom'); assert.equal(calls.filter(c => c.model).at(-1).model, 'claude-opus-5-5'); assert.equal(calls.filter(c => c.model).at(-1).images, 1);
+assert.equal((await me(A)).homes.h1.changes_left, 28); assert.ok((await ai(A, { kind: 'edit_followup', editId: r.meta.editId, prompt: FURNISH })).done); assert.equal((await me(A)).homes.h1.changes_left, 28); ok('copying a photo into a room is one change: Opus reads the photo, the refurnish rides on it');
+r = await ai(A, { kind: 'reference', homeId: 'h1', prompt: 'You are a senior interior designer. A client has given you reference photos NOREF', images: [IMG] }); assert.equal((await me(A)).homes.h1.changes_left, 28); ok('a photo that yields nothing to copy is not charged');
 r = await ai(A, { kind: 'refurnish', homeId: 'h1', prompt: FURNISH }); assert.ok(r.done);
-assert.equal((await me(A)).homes.h1.changes_left, 28); ok('"redo this room" uses a change');
+assert.equal((await me(A)).homes.h1.changes_left, 27); ok('"redo this room" uses a change');
 r = await ai(A, { kind: 'refurnish', homeId: 'h1', prompt: FURNISH + ' EMPTYROOM' });
-assert.equal((await me(A)).homes.h1.changes_left, 28); ok('a redo that places nothing is refunded');
+assert.equal((await me(A)).homes.h1.changes_left, 27); ok('a redo that places nothing is refunded');
 
 // a design run that places nothing gives the design back
 r = await call(A, '/api/generate', { action: 'start', homeId: 'h1' }); gen = r.body.genId;
@@ -112,7 +116,7 @@ for (let i = 0; i < 3; i++) { r = await call(A, '/api/generate', { action: 'star
 r = await call(A, '/api/generate', { action: 'start', homeId: 'h1' }); assert.equal(r.body.error.code, 'no_designs_left'); ok('restyles stop after 1 design + 3 restyles');
 
 r = await call(A, '/api/billing', { action: 'topup', homeId: 'h1' }); r = await pay(A, { orderId: r.body.orderId });
-assert.equal((await me(A)).homes.h1.changes_left, 43); ok('top-up adds 15 changes');
+assert.equal((await me(A)).homes.h1.changes_left, 42); ok('top-up adds 15 changes');
 
 // someone else can't touch this home
 const X = '99999999-aaaa-4aaa-8aaa-000000000009';

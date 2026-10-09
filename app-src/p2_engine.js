@@ -298,6 +298,7 @@ function mat(spec0) {
   else if (kind === 'stone') { stoneTex(a, b); m = std({ map: TX['stone-' + a + b], normalMap: nmap('stone-' + a + b, 1.4), normalScale: new THREE.Vector2(.25, .25), roughness: a === 'marble' ? .36 : a === 'concrete' ? .9 : .65 }); }
   else if (kind === 'clay') m = std({ map: fabricTex(a), roughness: .9 });
   else if (kind === 'velvet') { const t = fabricTex(a); m = phys({ map: t, normalMap: nmap('fab-' + a, 1.5), normalScale: new THREE.Vector2(.3, .3), roughness: .7, sheen: 1, sheenRoughness: .35, sheenColor: new THREE.Color(a).lerp(new THREE.Color('#ffffff'), .55) }); }
+  else if (a && (m = matExtra(kind, a, b))) { }   // bouclé, linen, leather, metal, lacquer, cane, rattan, jute … (cat5_custom.js)
   else switch (spec) {
     case 'black-metal': m = std({ color: '#1f1c1a', roughness: .38, metalness: .7 }); break;
     case 'leather-cognac': m = phys({ color: '#8a4d2b', map: fabricTex('#ffffff'), roughness: .5, clearcoat: .25, clearcoatRoughness: .5 }); break;

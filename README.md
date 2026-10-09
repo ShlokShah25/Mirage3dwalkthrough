@@ -78,6 +78,14 @@ A separate page at `/forge`, on the same server. A customer describes an object 
 - **Limits** (`FORGE` in `api/_lib/env.js`): 25 new models, 120 changes and 6 sculpted shapes a day per person; for guests, also a site-wide ceiling. Forge is free for now. Models are kept in the visitor's browser, not on the server.
 - **Formats.** STL, 3MF, OBJ, PLY, AMF and DAE are in millimetres with Z up; GLB and USDZ are in metres with Y up, as those formats expect. STEP is a solid made of flat faces (one per triangle, up to 30,000; a lighter copy is built for it when needed): CAD programs open it as a solid body, but a hole in it is facets, not a true cylinder.
 
+## Reference photos and custom pieces
+
+- **Photos are copied, not just sampled** (`app-src/p3l_reference.js`). Inspiration photos (whole home or per room) are read by the strongest model with `REF_PROMPT` into a palette plus a *recipe* per room type: every piece in the photo (role, catalog type or custom parts, size, materials, where it stands), the wall treatment, layout, styling and light. Furnishing a room that has a recipe shows Claude the recipe and the photo itself, and tells it to place every piece, copying custom parts exactly, before adding anything else.
+- **Copy a photo from Mira's chat**: the picture button next to the microphone takes a photo and rebuilds the room the client stands in to match it (server kind `reference`: one change; the refurnish rides on it as follow-ups).
+- **Custom pieces** (`app-src/cat5_custom.js`): `type: "custom"` with `parts` (box, cushion, cyl, sphere, torus, lathe, tube, shape, arch; mirror / repeat / around copies; any material). Built by `cpBuild`, sized by `prepCustom`. Available to furnishing, changes and photo reading (`CUSTOM_GUIDE`).
+- **Materials**: `boucle:`, `linen:`, `leather:`, `metal:` (`:brushed`, `:matte`), `lacquer:`, `matte:`, `ceramic:`, `stoneware:`, `rattan:`, `cane:`, `jute:`, `fluted:`, `glass:`, `glow:` with a hex colour. Custom parts use real-world texture scale.
+- **New catalog pieces** built from parts: sofa-cloud, sofa-channel, chair-cane, chair-shell, chair-bentwood, table-pedestal, coffee-pebble, side-drum, mirror-arch, cabinet-arch, lamp-mushroom, lamp-paper, pendant-paper, bed-wing, bed-platform, bench-curved, shelves-floating, vase-branches, decor-books.
+
 ## Pricing and limits
 
 All set in `api/_lib/env.js` (server) and shown by the app from `/api/config`:

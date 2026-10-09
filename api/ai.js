@@ -10,7 +10,7 @@ import { streamClaude, extractJSON } from './_lib/claude.js';
 import * as E from './_lib/entitle.js';
 import { authorizeGuest } from './_lib/guest.js';
 
-const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_fix', 'edit_followup', 'refurnish', 'guide', 'model_make', 'model_edit', 'model_fix'];
+const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_fix', 'edit_followup', 'reference', 'refurnish', 'guide', 'model_make', 'model_edit', 'model_fix'];
 
 async function authorize(user, b) {
   const { kind } = b, uid = user.id;
@@ -51,6 +51,12 @@ async function authorize(user, b) {
         after: async j => { if (!(Array.isArray(j?.ops) && j.ops.length)) await E.refundEdit(payer, e); },
         onFail: () => E.refundEdit(payer, e),
       };
+    }
+    case 'reference': {      // a client's photo, read so one room can be refurnished to copy it: counted as one change, whose follow-ups furnish the room
+      const payer = await E.payerFor(user, b.homeId);
+      const e = await E.startEdit(payer, b.homeId);
+      const ok = j => Array.isArray(j?.recipes) && j.recipes.some(r => Array.isArray(r?.pieces) && r.pieces.length);
+      return { homeId: b.homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', meta: { editId: e.id }, after: async j => { if (!ok(j)) await E.refundEdit(payer, e); }, onFail: () => E.refundEdit(payer, e) };
     }
     case 'edit_followup': {
       const e = await E.useEditFollowup(user, b.editId);

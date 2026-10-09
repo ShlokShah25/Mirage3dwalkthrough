@@ -35,7 +35,7 @@ const itemsGroup = new THREE.Group(); scene.add(itemsGroup);
 const itemGroups = new Map();
 let wallCols = [], itemCols = [], allCols = [], surfaces = [], floorMeshes = [], ceilings = [], labels = [], lamps = [], dayLights = [], wallGroup, doorGroup, doors = [], bounds = null, H = 10;
 const S = { center: new THREE.Vector3() };
-const WALLMOUNT = new Set(['tv', 'artwork', 'mirror', 'panel-slats', 'panel-stone', 'panel-upholstered', 'curtain', 'sconce', 'wall-molding', 'wall-panel-wood', 'feature-stone']);
+const WALLMOUNT = new Set(['tv', 'artwork', 'mirror', 'panel-slats', 'panel-stone', 'panel-upholstered', 'curtain', 'sconce', 'wall-molding', 'wall-panel-wood', 'feature-stone', 'mirror-arch', 'shelves-floating']);
 
 function toWorldCollider(c, it, y) {
   const th = -(it.rot || 0) * D2R, cs = Math.cos(th), sn = Math.sin(th), ca = c.ang + th;

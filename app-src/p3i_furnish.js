@@ -6,7 +6,7 @@
 const RESIZABLE = new Set(['wardrobe', 'closet-lit', 'kitchen-counter', 'kitchen-luxe', 'kitchen-tall-luxe', 'console', 'sideboard-fluted', 'bookshelf', 'panel-slats', 'panel-stone', 'panel-upholstered', 'wall-panel-wood', 'media-wall', 'tv-wall', 'wall-molding', 'feature-stone', 'bar-unit', 'planter-flowers', 'desk', 'vanity', 'vanity-luxe', 'curtain']);
 const SEATING = /sofa|sectional|armchair|lounge|chair|barrel|bench|pouf|stool|jhoola/;
 const NOT_SOLID = new Set(['rug', 'rug-round', 'loft-platform', 'stair-curved', 'ceiling-cove']);
-const isSolid = it => { const d = CAT[it.type]; return !!d && !d.nc && !WALLMOUNT.has(it.type) && !NOT_SOLID.has(it.type) && (+withDefaults(it).y || 0) < 2; };
+const isSolid = it => { const d = CAT[it.type]; if (it.type === 'custom' && (+it.h || 0) < .35) return false; return !!d && !d.nc && !WALLMOUNT.has(it.type) && !NOT_SOLID.has(it.type) && (+withDefaults(it).y || 0) < 2; };
 const ftIn = v => fmtFtIn(Math.max(0, v));
 const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
 
@@ -123,7 +123,7 @@ const DESIGN_RULES = `HOW A GOOD DESIGNER LAYS OUT A ROOM (follow these; they ar
 const PLACE_SCHEMA = `PLACING PIECES — use the room coordinates and wall ids above, never whole-home coordinates. Each item is one of:
  a) Against a wall: {"id":"bed1","type":"bed-luxe","wall":"W3","along":7.7,"off":0, ...} — the item's back is "off" feet from that wall face (0 = touching), its centre is "along" feet along it, and its front faces into the room. Use this for everything that stands against or hangs on a wall (beds, sofas on a wall, wardrobes, counters, consoles, desks, vanities, WCs, TVs, art, mirrors, sconces, wall panels, curtains) and for pieces that face away from a wall from further out (a floating sofa: off = distance from the wall behind it).
  b) Next to another piece: {"id":"ct1","type":"coffee-plinth","rel":"sofa1","side":"front","gap":1.5} — side is "front", "back", "left" or "right" (the piece's own left/right, as if sitting on it), gap is the clear distance between them, "shift" slides it sideways; it faces the other piece unless "face" or "turn" says otherwise. "side":"both" places a mirrored pair left and right.
- c) On top of a piece: {"type":"lamp-table","on":"ns1"} (lamps, vases, decor) or above one: {"type":"pendant-linear","over":"table1"} (pendants, chandeliers).
+ c) On top of a piece: {"type":"lamp-table","on":"ns1"} (lamps, vases, decor; "shift" slides it along the piece, e.g. a lamp at each end of a sideboard) or above one: {"type":"pendant-linear","over":"table1"} (pendants, chandeliers).
  d) At a point: {"id":"rug1","type":"rug","at":[9.2,7.6],"rot":0,"w":9,"d":12} — X,Z in room coordinates; rot in degrees: front faces +Z (down) at 0, +X (right) at 90, -Z (up) at 180, -X (left) at -90.
  Optional on any item: "face":"W2" (turn its front toward that wall) or "face":"<id>" (toward that piece); "turn": extra degrees; w, d, h, y (lift off the floor), finish, accent, name, and any extra fields the catalog note gives.
  Groups the code builds for you: on a dining table "chairs": 6 and "chair": "dining-chair-luxe"; on a bed "nightstands": true (two matched nightstands at the headboard, "lamps": true puts a lamp on each); on an island "stools": 3. A "ceiling-cove" with no position fills the room's ceiling.
@@ -132,7 +132,7 @@ const PLACE_SCHEMA = `PLACING PIECES — use the room coordinates and wall ids a
 function furnishPrompt(rooms, extra = '') {
   const st = project.style, cat = Object.entries(CAT).map(([k, d]) => `${k}: ${d.d.w}×${d.d.d}×${d.d.h}${d.d.y ? ' y' + d.d.y : ''} — ${NOTES[k] || d.label}`).join('\n');
   const others = layout.rooms.filter(r => r.kind !== 'ledge').map(r => `${r.name} (${r.type})`).join(', '), BRIEF = briefForFurnish();
-  const blocks = rooms.map(r => { const F = roomFrame(r); return describeRoom(F) + (project.roomStyles?.[r.name] ? `\nROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : ''); }).join('\n\n');
+  const blocks = rooms.map(r => { const F = roomFrame(r), ref = recipeFor(r); return describeRoom(F) + (project.roomStyles?.[r.name] ? `\nROOM STYLE (from inspiration for this room; it overrides the home style here): ${project.roomStyles[r.name].summary} Signature: ${(project.roomStyles[r.name].features || []).join(', ') || 'none'}.` : '') + (ref ? '\n' + recipeText(ref.recipe) : ''); }).join('\n\n');
   return `You are a senior interior designer at a luxury studio, placing furniture into a 3D model of a real home built from its architect's floor plan. The homeowner will walk through it, so the layout must be one a professional would sign off: right pieces, right sizes, in the right places, with a reason for each. Units are feet.
 
 STYLE: ${st.summary} Signature elements: ${(st.features || []).join(', ') || 'none given'}. Plants: ${st.plants}.
@@ -147,7 +147,10 @@ ${DESIGN_RULES}
 CATALOG (type: default w×d×h — notes):
 ${cat}
 
-FINISHING (after the layout works): living, dining and bedrooms get a feature treatment on the focal wall (tv-wall, media-wall, panel-stone, panel-slats, panel-upholstered, wall-panel-wood, wall-molding, arch-niche, or bed-luxe whose headboard wall is the feature), a ceiling-cove, three layers of light (a statement pendant or chandelier, a floor or table lamp, sconces), one hero piece, a rug, art, a plant, and sheer curtains at the windows — scaled to the budget. Bathrooms: vanity-luxe, shower-luxe in the far corner, wc, a plant. Walk-ins: closet-lit on the solid walls. Balconies: an outdoor seat, planters, a small table. Pooja rooms: a pooja-unit centred on the east or west wall. Rooms must not repeat each other's feature, rug or accent colour.
+${CUSTOM_GUIDE}
+Use a custom piece whenever the homeowner's notes, the request or a reference photo call for a piece the catalog has nothing like; a close catalog piece is better than a custom one only when it really looks the same.
+
+FINISHING (after the layout works): living, dining and bedrooms get a feature treatment on the focal wall (tv-wall, media-wall, panel-stone, panel-slats, panel-upholstered, wall-panel-wood, wall-molding, arch-niche, or bed-luxe whose headboard wall is the feature), a ceiling-cove, three layers of light (a statement pendant or chandelier, a floor or table lamp, sconces), one hero piece, a rug, art, a plant, and sheer curtains at the windows — scaled to the budget. Bathrooms: vanity-luxe, shower-luxe in the far corner, wc, a plant. Walk-ins: closet-lit on the solid walls. Balconies: an outdoor seat, planters, a small table. Pooja rooms: a pooja-unit centred on the east or west wall. Rooms must not repeat each other's feature, rug or accent colour. Style every room like a magazine shoot: books and objects (decor-books) on coffee tables and consoles, a vase with branches or a floor vase, cushions in two or three colours and a throw on sofas and beds (custom cushions), a lamp on each nightstand.
 
 ${PLACE_SCHEMA}
 
@@ -170,8 +173,10 @@ function resolveItems(raw, frames, roomsByName) {
       const r = roomsByName[src.room] || (ref != null ? roomsByName[byId[ref]?.room] : null) || (isFinite(+src.x) && isFinite(+src.z) ? roomAt(+src.x, +src.z) : null) || (frames.length === 1 ? frames[0].r : null); if (!r) { notes.push(`${src.type} has no room`); continue; }
       const F = frames.find(f => f.r === r) || roomFrame(r);
       const it = { type: src.type, name: String(src.name || CAT[src.type].label).slice(0, 40), room: r.name };
-      for (const [k, v] of Object.entries(src)) if (!['id', 'type', 'name', 'room', 'wall', 'along', 'off', 'at', 'rel', 'side', 'gap', 'shift', 'on', 'over', 'face', 'turn', 'chairs', 'chair', 'nightstands', 'lamps', 'stools', 'x', 'z'].includes(k)) it[k] = v;
+      for (const [k, v] of Object.entries(src)) if (!['id', 'copy', 'type', 'name', 'room', 'wall', 'along', 'off', 'at', 'rel', 'side', 'gap', 'shift', 'on', 'over', 'face', 'turn', 'chairs', 'chair', 'nightstands', 'lamps', 'stools', 'x', 'z'].includes(k)) it[k] = v;
       for (const k of ['rot', 'w', 'd', 'h', 'y']) if (k in it) { const v = +it[k]; if (!isFinite(v) || (['w', 'd', 'h'].includes(k) && v <= 0)) delete it[k]; else it[k] = v; }
+      if (it.type === 'custom' && src.copy != null && byId[src.copy]?.parts) it.parts = byId[src.copy].parts;
+      if (it.type === 'custom') { if (!Array.isArray(it.parts) || !it.parts.length) { notes.push(`custom piece "${it.name}" has no parts`); continue; } prepCustom(it); }
       const f = () => withDefaults(it);
       let anchor = null;
       const face = F.faces.find(q => q.id === String(src.wall || '').toUpperCase());
@@ -317,13 +322,15 @@ function auditRoom(items, F) {
 async function furnishOne(sample, rooms, extra, signal, repairOK) {
   const frames = rooms.map(roomFrame), byName = Object.fromEntries(layout.rooms.map(r => [r.name, r]));
   const prompt = furnishPrompt(rooms, extra);
-  let res = await sample.json(prompt, { modelTier: 'default', signal });
+  // a room copied from a client's photo is furnished looking at the photo itself, not only at its description
+  const photos = rooms.length === 1 ? (recipeFor(rooms[0])?.photos || []).slice(0, 2) : [];
+  let res = await sample.json(prompt, { modelTier: 'default', signal, ...(photos.length ? { images: photos } : {}) });
   let raw = Array.isArray(res) ? res : res?.items, { items, notes } = resolveItems(raw, frames, byName);
   let issues = [...notes, ...frames.flatMap(F => auditRoom(items, F))];
   if (issues.length && repairOK) {
     const fixPrompt = `${prompt}\n\nYOUR FIRST ANSWER:\n${JSON.stringify({ items: raw })}\n\nWHEN IT WAS BUILT, THESE PROBLEMS CAME UP:\n- ${issues.slice(0, 40).join('\n- ')}\n\nFix every problem without breaking anything that worked (move, resize, swap or drop pieces as a designer would; keep the design intent). Reply with only the complete corrected JSON in the same shape: {"items":[...]}.`;
     try {
-      const res2 = await sample.json(fixPrompt, { modelTier: 'default', signal });
+      const res2 = await sample.json(fixPrompt, { modelTier: 'default', signal, ...(photos.length ? { images: photos } : {}) });
       const raw2 = Array.isArray(res2) ? res2 : res2?.items;
       if (Array.isArray(raw2) && raw2.length >= Math.min(3, (raw || []).length * .5)) { const r2_ = resolveItems(raw2, frames, byName), iss2 = [...r2_.notes, ...frames.flatMap(F => auditRoom(r2_.items, F))]; if (iss2.length <= issues.length) { items = r2_.items; issues = iss2; raw = raw2; } }
     } catch (e) { if (e?.code === 'cancelled') throw e; }

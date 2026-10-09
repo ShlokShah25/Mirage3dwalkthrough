@@ -147,11 +147,13 @@ async function runGenerate(ok) {
     }
     const roomsWith = inspRooms().filter(r => project.roomInspo?.[r.name]?.length);
     const ts = ticker('style', 'Reading materials and colours');
-    const homeP = project.inspo.length ? collages(project.inspo, max).then(imgs => sample.json(STYLE_PROMPT(project.brief), { images: imgs, modelTier: 'default', signal, onText: ts.onText })) : Promise.resolve(null);
+    // the photos are read as recipes to copy (every piece, its shape, colours, materials and place), not only as a palette
+    const homeP = project.inspo.length ? collages(project.inspo, max).then(imgs => sample.json(REF_PROMPT(project.brief), { images: imgs, modelTier: 'complex', signal, onText: ts.onText })) : Promise.resolve(null);
     const roomJobs = roomsWith.map(r => async () => {
       const imgs = await collages(project.roomInspo[r.name], max);
-      const raw = await sample.json(STYLE_PROMPT(project.brief, r), { images: imgs, modelTier: 'default', signal });
-      const st = normalizeStyle(raw); project.roomStyles[r.name] = { summary: st.summary, features: st.features, tokens: st.tokens, floor: st.floors[roomCat(r.type)] };
+      const raw = await sample.json(REF_PROMPT(project.brief, r), { images: imgs, modelTier: 'complex', signal });
+      const st = normalizeStyle(raw), fam = refFamily(r), recipe = st.recipes.find(x => x.shows === fam) || st.recipes[0] || null;
+      project.roomStyles[r.name] = { summary: st.summary, features: st.features, tokens: st.tokens, floor: st.floors[roomCat(r.type)], recipe, walls: recipe?.wall?.color || st.walls, ceiling: st.ceiling };
     });
     let rdone = 0, rfail = 0; const pool = async () => { while (roomJobs.length) { const j = roomJobs.shift(); try { await j(); } catch (e) { if (e?.code === 'cancelled') throw e; rfail++; } rdone++; stepSet('rstyle', null, `${rdone} of ${roomsWith.length} rooms`); } };
     const [hr, rr] = await Promise.allSettled([homeP.finally(ts.stop), Promise.all([pool(), pool()])]);
@@ -272,6 +274,9 @@ ${furn.join('\n')}
 
 CATALOG for new items (type: default w×d×h — notes [options: the only extra fields that type has]):
 ${cat}
+
+${CUSTOM_GUIDE}
+A custom piece is added with {"op":"add","item":{"type":"custom","name":...,"parts":[...], ...placement}}; an existing custom piece is reshaped with update "set":{"parts":[...]}. Use one when they ask for a piece the catalog has nothing like ("a cane chair like this", "a scalloped headboard"), rather than a stand-in that does not look like it.${refsFor(focus)}
 
 Reply with only JSON: {"summary":"one short sentence, as the designer speaking to the homeowner, saying what you changed","left":"anything they asked for that these operations do not do, and why, in a few plain words; empty when everything asked for is done","ops":[ ... ]}. Operations:
 {"op":"update","id":"<id>","set":{ any of x, z, rot, w, d, h, y, finish, accent, name, "type" (to turn the piece into another catalog type where it stands), or one of that type's options }}
@@ -396,6 +401,7 @@ function applyOps(res) {
       for (const [k, v] of Object.entries(set)) {
         if (['id', 'type', 'room'].includes(k)) continue;
         if (['x', 'z', 'rot', 'w', 'd', 'h', 'y'].includes(k)) { const x = +v; if (isFinite(x) && (!['w', 'd', 'h'].includes(k) || x > 0)) { if (it[k] !== x && k !== 'h' && k !== 'y') geo = true; it[k] = x; } }
+        else if (k === 'parts' && it.type === 'custom' && Array.isArray(v) && v.length) { it.parts = v; for (const q of ['w', 'd', 'h']) if (!(q in set)) delete it[q]; prepCustom(it); geo = true; }
         else if (CORE_FIELDS.has(k) || opts.has(k) || k in it) it[k] = v;
         else bad.push(k);
       }
@@ -408,6 +414,7 @@ function applyOps(res) {
       const src = op.item && typeof op.item === 'object' ? op.item : op, t = nearType(src.type);
       if (!t) { fail(`add: "${src.type}" is not a catalog type`, `there is no ${String(src.type || 'such piece').replace(/-/g, ' ')} in the catalogue`); continue; }
       const opts = typeOptions(t), bad = Object.keys(src).filter(k => !CORE_FIELDS.has(k) && !opts.has(k) && !ADD_TERMS.has(k)), item = { ...src, type: t }; for (const k of bad) delete item[k];
+      if (t === 'custom') { if (!Array.isArray(item.parts) || !item.parts.length) { fail('add: a custom piece needs "parts"', `the ${String(src.name || 'custom piece').toLowerCase()} could not be built`); continue; } prepCustom(item); }
       added.push({ item, room: nearRoom(src.room), named: src.room });   // the room itself, not its name: a later op may rename it
     }
     else if (op.op === 'style') {

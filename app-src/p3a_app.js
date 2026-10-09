@@ -226,12 +226,12 @@ async function takePlan(file) {
 }
 async function takeInspo(files) {
   const list = [...files].filter(f => f.type.startsWith('image/')); if (!list.length) return;
-  try { const imgs = await Promise.all(list.map(f => prepImage(f, 3.2e5, .8).then(r => r.image))); project.inspo = [...(project.inspo || []), ...imgs]; renderUploads(); renderStyle(); saveSoon(); flash(`${imgs.length} photo${imgs.length > 1 ? 's' : ''} added. They'll guide the style when you design.`); renderPresets(); }
+  try { const imgs = await Promise.all(list.map(f => prepImage(f, 1.1e6, .82).then(r => r.image))); project.inspo = [...(project.inspo || []), ...imgs]; renderUploads(); renderStyle(); saveSoon(); flash(`${imgs.length} photo${imgs.length > 1 ? 's' : ''} added. They'll guide the style when you design.`); renderPresets(); }
   catch (e) { flash(e.message, true); }
 }
 async function takeRoomInspo(name, files) {
   const list = [...files].filter(f => f.type.startsWith('image/')); if (!list.length) return;
-  try { const imgs = await Promise.all(list.map(f => prepImage(f, 3.2e5, .8).then(r => r.image))); project.roomInspo ||= {}; project.roomInspo[name] = [...(project.roomInspo[name] || []), ...imgs]; if (project.roomStyles) delete project.roomStyles[name]; renderUploads(); saveSoon(); flash(`${imgs.length} photo${imgs.length > 1 ? 's' : ''} added for ${name}.`); }
+  try { const imgs = await Promise.all(list.map(f => prepImage(f, 1.1e6, .82).then(r => r.image))); project.roomInspo ||= {}; project.roomInspo[name] = [...(project.roomInspo[name] || []), ...imgs]; if (project.roomStyles) delete project.roomStyles[name]; renderUploads(); saveSoon(); flash(`${imgs.length} photo${imgs.length > 1 ? 's' : ''} added for ${name}.`); }
   catch (e) { flash(e.message, true); }
 }
 $('planFile').addEventListener('change', e => { takePlan(e.target.files[0]); e.target.value = ''; });

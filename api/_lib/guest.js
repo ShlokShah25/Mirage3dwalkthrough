@@ -71,6 +71,12 @@ export function authorizeGuest(user, b) {
       const back = () => { giveBack(uid, 'edit'); edits.delete(id); };
       return { homeId, model: MODELS.default(), maxTokens: 24000, effort: 'medium', meta: { editId: id }, after: j => { if (!(Array.isArray(j?.ops) && j.ops.length)) back(); }, onFail: back };
     }
+    case 'reference': {
+      take(uid, 'edit'); sweep(edits);
+      const id = 'e_' + randomUUID(); edits.set(id, { uid, left: PRICING.budgets.editFollowups, until: Date.now() + 30 * 60e3 });
+      const back = () => { giveBack(uid, 'edit'); edits.delete(id); };
+      return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', meta: { editId: id }, after: j => { if (!(Array.isArray(j?.recipes) && j.recipes.length)) back(); }, onFail: back };
+    }
     case 'edit_followup': {
       const e = edits.get(b.editId);
       if (!e || e.uid !== uid) throw new HttpError(404, 'not_found', 'Change not found.');

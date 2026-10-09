@@ -328,6 +328,7 @@
   #guideForm{display:flex;gap:8px;padding:10px 10px 10px 12px;align-items:center}
   #guideForm input{flex:1;min-width:0;font-size:14.5px;padding:10px 6px;border:0;background:transparent}
   #guideForm input:focus-visible{outline:none}
+  .gmsg .gimg{display:block;max-width:180px;max-height:150px;border-radius:8px;margin-top:6px}
   #guideMic.on{background:#F2877A;color:#0A0B0C;border-color:transparent;animation:gpulse 1s infinite}
   @media (max-width:860px){#guidePanel{left:8px;right:8px;width:auto;min-width:0;transform:none;bottom:8px}#guideLog{max-height:32vh}#guideCap{bottom:auto;top:84px;font-size:15px}body:not(.presenting) #guideCap{display:none}#designBar{flex-wrap:wrap}#designBar span:nth-child(2){flex:1 0 calc(100% - 30px)}}
   #photoBar{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:flex;gap:8px;align-items:center;padding:7px 8px 7px 16px;border-radius:14px}
@@ -674,7 +675,7 @@
           <button type="button" id="guideLast" hidden title="Show the conversation"></button>
           <div id="guideActs" hidden></div>
           <div id="guideChips"><button type="button" id="guideTour" data-act="tour" class="primary">▶ Walk me through it</button><button type="button" data-act="design">Design room by room</button><button type="button" data-act="ideas">Ideas for this room</button><button type="button" data-act="vastu">Is it Vastu compliant?</button><button type="button" data-act="fix">The plan is wrong here</button><button type="button">Make it night</button></div>
-          <form id="guideForm"><span class="gav" aria-hidden="true"></span><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira, or say what to change: “make this room moodier”, “open up this wall”" aria-label="Message Mira"><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
+          <form id="guideForm"><span class="gav" aria-hidden="true"></span><input id="guideIn" type="text" autocomplete="off" placeholder="Ask Mira, or say what to change: “make this room moodier”, “open up this wall”" aria-label="Message Mira"><button type="button" id="guidePic" class="icon" title="Copy a photo into this room" aria-label="Copy a photo into this room">🖼</button><input type="file" id="guidePicFile" accept="image/jpeg,image/png,image/webp" hidden><button type="button" id="guideMic" class="icon" title="Speak">🎙</button><button class="primary" type="submit">Send</button></form>
         </section>
         <div id="empty3d" class="gpanel" hidden><div class="eyebrow">New home</div><h2>Start with your floor plan</h2><p>Add it on the left and pick a style. Your home appears here, room by room, as it gets designed.</p></div>
         <div id="coach" class="gpanel" hidden></div>

@@ -77,6 +77,7 @@ function normalizeStyle(raw) {
     cove: r.cove !== false, time: ['golden', 'day', 'night', 'dusk'].includes(r.time) ? r.time : 'golden', view: ['sea', 'city', 'garden'].includes(r.view) ? r.view : undefined,
     plants: ['none', 'some', 'lush'].includes(r.plants) ? r.plants : 'some',
     features: Array.isArray(r.features) ? r.features.slice(0, 10).map(String) : [],
+    recipes: normRecipes(r.recipes),
   };
 }
 const roomCat = t => ['bedroom', 'master', 'walkin', 'staff', 'study', 'cabin'].includes(t) ? 'bedroom' : ['bath', 'utility'].includes(t) ? 'wet' : isOutdoorType(t) ? 'outdoor' : 'living';
@@ -88,7 +89,7 @@ function applyStyleToRooms(L, st) {
     r.cove = r.kind === 'room' && st.cove && !['staff', 'utility', 'passage', 'other'].includes(r.type);
   }
   L.settings.wallColor = st.walls; L.settings.ceilingColor = st.ceiling;
-  for (const r of L.rooms) { const rs = project?.roomStyles?.[r.name]; if (rs?.floor && r.kind !== 'ledge') { r.finish = rs.floor.finish; r.floor = rs.floor.color; } }
+  for (const r of L.rooms) { const rs = project?.roomStyles?.[r.name]; if (rs?.floor && r.kind !== 'ledge') { r.finish = rs.floor.finish; r.floor = rs.floor.color; } if (rs?.walls && r.kind !== 'ledge') { r.wall = rs.walls; if (rs.ceiling) r.ceil = rs.ceiling; } }   // a room copied from its own photo keeps the photo's paint
 }
 
 /* ================= plan trace → 3D layout ================= */
