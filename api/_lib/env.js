@@ -39,6 +39,16 @@ export const MODELS = {
   // placing furniture is spatial reasoning over a whole room; it gets the strongest model unless MODEL_DESIGN says otherwise
   design: () => env('MODEL_DESIGN', env('MODEL_COMPLEX', 'claude-opus-5-5')),
   fast: () => env('MODEL_FAST', 'claude-haiku-4-5-20251001'),
+  // Forge (the 3D model maker): writing a model from a description is the hard part and gets the strongest model; edits and repairs use the default one
+  forge: () => env('MODEL_FORGE', env('MODEL_COMPLEX', 'claude-opus-5-5')),
+  forgeEdit: () => env('MODEL_FORGE_EDIT', env('MODEL_DEFAULT', 'claude-sonnet-5')),
+};
+// Forge daily limits while it is free: per person, and for the whole site (guests share the site-wide ones).
+export const FORGE = {
+  makesPerDay: Number(env('FORGE_MAKES_PER_DAY', 25)), editsPerDay: Number(env('FORGE_EDITS_PER_DAY', 120)), meshesPerDay: Number(env('FORGE_MESHES_PER_DAY', 6)),
+  siteMakesPerDay: Number(env('FORGE_SITE_MAKES_PER_DAY', 400)), siteMeshesPerDay: Number(env('FORGE_SITE_MESHES_PER_DAY', 60)),
+  // organic shapes: an image is made from the words, then a mesh from the image (fal.ai)
+  imageModel: () => env('FAL_3D_IMAGE_MODEL', 'fal-ai/flux/schnell'), meshModel: () => env('FAL_3D_MODEL', 'fal-ai/hunyuan3d/v2'),
 };
 
 export const LIMITS = { promptChars: 200000, images: 10, imageChars: 5_000_000 };
@@ -49,7 +59,7 @@ export const DEEP = { rounds: () => Math.max(0, Math.min(8, Number(env('PLAN_DEE
 
 export function publicConfig(launch) {
   return {
-    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(), voiceOn: !!env('FAL_KEY'),
+    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(), voiceOn: !!env('FAL_KEY'), forge: { meshOn: !!env('FAL_KEY'), makesPerDay: FORGE.makesPerDay, meshesPerDay: FORGE.meshesPerDay },
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

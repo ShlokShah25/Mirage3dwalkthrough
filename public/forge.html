@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Describe a part and its sizes. Forge builds an exact 3D model you can print, and exports STL, 3MF, STEP, OBJ, GLB and more.">
+<meta name="theme-color" content="#F6F8F9">
+<title>Forge — describe a part, get a 3D model you can print</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%2312202B'/%3E%3Cpath d='M14 46 32 14l18 32z' fill='%23F26A1B'/%3E%3Cpath d='M10 52h44' stroke='%23E8ECEE' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#E8ECEE; --film:#EEF1F3; --panel:#F6F8F9; --white:#FFFFFF;
+    --ink:#12202B; --ink2:#44535F; --ink3:#6B7A86;
+    --line:#B9C4CC; --line2:#D5DCE1;
+    --blue:#1F5FBF; --blue-soft:#E3ECF9;
+    --orange:#F26A1B; --orange-deep:#C9500B; --orange-soft:#FDEBDD;
+    --body:'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --cond:'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
+    --top:52px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+  button,input,textarea,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  [hidden]{display:none !important}
+
+  /* ---- top bar ---- */
+  .top{height:var(--top);display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:baseline;gap:8px;text-decoration:none;color:var(--ink)}
+  .brand b{font:700 22px/1 var(--cond);letter-spacing:.01em}
+  .brand span{font-size:13px;color:var(--ink3)}
+  .top nav{margin-left:auto;display:flex;align-items:center;gap:6px}
+  .quiet{white-space:nowrap;background:none;border:1px solid transparent;border-radius:3px;padding:6px 10px;color:var(--ink2);text-decoration:none;font-size:14px}
+  .quiet:hover{border-color:var(--line);color:var(--ink)}
+  .quiet[aria-pressed="true"]{border-color:var(--blue);color:var(--blue);background:var(--blue-soft)}
+
+  /* ---- the bench: talk | stage | sheet ---- */
+  .bench{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(280px,330px);height:calc(100% - var(--top))}
+  .bench:has(> .sheet[hidden]){grid-template-columns:minmax(280px,340px) minmax(0,1fr)}
+  .talk,.sheet{background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  .talk{border-right:1px solid var(--line)}
+  .sheet{border-left:1px solid var(--line);overflow-y:auto}
+
+  /* conversation */
+  .log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:100%;overflow-wrap:anywhere}
+  .msg.you{align-self:flex-end;background:var(--white);border:1px solid var(--line);border-radius:3px;padding:8px 11px;max-width:92%}
+  .msg.you img{display:block;max-width:140px;max-height:120px;border:1px solid var(--line2);margin-top:6px}
+  .msg.forge{border-left:2px solid var(--blue);padding:1px 0 1px 11px}
+  .msg.forge .tip{display:block;margin-top:5px;color:var(--ink2);font-size:14px}
+  .msg.note{color:var(--ink2);font-size:14px;padding-left:13px;position:relative}
+  .msg.note::before{content:"";position:absolute;left:0;top:.5em;width:6px;height:6px;background:var(--orange)}
+  .msg.wait{color:var(--ink2);font-size:14px;display:flex;align-items:center;gap:9px}
+  .msg.wait i{flex:none;width:28px;height:2px;background:linear-gradient(90deg,var(--blue) 40%,var(--line) 40%);background-size:200% 100%;animation:run 1.1s linear infinite}
+  @keyframes run{to{background-position:-200% 0}}
+  .ask{border-top:1px solid var(--line);padding:12px;display:grid;gap:8px}
+  .ask textarea{width:100%;min-height:76px;max-height:200px;resize:vertical;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:9px 10px;line-height:1.4}
+  .ask textarea::placeholder{color:var(--ink3)}
+  .ask .row{display:flex;gap:8px;align-items:center}
+  .attach{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+  .attach img{width:34px;height:34px;object-fit:cover;border:1px solid var(--line)}
+  .go{background:var(--orange);color:#fff;border:0;border-radius:3px;padding:9px 18px;font:600 15px/1 var(--cond);letter-spacing:.02em}
+  .go:hover{background:var(--orange-deep)}
+  .go:disabled{background:var(--line);color:var(--ink3);cursor:default}
+  .plain{background:var(--white);border:1px solid var(--line);border-radius:3px;padding:7px 11px;font-size:14px}
+  .plain:hover{border-color:var(--ink2)}
+  .plain:disabled{color:var(--ink3);cursor:default;border-color:var(--line2)}
+
+  /* stage */
+  .stage{position:relative;min-width:0;min-height:0;background:var(--film);overflow:hidden}
+  #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #dims{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .dim{position:absolute;left:0;top:0;white-space:nowrap;font:600 14px/1 var(--cond);color:var(--blue);background:var(--film);padding:2px 5px;border:1px solid var(--blue);border-radius:2px;font-variant-numeric:tabular-nums;will-change:transform}
+  .dim small{font:500 11px/1 var(--cond);margin-left:2px}
+  .dim.off{border-color:var(--orange);color:var(--orange-deep)}
+  .tools{position:absolute;left:12px;top:12px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 24px)}
+  .tools .quiet{background:var(--panel);border-color:var(--line);padding:5px 9px;font-size:13px}
+  .status{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:7px 14px;border-radius:3px;font-size:14px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 24px)}
+  .status i{flex:none;width:28px;height:2px;background:linear-gradient(90deg,var(--orange) 40%,rgba(255,255,255,.3) 40%);background-size:200% 100%;animation:run 1.1s linear infinite}
+  .start{position:absolute;inset:0;display:grid;place-items:center;padding:24px;overflow-y:auto;background:rgba(238,241,243,.9)}
+  .start-in{max-width:560px}
+  .start h1{font:700 clamp(30px,4.4vw,46px)/1.04 var(--cond);margin:0 0 12px;letter-spacing:-.005em}
+  .start p{margin:0 0 20px;color:var(--ink2);max-width:52ch}
+  .starters{display:grid;gap:8px;margin:0 0 18px;padding:0;list-style:none}
+  .starters button{width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline}
+  .starters button:hover{border-color:var(--blue)}
+  .starters button span{color:var(--blue);font:600 13px/1 var(--cond);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .drop{outline:2px dashed var(--blue);outline-offset:-10px}
+
+  /* the sheet: laid out like the title block of a drawing */
+  .sheet h2{font:600 13px/1 var(--body);color:var(--ink3);margin:0;padding:14px 16px 8px}
+  .block{border-bottom:1px solid var(--line)}
+  .name{width:100%;border:0;border-bottom:1px solid var(--line);background:none;padding:14px 16px 12px;font:700 22px/1.1 var(--cond)}
+  .name:focus{outline:none;background:var(--white);box-shadow:inset 0 -2px 0 var(--blue)}
+  .cells{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+  .cell{padding:10px 6px 11px 14px;border-right:1px solid var(--line2);min-width:0}
+  .cell:first-child{padding-left:16px}
+  .cell:last-child{border-right:0}
+  .cell dt{font-size:12px;color:var(--ink3);margin:0 0 3px}
+  .cell dd{margin:0;font:600 22px/1 var(--cond);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cell dd small{font:500 11px/1 var(--cond);color:var(--ink3);margin-left:2px}
+  .facts{margin:0;padding:8px 16px 12px;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px}
+  .facts dt{color:var(--ink3)}
+  .facts dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:var(--blue)} .bad{color:var(--orange-deep)}
+  .params{padding:0 16px 14px;display:grid;gap:12px}
+  .param label{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:3px}
+  .param .v{display:flex;align-items:center;gap:4px}
+  .param input[type=number],.param input[type=text]{width:74px;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:3px 6px;text-align:right;font:600 14px/1.2 var(--cond);font-variant-numeric:tabular-nums}
+  .param input[type=text]{width:100%;text-align:left}
+  .param small{color:var(--ink3);font-size:12px;min-width:18px}
+  .param input[type=range]{width:100%;accent-color:var(--blue);margin:0}
+  .export{padding:0 16px 14px;display:grid;gap:8px}
+  .export .go{width:100%;padding:11px 14px;font-size:16px}
+  .formats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .formats button{background:var(--white);border:1px solid var(--line);border-radius:3px;padding:7px 4px;font:600 14px/1 var(--cond)}
+  .formats button:hover{border-color:var(--blue);color:var(--blue)}
+  .hint{font-size:13px;color:var(--ink3);margin:0;min-height:2.6em}
+  .row2{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:0 16px 12px;font-size:14px}
+  .row2 select{border:1px solid var(--line);border-radius:3px;background:var(--white);padding:4px 6px;max-width:60%}
+  details.code{padding:0 16px 16px}
+  details.code summary{cursor:pointer;font-size:14px;color:var(--ink2);padding:12px 0 8px}
+  details.code textarea{width:100%;height:240px;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:8px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;tab-size:2;resize:vertical}
+  details.code .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .codeerr{color:var(--orange-deep);font-size:13px;margin:6px 0 0}
+
+  /* my models */
+  .drawer{position:fixed;top:var(--top);right:0;bottom:0;width:min(360px,100%);background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:12px 16px 20px;z-index:5}
+  .drawer h2{font:700 20px/1 var(--cond);margin:6px 0 12px}
+  .mlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .mlist li{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:6px}
+  .mlist li.on{border-color:var(--blue)}
+  .mlist img,.mlist .ph{width:64px;height:48px;object-fit:cover;background:var(--film);display:block}
+  .mlist button.open{background:none;border:0;text-align:left;padding:0;min-width:0}
+  .mlist b{display:block;font:600 16px/1.15 var(--cond);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mlist small{color:var(--ink3);font-size:12px}
+  .mlist .del{background:none;border:0;color:var(--ink3);padding:6px;font-size:13px}
+  .mlist .del:hover{color:var(--orange-deep)}
+
+  /* small screens: the model on top, then the conversation, then the sheet */
+  @media (max-width: 980px){
+    html,body{height:auto}
+    .bench,.bench:has(> .sheet[hidden]){display:flex;flex-direction:column;height:auto}
+    .stage{order:-1;height:46vh;min-height:300px;position:sticky;top:0;z-index:2;border-bottom:1px solid var(--line)}
+    .bench:has(> .sheet[hidden]) .stage{height:auto;min-height:0;position:static}
+    .bench:has(> .sheet[hidden]) .start{position:static}
+    .bench:has(> .sheet[hidden]) #view{display:none}
+    .brand span{display:none}
+    .top{gap:8px;padding:0 10px}
+    .talk{border-right:0;border-bottom:1px solid var(--line)}
+    .log{max-height:none;overflow:visible}
+    .sheet{border-left:0;overflow:visible}
+    .start h1{font-size:28px}
+    .top nav .hide-s{display:none}
+  }
+  @media (prefers-reduced-motion: reduce){ .msg.wait i,.status i{animation:none} }
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <a class="brand" href="/forge"><b>Forge</b><span>by Mirage</span></a>
+  <nav>
+    <button class="quiet" id="btnNew" type="button">New model</button>
+    <button class="quiet" id="btnModels" type="button" aria-expanded="false">My models</button>
+    <a class="quiet hide-s" href="/">Mirage home</a>
+  </nav>
+</header>
+
+<main class="bench">
+  <section class="talk" aria-label="Conversation">
+    <div class="log" id="log" aria-live="polite"></div>
+    <form class="ask" id="ask">
+      <label for="say" hidden>Describe the object</label>
+      <textarea id="say" placeholder="Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes." rows="3"></textarea>
+      <div class="row">
+        <div class="attach">
+          <button class="plain" id="btnPic" type="button">Add a picture</button>
+          <img id="picThumb" alt="" hidden>
+          <button class="quiet" id="picClear" type="button" hidden>Remove</button>
+        </div>
+        <button class="go" id="btnGo" type="submit">Make it</button>
+      </div>
+      <input type="file" id="picFile" accept="image/jpeg,image/png,image/webp" hidden>
+    </form>
+  </section>
+
+  <section class="stage" id="stage" aria-label="3D view">
+    <canvas id="view"></canvas>
+    <div id="dims" aria-hidden="true"></div>
+    <div class="tools" id="tools" hidden>
+      <button class="quiet" type="button" data-view="iso">Corner</button>
+      <button class="quiet" type="button" data-view="front">Front</button>
+      <button class="quiet" type="button" data-view="top">Top</button>
+      <button class="quiet" type="button" data-view="right">Side</button>
+      <button class="quiet" type="button" id="tgDims" aria-pressed="true">Sizes</button>
+      <button class="quiet" type="button" id="tgEdges" aria-pressed="true">Edges</button>
+      <button class="quiet" type="button" id="tgUnit">mm</button>
+    </div>
+    <div class="start" id="start">
+      <div class="start-in">
+        <h1>Say what you need. Get a part that measures what you said.</h1>
+        <p>Forge writes the geometry for you, checks every size against your numbers, and gives you a closed solid ready for a 3D printer, in STL and nine other formats.</p>
+        <ul class="starters" id="starters"></ul>
+        <button class="plain" id="btnImport" type="button">Open a mesh you already have (STL, OBJ or GLB)</button>
+        <input type="file" id="meshFile" accept=".stl,.obj,.glb,model/stl,model/obj,model/gltf-binary" hidden>
+      </div>
+    </div>
+    <div class="status" id="status" hidden><i></i><span id="statusText"></span></div>
+  </section>
+
+  <aside class="sheet" id="sheet" aria-label="Sizes, settings and download" hidden>
+    <input class="name" id="mName" aria-label="Model name" maxlength="60">
+    <dl class="cells">
+      <div class="cell"><dt>Width (X)</dt><dd id="sx">–</dd></div>
+      <div class="cell"><dt>Depth (Y)</dt><dd id="sy">–</dd></div>
+      <div class="cell"><dt>Height (Z)</dt><dd id="sz">–</dd></div>
+    </dl>
+    <div class="block">
+      <dl class="facts" id="facts"></dl>
+    </div>
+    <div class="block" id="paramBlock">
+      <h2>Adjust</h2>
+      <div class="params" id="params"></div>
+    </div>
+    <div class="block">
+      <h2>Download</h2>
+      <div class="export">
+        <button class="go" id="dlMain" type="button">Download STL</button>
+        <div class="formats" id="formats"></div>
+        <p class="hint" id="fmtHint">STL opens in every slicer. The other formats are for CAD, 3D tools and AR.</p>
+      </div>
+      <div class="row2"><label for="quality">Detail</label>
+        <select id="quality"><option value="normal">Standard</option><option value="fine">Fine (slower, bigger files)</option></select></div>
+      <div class="row2"><label for="bed">Printer bed</label>
+        <select id="bed"><option value="180,180,180">180 × 180 × 180 mm</option><option value="220,220,250" selected>220 × 220 × 250 mm</option><option value="256,256,256">256 × 256 × 256 mm</option><option value="300,300,300">300 × 300 × 300 mm</option><option value="350,350,350">350 × 350 × 350 mm</option></select></div>
+    </div>
+    <details class="code" id="codeBox">
+      <summary>See or edit the model's code</summary>
+      <textarea id="code" spellcheck="false" aria-label="Model code"></textarea>
+      <p class="codeerr" id="codeErr" hidden></p>
+      <div class="row"><button class="plain" id="codeRun" type="button">Run this code</button><button class="quiet" id="btnUndo" type="button">Undo last change</button></div>
+    </details>
+  </aside>
+</main>
+
+<div class="drawer" id="drawer" hidden>
+  <h2>My models</h2>
+  <ul class="mlist" id="mlist"></ul>
+  <p class="hint" id="mEmpty" hidden>Models you make are kept in this browser. Nothing here yet.</p>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+/* ================= Forge exporters =================
+   Every writer takes the same mesh: positions (Float32Array of x, y, z in millimetres, Z up) and indices (three per
+   triangle, counter-clockwise seen from outside). Formats for printing keep millimetres and Z up; formats for viewing
+   on screens or in AR (GLB, USDZ) are converted to metres with Y up, as those formats expect. */
+const enc = new TextEncoder();
+const F = v => { const s = (Math.abs(v) < 5e-7 ? 0 : v).toFixed(5); return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s; };
+const safeName = n => String(n || 'model').replace(/[^\w .-]+/g, ' ').trim().slice(0, 60) || 'model';
+const triCount = m => m.indices.length / 3;
+function normalOf(p, a, b, c, out) {
+  const ax = p[a * 3], ay = p[a * 3 + 1], az = p[a * 3 + 2], ux = p[b * 3] - ax, uy = p[b * 3 + 1] - ay, uz = p[b * 3 + 2] - az, vx = p[c * 3] - ax, vy = p[c * 3 + 1] - ay, vz = p[c * 3 + 2] - az;
+  let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz); if (l > 0) { nx /= l; ny /= l; nz /= l; } out[0] = nx; out[1] = ny; out[2] = nz; return l;
+}
+// drop corners no triangle uses, so files hold only what is needed
+function compact(m) {
+  const p = m.positions, idx = m.indices, map = new Int32Array(p.length / 3).fill(-1), pos = []; const out = new Uint32Array(idx.length);
+  for (let i = 0; i < idx.length; i++) { let k = map[idx[i]]; if (k < 0) { k = map[idx[i]] = pos.length / 3; pos.push(p[idx[i] * 3], p[idx[i] * 3 + 1], p[idx[i] * 3 + 2]); } out[i] = k; }
+  return { positions: new Float32Array(pos), indices: out };
+}
+
+/* ---- STL ---- */
+function toSTL(m, name) {
+  const n = triCount(m), buf = new ArrayBuffer(84 + n * 50), dv = new DataView(buf), p = m.positions, idx = m.indices, N = [0, 0, 0];
+  new Uint8Array(buf, 0, 80).set(enc.encode(`${safeName(name)} - made with Forge - units mm`.slice(0, 79))); dv.setUint32(80, n, true);
+  for (let t = 0, o = 84; t < n; t++, o += 50) { const a = idx[t * 3], b = idx[t * 3 + 1], c = idx[t * 3 + 2]; normalOf(p, a, b, c, N); for (let k = 0; k < 3; k++) dv.setFloat32(o + k * 4, N[k], true); let q = o + 12; for (const v of [a, b, c]) for (let k = 0; k < 3; k++, q += 4) dv.setFloat32(q, p[v * 3 + k], true); }
+  return new Uint8Array(buf);
+}
+function toSTLAscii(m, name) {
+  const p = m.positions, idx = m.indices, N = [0, 0, 0], out = [`solid ${safeName(name).replace(/\s+/g, '_')}`];
+  for (let t = 0; t < idx.length; t += 3) { normalOf(p, idx[t], idx[t + 1], idx[t + 2], N); out.push(` facet normal ${F(N[0])} ${F(N[1])} ${F(N[2])}`, '  outer loop'); for (let k = 0; k < 3; k++) { const v = idx[t + k] * 3; out.push(`   vertex ${F(p[v])} ${F(p[v + 1])} ${F(p[v + 2])}`); } out.push('  endloop', ' endfacet'); }
+  out.push(`endsolid ${safeName(name).replace(/\s+/g, '_')}`); return enc.encode(out.join('\n') + '\n');
+}
+/* ---- OBJ ---- */
+function toOBJ(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, out = [`# ${safeName(name)} - made with Forge`, '# units: millimetres, Z up', `o ${safeName(name).replace(/\s+/g, '_')}`];
+  for (let i = 0; i < p.length; i += 3) out.push(`v ${F(p[i])} ${F(p[i + 1])} ${F(p[i + 2])}`);
+  for (let t = 0; t < idx.length; t += 3) out.push(`f ${idx[t] + 1} ${idx[t + 1] + 1} ${idx[t + 2] + 1}`);
+  return enc.encode(out.join('\n') + '\n');
+}
+/* ---- PLY (binary) ---- */
+function toPLY(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, nV = p.length / 3, nT = idx.length / 3;
+  const head = enc.encode(`ply\nformat binary_little_endian 1.0\ncomment ${safeName(name)} - made with Forge - units mm\nelement vertex ${nV}\nproperty float x\nproperty float y\nproperty float z\nelement face ${nT}\nproperty list uchar int vertex_indices\nend_header\n`);
+  const buf = new Uint8Array(head.length + nV * 12 + nT * 13), dv = new DataView(buf.buffer); buf.set(head); let o = head.length;
+  for (let i = 0; i < p.length; i++, o += 4) dv.setFloat32(o, p[i], true);
+  for (let t = 0; t < nT; t++) { dv.setUint8(o, 3); o++; for (let k = 0; k < 3; k++, o += 4) dv.setInt32(o, idx[t * 3 + k], true); }
+  return buf;
+}
+/* ---- zip (for 3MF and USDZ) ---- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function deflateRaw(data) { if (typeof CompressionStream === 'undefined') return null; try { const cs = new CompressionStream('deflate-raw'), w = cs.writable.getWriter(); w.write(data); w.close(); return new Uint8Array(await new Response(cs.readable).arrayBuffer()); } catch { return null; } }
+// files: [{ name, data: Uint8Array }]. compress: shrink entries when the browser can; align: pad so each file's bytes start on a multiple of `align` (USDZ needs 64).
+async function zip(files, { compress = true, align = 0 } = {}) {
+  const parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const nameB = enc.encode(f.name), crc = crc32(f.data); let body = f.data, method = 0; if (compress) { const z = await deflateRaw(f.data); if (z && z.length < f.data.length) { body = z; method = 8; } }
+    let extra = new Uint8Array(0); if (align) { const start = off + 30 + nameB.length, padTo = Math.ceil((start + 4) / align) * align, n = padTo - start - 4; extra = new Uint8Array(4 + n); new DataView(extra.buffer).setUint16(0, 0x1986, true); new DataView(extra.buffer).setUint16(2, n, true); }
+    const h = new Uint8Array(30), dv = new DataView(h.buffer); dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true); dv.setUint16(8, method, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true); dv.setUint32(14, crc, true); dv.setUint32(18, body.length, true); dv.setUint32(22, f.data.length, true); dv.setUint16(26, nameB.length, true); dv.setUint16(28, extra.length, true);
+    const c = new Uint8Array(46), cv = new DataView(c.buffer); cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x0800, true); cv.setUint16(10, method, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0x21, true); cv.setUint32(16, crc, true); cv.setUint32(20, body.length, true); cv.setUint32(24, f.data.length, true); cv.setUint16(28, nameB.length, true); cv.setUint32(42, off, true);
+    central.push(c, nameB); parts.push(h, nameB, extra, body); off += 30 + nameB.length + extra.length + body.length;
+  }
+  const cdSize = central.reduce((s, b) => s + b.length, 0), end = new Uint8Array(22), ev = new DataView(end.buffer); ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, cdSize, true); ev.setUint32(16, off, true);
+  const all = [...parts, ...central, end], out = new Uint8Array(all.reduce((s, b) => s + b.length, 0)); let o = 0; for (const b of all) { out.set(b, o); o += b.length; } return out;
+}
+/* ---- 3MF ---- */
+async function to3MF(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, v = [], t = [];
+  for (let i = 0; i < p.length; i += 3) v.push(`<vertex x="${F(p[i])}" y="${F(p[i + 1])}" z="${F(p[i + 2])}"/>`);
+  for (let i = 0; i < idx.length; i += 3) t.push(`<triangle v1="${idx[i]}" v2="${idx[i + 1]}" v3="${idx[i + 2]}"/>`);
+  const nm = safeName(name).replace(/[<>&"]/g, ' ');
+  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n<metadata name="Title">${nm}</metadata>\n<metadata name="Application">Forge</metadata>\n<resources>\n<object id="1" name="${nm}" type="model">\n<mesh>\n<vertices>\n${v.join('\n')}\n</vertices>\n<triangles>\n${t.join('\n')}\n</triangles>\n</mesh>\n</object>\n</resources>\n<build>\n<item objectid="1"/>\n</build>\n</model>\n`;
+  return zip([
+    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
+    { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
+    { name: '3D/3dmodel.model', data: enc.encode(model) },
+  ]);
+}
+/* ---- AMF ---- */
+function toAMF(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, out = ['<?xml version="1.0" encoding="UTF-8"?>', '<amf unit="millimeter" version="1.1">', `<metadata type="name">${safeName(name).replace(/[<>&"]/g, ' ')}</metadata>`, '<object id="0"><mesh><vertices>'];
+  for (let i = 0; i < p.length; i += 3) out.push(`<vertex><coordinates><x>${F(p[i])}</x><y>${F(p[i + 1])}</y><z>${F(p[i + 2])}</z></coordinates></vertex>`);
+  out.push('</vertices><volume>'); for (let i = 0; i < idx.length; i += 3) out.push(`<triangle><v1>${idx[i]}</v1><v2>${idx[i + 1]}</v2><v3>${idx[i + 2]}</v3></triangle>`);
+  out.push('</volume></mesh></object>', '</amf>'); return enc.encode(out.join('\n') + '\n');
+}
+/* ---- Collada (DAE) ---- */
+function toDAE(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, nm = safeName(name).replace(/[<>&"]/g, ' '), now = new Date().toISOString();
+  return enc.encode(`<?xml version="1.0" encoding="utf-8"?>\n<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">\n<asset><contributor><authoring_tool>Forge</authoring_tool></contributor><created>${now}</created><modified>${now}</modified><unit name="millimeter" meter="0.001"/><up_axis>Z_UP</up_axis></asset>\n<library_geometries><geometry id="mesh" name="${nm}"><mesh>\n<source id="mesh-pos"><float_array id="mesh-pos-array" count="${p.length}">${Array.from(p, F).join(' ')}</float_array><technique_common><accessor source="#mesh-pos-array" count="${p.length / 3}" stride="3"><param name="X" type="float"/><param name="Y" type="float"/><param name="Z" type="float"/></accessor></technique_common></source>\n<vertices id="mesh-vtx"><input semantic="POSITION" source="#mesh-pos"/></vertices>\n<triangles count="${idx.length / 3}"><input semantic="VERTEX" source="#mesh-vtx" offset="0"/><p>${Array.from(idx).join(' ')}</p></triangles>\n</mesh></geometry></library_geometries>\n<library_visual_scenes><visual_scene id="scene"><node id="model" name="${nm}"><instance_geometry url="#mesh"/></node></visual_scene></library_visual_scenes>\n<scene><instance_visual_scene url="#scene"/></scene>\n</COLLADA>\n`);
+}
+/* ---- GLB (glTF 2.0 binary): metres, Y up ---- */
+function yUpMetres(m0) {       // corners are split per triangle so each face keeps its own flat shading
+  const p = m0.positions, idx = m0.indices, n = idx.length, pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), N = [0, 0, 0], lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let t = 0; t < n; t += 3) { normalOf(p, idx[t], idx[t + 1], idx[t + 2], N); for (let k = 0; k < 3; k++) { const v = idx[t + k] * 3, o = (t + k) * 3, x = p[v] / 1000, y = p[v + 2] / 1000, z = -p[v + 1] / 1000; pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; nor[o] = N[0]; nor[o + 1] = N[2]; nor[o + 2] = -N[1]; if (x < lo[0]) lo[0] = x; if (y < lo[1]) lo[1] = y; if (z < lo[2]) lo[2] = z; if (x > hi[0]) hi[0] = x; if (y > hi[1]) hi[1] = y; if (z > hi[2]) hi[2] = z; } }
+  return { pos, nor, lo, hi, n };
+}
+function toGLB(m0, name) {
+  const { pos, nor, lo, hi, n } = yUpMetres(m0), bin = new Uint8Array(pos.byteLength + nor.byteLength); bin.set(new Uint8Array(pos.buffer), 0); bin.set(new Uint8Array(nor.buffer), pos.byteLength);
+  const json = { asset: { version: '2.0', generator: 'Forge' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name: safeName(name) }], meshes: [{ name: safeName(name), primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0, mode: 4 }] }],
+    materials: [{ name: 'Print', pbrMetallicRoughness: { baseColorFactor: [.78, .78, .76, 1], metallicFactor: 0, roughnessFactor: .7 } }],
+    buffers: [{ byteLength: bin.length }], bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: pos.byteLength, target: 34962 }, { buffer: 0, byteOffset: pos.byteLength, byteLength: nor.byteLength, target: 34962 }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: n, type: 'VEC3', min: lo, max: hi }, { bufferView: 1, componentType: 5126, count: n, type: 'VEC3' }] };
+  let jb = enc.encode(JSON.stringify(json)); const jp = (4 - jb.length % 4) % 4, bp = (4 - bin.length % 4) % 4, total = 12 + 8 + jb.length + jp + 8 + bin.length + bp, out = new Uint8Array(total), dv = new DataView(out.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, total, true); dv.setUint32(12, jb.length + jp, true); dv.setUint32(16, 0x4E4F534A, true); out.set(jb, 20); out.fill(0x20, 20 + jb.length, 20 + jb.length + jp);
+  const o = 20 + jb.length + jp; dv.setUint32(o, bin.length + bp, true); dv.setUint32(o + 4, 0x004E4942, true); out.set(bin, o + 8); return out;
+}
+/* ---- USDZ (for AR on iPhone and iPad): metres, Y up ---- */
+async function toUSDZ(m0, name) {
+  const { pos, nor, n } = yUpMetres(m0), P = [], Nn = [], I = [];
+  for (let i = 0; i < n; i++) { P.push(`(${+pos[i * 3].toFixed(7)}, ${+pos[i * 3 + 1].toFixed(7)}, ${+pos[i * 3 + 2].toFixed(7)})`); Nn.push(`(${F(nor[i * 3])}, ${F(nor[i * 3 + 1])}, ${F(nor[i * 3 + 2])})`); I.push(i); }
+  const usda = `#usda 1.0\n(\n    customLayerData = {\n        string creator = "Forge"\n    }\n    defaultPrim = "Root"\n    metersPerUnit = 1\n    upAxis = "Y"\n)\n\ndef Xform "Root"\n{\n    def Scope "Materials"\n    {\n        def Material "Print"\n        {\n            token outputs:surface.connect = </Root/Materials/Print/Shader.outputs:surface>\n\n            def Shader "Shader"\n            {\n                uniform token info:id = "UsdPreviewSurface"\n                color3f inputs:diffuseColor = (0.78, 0.78, 0.76)\n                float inputs:metallic = 0\n                float inputs:roughness = 0.7\n                token outputs:surface\n            }\n        }\n    }\n\n    def Mesh "Model" (\n        prepend apiSchemas = ["MaterialBindingAPI"]\n    )\n    {\n        int[] faceVertexCounts = [${new Array(n / 3).fill(3).join(', ')}]\n        int[] faceVertexIndices = [${I.join(', ')}]\n        normal3f[] normals = [${Nn.join(', ')}] (\n            interpolation = "vertex"\n        )\n        point3f[] points = [${P.join(', ')}]\n        uniform token subdivisionScheme = "none"\n        rel material:binding = </Root/Materials/Print>\n    }\n}\n`;
+  return zip([{ name: 'model.usda', data: enc.encode(usda) }], { compress: false, align: 64 });
+}
+/* ---- STEP (ISO 10303-21): the solid as flat faces, one per triangle. CAD programs open it as a solid body made of facets. ---- */
+const STEP_MAX = 30000;
+function toSTEP(m0, name) {
+  const m = compact(m0), p = m.positions, idx = m.indices, nT = idx.length / 3, nV = p.length / 3; if (nT > STEP_MAX) throw new Error(`STEP holds one flat face per triangle, which is only practical up to ${STEP_MAX.toLocaleString()} triangles; this model has ${nT.toLocaleString()}. Use 3MF or STL for it, or a lower detail setting.`);
+  const L = [], nm = safeName(name).replace(/'/g, ''); let id = 0; const add = s => { L.push(`#${++id}=${s};`); return id; }, R = v => { const s = F(v); return s.includes('.') ? s : s + '.'; };
+  const ctx = add(`APPLICATION_CONTEXT('core data for automotive mechanical design processes')`); add(`APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#${ctx})`);
+  const pc = add(`PRODUCT_CONTEXT('',#${ctx},'mechanical')`), prod = add(`PRODUCT('${nm}','${nm}','',(#${pc}))`), pdf = add(`PRODUCT_DEFINITION_FORMATION('','',#${prod})`), pdc = add(`PRODUCT_DEFINITION_CONTEXT('part definition',#${ctx},'design')`), pd = add(`PRODUCT_DEFINITION('design','',#${pdf},#${pdc})`), pds = add(`PRODUCT_DEFINITION_SHAPE('','',#${pd})`);
+  const lu = add(`(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.))`), au = add(`(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.))`), su = add(`(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT())`), unc = add(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-05),#${lu},'distance_accuracy_value','confusion accuracy')`);
+  const gctx = add(`(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#${unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((#${lu},#${au},#${su}))REPRESENTATION_CONTEXT('Context','3D'))`);
+  const o0 = add(`CARTESIAN_POINT('',(0.,0.,0.))`), dz = add(`DIRECTION('',(0.,0.,1.))`), dx = add(`DIRECTION('',(1.,0.,0.))`), ax0 = add(`AXIS2_PLACEMENT_3D('',#${o0},#${dz},#${dx})`);
+  const cp = new Int32Array(nV), vp = new Int32Array(nV); for (let i = 0; i < nV; i++) { cp[i] = add(`CARTESIAN_POINT('',(${R(p[i * 3])},${R(p[i * 3 + 1])},${R(p[i * 3 + 2])}))`); vp[i] = add(`VERTEX_POINT('',#${cp[i]})`); }
+  const edges = new Map(), edgeOf = (a, b) => { const lo = Math.min(a, b), hi = Math.max(a, b), k = lo * nV + hi; let e = edges.get(k); if (!e) { const ux = p[hi * 3] - p[lo * 3], uy = p[hi * 3 + 1] - p[lo * 3 + 1], uz = p[hi * 3 + 2] - p[lo * 3 + 2], l = Math.hypot(ux, uy, uz) || 1; const d = add(`DIRECTION('',(${R(ux / l)},${R(uy / l)},${R(uz / l)}))`), v = add(`VECTOR('',#${d},${R(l)})`), ln = add(`LINE('',#${cp[lo]},#${v})`); e = add(`EDGE_CURVE('',#${vp[lo]},#${vp[hi]},#${ln},.T.)`); edges.set(k, e); } return [e, a < b]; };
+  const faces = [], N = [0, 0, 0];
+  for (let t = 0; t < nT; t++) {
+    const a = idx[t * 3], b = idx[t * 3 + 1], c = idx[t * 3 + 2]; if (!(normalOf(p, a, b, c, N) > 1e-12)) continue;
+    const oe = [[a, b], [b, c], [c, a]].map(([u, v]) => { const [e, fwd] = edgeOf(u, v); return add(`ORIENTED_EDGE('',*,*,#${e},${fwd ? '.T.' : '.F.'})`); });
+    const loop = add(`EDGE_LOOP('',(${oe.map(e => '#' + e).join(',')}))`), bound = add(`FACE_OUTER_BOUND('',#${loop},.T.)`);
+    let rx = p[b * 3] - p[a * 3], ry = p[b * 3 + 1] - p[a * 3 + 1], rz = p[b * 3 + 2] - p[a * 3 + 2]; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
+    const dn = add(`DIRECTION('',(${R(N[0])},${R(N[1])},${R(N[2])}))`), dr = add(`DIRECTION('',(${R(rx)},${R(ry)},${R(rz)}))`), ax = add(`AXIS2_PLACEMENT_3D('',#${cp[a]},#${dn},#${dr})`), pl = add(`PLANE('',#${ax})`);
+    faces.push(add(`ADVANCED_FACE('',(#${bound}),#${pl},.T.)`));
+  }
+  const shell = add(`CLOSED_SHELL('',(${faces.map(f => '#' + f).join(',')}))`), brep = add(`MANIFOLD_SOLID_BREP('${nm}',#${shell})`), rep = add(`ADVANCED_BREP_SHAPE_REPRESENTATION('${nm}',(#${ax0},#${brep}),#${gctx})`); add(`SHAPE_DEFINITION_REPRESENTATION(#${pds},#${rep})`);
+  const stamp = new Date().toISOString().slice(0, 19);
+  return enc.encode(`ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('${nm}'),'2;1');\nFILE_NAME('${nm}.step','${stamp}',('Forge'),(''),'Forge','Forge','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\nENDSEC;\nDATA;\n${L.join('\n')}\nENDSEC;\nEND-ISO-10303-21;\n`);
+}
+
+// what the app offers: id, file ending, label, what it is for, and the writer (some are async)
+const FORMATS = [
+  { id: 'stl', ext: 'stl', label: 'STL', note: 'Every slicer and printer. Millimetres.', mime: 'model/stl', write: toSTL },
+  { id: '3mf', ext: '3mf', label: '3MF', note: 'Modern print format: smaller, carries units. Bambu, Prusa, Cura.', mime: 'model/3mf', write: to3MF },
+  { id: 'obj', ext: 'obj', label: 'OBJ', note: 'Blender, Maya, most 3D tools.', mime: 'model/obj', write: toOBJ },
+  { id: 'step', ext: 'step', label: 'STEP', note: 'CAD programs (Fusion, SolidWorks, FreeCAD): a solid made of flat facets.', mime: 'model/step', write: toSTEP, max: STEP_MAX },
+  { id: 'glb', ext: 'glb', label: 'GLB', note: 'Web, games, AR on Android. Metres, Y up.', mime: 'model/gltf-binary', write: toGLB },
+  { id: 'usdz', ext: 'usdz', label: 'USDZ', note: 'AR on iPhone and iPad. Metres, Y up.', mime: 'model/vnd.usdz+zip', write: toUSDZ },
+  { id: 'ply', ext: 'ply', label: 'PLY', note: 'Scanning and research tools, MeshLab.', mime: 'application/octet-stream', write: toPLY },
+  { id: 'dae', ext: 'dae', label: 'DAE', note: 'Collada: SketchUp and older 3D tools.', mime: 'model/vnd.collada+xml', write: toDAE },
+  { id: 'amf', ext: 'amf', label: 'AMF', note: 'Older print format, still read by most slicers.', mime: 'application/x-amf', write: toAMF },
+  { id: 'stla', ext: 'stl', label: 'STL (text)', note: 'The same STL as readable text, for tools that need it.', mime: 'model/stl', write: toSTLAscii },
+];
+/* ================= Forge: what Claude is asked =================
+   Three requests share one vocabulary and one set of rules: make a model, change one, and repair one whose code failed
+   or whose measured size is not what was promised. The answer is always one JSON object (see REPLY). */
+const VOCAB = `HOW A MODEL IS WRITTEN
+A model is the body of a JavaScript function. It builds a solid from the vocabulary below and ends with: return <solid>;
+Units are millimetres. Z is up. The print bed is the plane z = 0: the finished model sits on it (lowest point at z = 0), roughly centred on x = 0, y = 0.
+The customer's adjustable sizes arrive as p.<key> (see "params"). Plain JavaScript maths, const, loops and arrays are fine. Nothing else exists: no imports, no other libraries, no console.
+
+FLAT SHAPES (2D, drawn in X and Y, centred on the origin unless moved)
+  rect(w, h, { r })                rectangle w along X, h along Y; r rounds the four corners
+  circle(r)   ellipse(rx, ry)   ngon(sides, r)   star(points, rOuter, rInner)
+  slot(length, width)              overall length along X, round ends
+  ring(rOuter, rInner)             sector(r, fromDeg, toDeg)
+  polygon([[x, y], ...])           corners in order (any direction)
+  text('ABC', capHeight, { font, align, spacing })   letters capHeight mm tall, centred on the origin. font: 'sans' | 'serif' | 'mono' | 'narrow'. align: 'center' | 'left' | 'right'
+  methods: .move(x, y)  .rotate(deg)  .scale(s)  .mirror('x' | 'y')  .grow(mm)  .shrink(mm)  .round(r)  .outline(thickness)  .bounds() gives { min, max, size }
+  combine: union(a, b, ...)   cut(a, b, ...)   intersect(a, b, ...)
+
+SOLIDS
+  box(w, d, h, { r })              w along X, d along Y, h along Z. Centred in X and Y, standing on z = 0 (z runs 0 to h). r rounds EVERY edge, top and bottom too
+  cylinder(r, h, { r2, round })    upright on z = 0 (z runs 0 to h). r2 = radius at the top (a taper). round = rounded rims
+  cone(rBottom, rTop, h)           upright on z = 0
+  sphere(r)                        centred on the origin (z runs -r to r)
+  torus(R, r)                      a ring lying flat, centred on the origin (z runs -r to r)
+  tube([[x, y, z], ...], r)        a round bar through the points, with round ends and joints
+  rod([x, y, z], [x, y, z], r)     a straight round bar with flat ends
+  extrude(shape, h, { twist, taper, center })   pushes a flat shape up from z = 0 to z = h. twist in degrees over the height; taper = size at the top (0.5 = half)
+  revolve(profile, { angle })      spins a flat profile around the Z axis: in the profile, x is the distance from the axis and y is the height
+  thread(diameter, pitch, length)  a threaded bar upright on z = 0 (diameter is the outside of the thread). Bolt: union it with a head. Nut: cut it from the body
+  methods: .move(x, y, z)  .moveX(v) .moveY(v) .moveZ(v)  .rotate(rx, ry, rz) in degrees about the origin (X first, then Y, then Z)  .rotateX(deg) .rotateY(deg) .rotateZ(deg)
+           .scale(s) or .scale(sx, sy, sz)  .mirror('x' | 'y' | 'z')  .grow(mm) .shrink(mm)  .round(r)
+           .shell(t) hollows the solid leaving a closed wall t thick (cut an opening yourself)
+           .clip({ z: [from, to] }) or .clip({ zmin: 0 }) or .clip({ xmax: 10 }) keeps the part inside the range
+           .center('xy') centres on those axes   .onBed() drops or lifts the solid so its lowest point is z = 0
+           .fit({ z: 80 }) scales the whole solid evenly so that side measures that much
+           .bounds() gives { min, max, size, center }
+  combine: union(a, b, ..., { fillet: r })   cut(body, tool, ..., { fillet: r })   intersect(a, b, ...)   fillet blends the joint with a radius
+  repeat:  array(solid, n, [dx, dy, dz])   polar(solid, n, { radius, start, angle })   grid(solid, nx, ny, dx, dy)
+
+TO GET THE SHAPE YOU MEAN
+  A plate with rounded corners but flat faces: extrude(rect(w, d, { r }), h), not box(w, d, h, { r }).
+  A through hole: make the tool longer than the body and start it below (cylinder(r, h + 2).moveZ(-1)), so no skin is left.
+  A sideways hole or peg: build it upright, then rotate it (rotateX(90) lays it along Y, rotateY(90) lays it along X), then move it.
+  Raised letters: extrude(text(...), depth).moveZ(top of the face). Engraved letters: cut them, with the tool starting inside the body and ending above the face.
+  A cup or box open at the top: cut an inner solid that starts at the floor thickness and runs past the top.
+  Do not give a variable the name of a vocabulary word (call a plate "plate", not "box").`;
+
+const RULES = `RULES
+1. The customer's numbers are exact. Every size they give is used as given, as a parameter's value or as a constant. Never round one, never trade one away for looks or printability. Convert other units exactly (1 inch = 25.4 mm).
+2. "size" is your promise: the overall outside size of the finished model in mm along x, y and z, with the parameters at their values. Give a number for each direction the customer's sizes fix, and null for a direction they left open. The built model is measured and compared with it, so work it out from your own code, not from a guess.
+3. Sizes the customer did not give: choose what suits the object's use, make the main ones parameters, and say what you assumed in one sentence.
+4. Fits: when a hole or slot must take a named thing (an M4 screw, a 6 mm rod, a phone), add clearance and say so: M3 3.4, M4 4.5, M5 5.5, M6 6.6, M8 9, M10 11 mm; 0.3 mm for a sliding fit on other things. When the customer gives the hole's own size, use it exactly.
+5. It must print: one connected solid (or the separate pieces they asked for, side by side on the bed with a gap of at least 5 mm), sitting on its largest flat face where the design allows, walls at least 1.2 mm, no part floating in the air. If something they asked for needs supports or is fragile, keep their sizes and say so in "print".
+6. Parameters: 2 to 8, the sizes a customer would want to change. key is a short camelCase word; the code reads it as p.key. Each has label, value, min, max, step and unit ("mm", "deg" or ""). For wording to print on the model use { "key", "label", "value": "TEXT", "type": "text" }.
+7. Do it all in this one reply. Do not ask questions; decide, and say what you decided.`;
+
+const REPLY = `REPLY with one JSON object and nothing else:
+{
+  "kind": "part" or "sculpt",
+  "name": "2 to 4 words",
+  "say": "1 to 3 short sentences for the customer: what you made, the sizes that matter, anything you assumed. Plain words, no talk of code.",
+  "params": [ { "key": "width", "label": "Width", "value": 70, "min": 30, "max": 160, "step": 1, "unit": "mm" } ],
+  "code": "the function body as one string",
+  "size": { "x": 70, "y": 22, "z": null },
+  "print": "one sentence of printing advice: which face down, supports or not, anything to watch"
+}
+In "code", write strings with single quotes and line breaks as \\n. No backticks.`;
+
+const EXAMPLE = `EXAMPLE
+Customer: "a name tag 70 x 22 mm, 3 thick, says MAYA raised, with a 5 mm keyring hole"
+{"kind":"part","name":"Name tag","say":"A 70 x 22 x 3 mm tag with MAYA raised 1 mm and a 5 mm keyring hole on the left. I rounded the corners by 3 mm.","params":[{"key":"width","label":"Width","value":70,"min":40,"max":160,"step":1,"unit":"mm"},{"key":"height","label":"Height","value":22,"min":12,"max":60,"step":1,"unit":"mm"},{"key":"thick","label":"Thickness","value":3,"min":1.2,"max":8,"step":0.2,"unit":"mm"},{"key":"hole","label":"Hole","value":5,"min":2,"max":10,"step":0.5,"unit":"mm"},{"key":"label","label":"Name","value":"MAYA","type":"text"},{"key":"raise","label":"Letter height","value":1,"min":0.4,"max":3,"step":0.2,"unit":"mm"}],"code":"const plate = extrude(rect(p.width, p.height, { r: 3 }), p.thick);\\nconst hole = cylinder(p.hole / 2, p.thick + 2).move(-p.width / 2 + p.hole / 2 + 4, 0, -1);\\nconst room = p.width - p.hole - 16;\\nlet word = text(p.label, p.height * 0.42, { font: 'sans' });\\nconst w = word.bounds().size[0];\\nif (w > room) word = word.scale(room / w);\\nconst letters = extrude(word, p.raise).move(p.hole / 2 + 2, 0, p.thick);\\nreturn union(cut(plate, hole), letters);","size":{"x":70,"y":22,"z":4},"print":"Print flat on its back with no supports; a 0.2 mm layer keeps the letters crisp."}`;
+
+const SCULPT_ON = `PART OR SCULPT
+"part": anything that can be built from the vocabulary: brackets, mounts, holders, boxes and lids, stands, knobs, gears, tags, signs, vases, organisers, adapters, simple stylised objects.
+"sculpt": natural, organic forms the vocabulary cannot build: animals, people, characters, faces, plants, creatures, rich ornament. A sculptor makes the shape and your code makes it a printable model.
+For a sculpt add "mesh": { "prompt": "the object alone, described for a sculptor in one clear sentence: what it is, its pose, its style", "from": "words" } (use "from": "picture" only when the customer attached a picture of the very thing to reproduce).
+In the code the sculpted shape is the solid "source": 100 mm along its longest side, centred on x = 0 and y = 0, sitting on z = 0. Size it with source.fit({ z: p.height }) (or x or y), then make it printable: a flat underside (source.fit({ z: p.height }).clip({ zmin: 1.5 }).onBed()), a base under it, a keyring loop, a hollow inside, lettering on the base. For a sculpt, "size" holds only the side you fitted.`;
+const SCULPT_OFF = `Sculpted shapes are switched off on this site. Always answer with "kind": "part": build the closest clean, stylised version you can from the vocabulary (blend rounded forms with union(..., { fillet })), and say in "say" that it is a simplified shape.`;
+
+const cleanIn = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+function modelBlock(m, stats) {
+  const o = { kind: m.kind, name: m.name, params: m.params, code: m.code, size: m.size };
+  let s = 'THE MODEL NOW\n' + JSON.stringify(o);
+  if (m.source) s += `\nThis model has a ${m.source.type === 'sculpt' ? 'sculpted' : 'customer-supplied'} shape available as "source" (${m.source.what || 'no description'}).`;
+  if (stats) s += `\nMEASURED after building: ${stats.size.map(v => +v.toFixed(2)).join(' x ')} mm (x, y, z), volume ${(stats.volume / 1000).toFixed(1)} cm3.`;
+  return s;
+}
+const talkBlock = m => { const t = (m?.chat || []).filter(c => c.who === 'you' || c.who === 'forge').slice(-8, -1); return t.length ? 'EARLIER IN THE CONVERSATION\n' + t.map(c => `${c.who === 'you' ? 'Customer' : 'You'}: ${cleanIn(c.text, 400)}`).join('\n') + '\n\n' : ''; };
+
+function makePrompt(text, o = {}) {
+  return `You are Forge, a mechanical designer who writes 3D models as short programs for 3D printing. A customer describes an object; you design it and reply with one JSON object.
+
+${VOCAB}
+
+${o.meshOn ? SCULPT_ON : SCULPT_OFF}
+
+${RULES}
+
+${REPLY}
+
+${EXAMPLE}
+
+${o.picture ? 'The customer attached a picture. If it is a sketch or drawing with sizes written on it, read every size and use it exactly. If it is a photo of an object, use it to understand the shape.\n\n' : ''}THE CUSTOMER ASKS
+${cleanIn(text, 4000)}`;
+}
+
+function editPrompt(m, text, o = {}) {
+  return `You are Forge, a mechanical designer who writes 3D models as short programs for 3D printing. The customer has a model and wants it changed. Reply with one JSON object.
+
+${VOCAB}
+
+${o.meshOn ? SCULPT_ON : SCULPT_OFF}
+
+${RULES}
+8. Change what was asked and leave the rest as it is: keep the parameter keys and their current values unless the change is about them, and keep every size the customer set earlier. Reply with the complete model, not a patch.
+9. Include "mesh" only when a NEW sculpted shape is needed; without it the existing "source" stays.
+10. If the customer only asks a question, answer it in "say" and leave out every other field.
+
+${REPLY}
+
+${modelBlock(m, o.stats)}
+
+${talkBlock(m)}${o.picture ? 'The customer attached a picture with this request. Read any sizes written on it and use them exactly.\n\n' : ''}THE CUSTOMER NOW ASKS
+${cleanIn(text, 4000)}`;
+}
+
+// problem: { type: 'error', message, line } or { type: 'size', want: {x,y,z}, got: [x,y,z], off: ['x', ...] } or { type: 'open', edges }
+function fixPrompt(m, problem, o = {}) {
+  const lines = String(m.code || '').split('\n');
+  const what = problem.type === 'error'
+    ? `The code did not run.\nError: ${problem.message}${problem.line && lines[problem.line - 1] ? `\nAt line ${problem.line}: ${lines[problem.line - 1].trim().slice(0, 300)}` : ''}`
+    : problem.type === 'size'
+      ? `The model was built and measured, and it does not match "size".\nPromised (x, y, z): ${['x', 'y', 'z'].map(a => m.size?.[a] ?? 'open').join(' x ')} mm\nMeasured (x, y, z): ${problem.got.map(v => +v.toFixed(2)).join(' x ')} mm\nWrong: ${problem.off.join(', ')}.\nFind which is wrong, the code or the promise, by working through the code step by step, and correct it so that the customer's sizes hold. Remember what the vocabulary really builds (box and cylinder stand on z = 0; sphere and torus are centred on the origin; lettering, fillets and added parts make the model bigger).`
+      : `The model was built but its surface is not closed (${problem.edges} open edges), usually because a wall or detail is thinner than 0.2 mm or two parts only touch along an edge. Make those parts overlap or thicker.`;
+  return `You are Forge, a mechanical designer who writes 3D models as short programs for 3D printing. A model you wrote has a problem. Correct it and reply with the complete model as one JSON object.
+
+${VOCAB}
+
+${RULES}
+
+${REPLY}
+
+${modelBlock(m, null)}
+${o.request ? '\nWHAT THE CUSTOMER ASKED FOR\n' + cleanIn(o.request, 2000) + '\n' : ''}
+THE PROBLEM
+${what}
+
+Keep "say" and "print" true to the corrected model.`;
+}
+/* ================= Forge: the page =================
+   Left: the conversation. Middle: the model on a millimetre bed with its measured sizes drawn around it.
+   Right: sizes, sliders and downloads. Models live in this browser (localStorage; sculpted shapes in IndexedDB). */
+const $ = id => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v); } for (const c of kids) if (c != null) e.append(c); return e; };
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } } };
+const newId = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fail = (code, message, extra) => Object.assign(new Error(message || code), { code }, extra);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const HOOK = {};            // tests may replace the calls that leave the page
+
+const ST = { cfg: {}, models: store.get('forge-models', []), cur: null, mesh: null, busy: false, unit: store.get('forge-unit', 'mm'), bed: store.get('forge-bed', [220, 220, 250]), dims: true, edges: true, pic: null, quality: 'normal', draft: [] };
+
+/* ---------------- numbers on screen ---------------- */
+// The mesh follows curves to about a hundredth of a millimetre, so sizes are shown to that and no finer.
+function nice(mm) {
+  const v = ST.unit === 'in' ? mm / 25.4 : mm, step = ST.unit === 'in' ? .005 : .05, tol = ST.unit === 'in' ? .0006 : .012, r = Math.round(v / step) * step;
+  const out = Math.abs(v - r) <= tol ? r : v; return (+out.toFixed(ST.unit === 'in' ? 3 : 2)).toString();
+}
+const unitName = () => ST.unit;
+const sizeText = s => `${nice(s[0])} × ${nice(s[1])} × ${nice(s[2])} ${unitName()}`;
+// a promised size holds if the measured one is within 0.05 mm or 0.2 %, whichever is larger
+const sizeOff = (want, got) => ['x', 'y', 'z'].filter((a, i) => want && Number.isFinite(+want[a]) && want[a] !== null && Math.abs(got[i] - want[a]) > Math.max(.05, Math.abs(want[a]) * .002));
+
+/* ---------------- storage ---------------- */
+const MEM = new Map();
+const idb = (() => {
+  let p; const open = () => p ||= new Promise((res, rej) => { const r = indexedDB.open('forge', 1); r.onupgradeneeded = () => r.result.createObjectStore('sources'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction('sources', mode), q = fn(t.objectStore('sources')); t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); };
+  return {
+    async get(k) { if (MEM.has(k)) return MEM.get(k); try { return await tx('readonly', s => s.get(k)); } catch { return undefined; } },
+    async put(k, v) { MEM.set(k, v); if (MEM.size > 3) MEM.delete(MEM.keys().next().value); try { await tx('readwrite', s => s.put(v, k)); } catch { } },
+    async del(k) { MEM.delete(k); try { await tx('readwrite', s => s.delete(k)); } catch { } },
+  };
+})();
+function save() {
+  ST.models.sort((a, b) => b.updated - a.updated);
+  for (const dead of ST.models.splice(40)) idb.del(dead.id);
+  if (!store.set('forge-models', ST.models)) { for (const m of ST.models.slice(8)) m.thumb = null; store.set('forge-models', ST.models); }   // out of room: older pictures go first
+  store.set('forge-last', ST.cur?.id || null);
+}
+
+/* ---------------- the server ---------------- */
+let supa = null;
+function guestKey() {
+  let k = null; try { k = localStorage.getItem('mirage-guest'); } catch { }
+  if (!/^[A-Za-z0-9_-]{24,80}$/.test(k || '')) { const b = crypto.getRandomValues(new Uint8Array(24)); k = Array.from(b, x => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[x & 63]).join(''); try { localStorage.setItem('mirage-guest', k); } catch { } }
+  return k;
+}
+async function token() {
+  const c = ST.cfg;
+  if (c.authMode === 'test') { let t = null; try { t = localStorage.getItem('mirage-test-token'); } catch { } if (t) return t; }
+  else if (c.supabaseUrl) {
+    try {
+      if (!supa) { const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'); supa = createClient(c.supabaseUrl, c.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true } }); }
+      const { data } = await supa.auth.getSession(); if (data?.session?.access_token) return data.session.access_token;
+    } catch { }
+  }
+  if (c.guest) return 'guest:' + guestKey();
+  throw fail('signin', 'Sign in on Mirage first, then come back to Forge.');
+}
+async function api(path, data) {
+  let r; try { r = await fetch(path, { method: data ? 'POST' : 'GET', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + await token() }, body: data ? JSON.stringify(data) : undefined }); }
+  catch (e) { if (e.code) throw e; throw fail('network', 'Could not reach Forge. Check your connection.'); }
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw fail(j.error?.code || 'server_error', j.error?.message || 'Something went wrong. Try again.'); }
+  return r;
+}
+// One request to Claude through /api/ai: the answer streams in and ends with the JSON it wrote.
+async function askAI(kind, prompt, images = []) {
+  if (HOOK.ai) return HOOK.ai(kind, prompt, images);
+  const r = await api('/api/ai', { kind, prompt, images });
+  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '', out = null;
+  for (; ;) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true }); let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const line = buf.slice(0, i).split('\n').find(l => l.startsWith('data:')); buf = buf.slice(i + 2); if (!line) continue;
+      const o = JSON.parse(line.slice(5)); if (o.error) throw fail(o.error.code, o.error.message); if (o.done) out = o.json;
+    }
+  }
+  if (!out) throw fail('empty', 'No answer came back. Try again.');
+  return out;
+}
+// one automatic second try when the answer was lost on the way, never when a limit was reached
+async function askAIOnce(kind, prompt, images) {
+  try { return await askAI(kind, prompt, images); }
+  catch (e) { if (!['invalid_json', 'upstream_error', 'network', 'server_error', 'empty'].includes(e.code)) throw e; await sleep(800); return askAI(kind, prompt, images); }
+}
+
+/* ---------------- the worker that builds solids ---------------- */
+const W = { w: null, jobs: new Map(), n: 0, has: new Set(), fonts: null };
+async function loadFonts() { W.fonts ||= Promise.all(['sans', 'serif', 'mono', 'narrow'].map(async n => ({ name: n, buf: await (await fetch(`/fonts/forge-${n}.ttf`)).arrayBuffer() }))); return W.fonts; }
+async function startWorker() {
+  const fonts = await loadFonts();
+  const w = new Worker('/forge-worker.js'); W.w = w; W.has = new Set();
+  w.onmessage = ev => { const m = ev.data, j = W.jobs.get(m.job); if (!j) return; if (m.type === 'progress') return j.onStep?.(m.f); W.jobs.delete(m.job); clearTimeout(j.timer); m.type === 'error' ? j.rej(fail('build', m.message, { line: m.line, stage: m.stage })) : j.res(m); };
+  w.onerror = () => { for (const j of W.jobs.values()) { clearTimeout(j.timer); j.rej(fail('build', 'The builder stopped unexpectedly. Try again.')); } W.jobs.clear(); W.w = null; };
+  for (const f of fonts) w.postMessage({ type: 'font', name: f.name, buf: f.buf.slice(0) });
+  w.postMessage({ type: 'lock' });
+}
+async function work(msg, { timeout = 90000, onStep } = {}) {
+  if (!W.w) await startWorker();
+  const job = ++W.n;
+  return new Promise((res, rej) => {
+    const timer = setTimeout(() => {       // a model that never finishes: stop the worker and start a clean one
+      const lost = [...W.jobs.values()]; W.jobs.clear(); try { W.w?.terminate(); } catch { } W.w = null;
+      for (const j of lost) { clearTimeout(j.timer); j.rej(fail('build', 'Building took too long and was stopped. The model is probably too detailed or far too large.', { stage: 'timeout' })); }
+    }, timeout);
+    W.jobs.set(job, { res, rej, timer, onStep }); W.w.postMessage({ ...msg, job });
+  });
+}
+async function ensureSource(m) {
+  if (!m.source) return null; if (!W.w) await startWorker(); if (W.has.has(m.id)) return m.id;
+  const tri = await idb.get(m.id); if (!tri) throw fail('source_lost', 'The shape this model was made from is no longer stored in this browser. Make or open it again.');
+  await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice() }, { timeout: 180000 });
+  W.has.add(m.id); return m.id;
+}
+const values = m => Object.fromEntries((m.params || []).map(p => [p.key, p.value]));
+async function buildNow(m, quality = 'normal', extra = {}) {
+  const sourceId = await ensureSource(m);
+  return work({ type: 'build', code: m.code, params: values(m), quality, sourceId, ...extra }, { timeout: quality === 'fine' ? 240000 : 90000 });
+}
+
+/* ---------------- the 3D view ---------------- */
+const V = { labels: [] };
+function initView() {
+  const canvas = $('view');
+  V.r = new THREE.WebGLRenderer({ canvas, antialias: true }); V.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); V.r.setClearColor(0xEEF1F3, 1);
+  V.scene = new THREE.Scene();
+  V.cam = new THREE.PerspectiveCamera(30, 1, 1, 30000); V.cam.up.set(0, 0, 1); V.cam.position.set(260, -330, 230);
+  V.ctl = new OrbitControls(V.cam, canvas); V.ctl.enableDamping = false; V.ctl.addEventListener('change', draw);
+  V.scene.add(new THREE.HemisphereLight(0xffffff, 0xAEB9C2, 1.5));
+  const key = new THREE.DirectionalLight(0xffffff, 2.1); key.position.set(.6, -1, 1.5); V.scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, .7); fill.position.set(-1, .8, .6); V.scene.add(fill);
+  V.bed = new THREE.Group(); V.dim = new THREE.Group(); V.scene.add(V.bed, V.dim);
+  V.mat = new THREE.MeshStandardMaterial({ color: 0xF26A1B, roughness: .6, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  V.edgeMat = new THREE.LineBasicMaterial({ color: 0x12202B, transparent: true, opacity: .5 });
+  V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
+  new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
+}
+function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); draw(); }
+function lines(pts, mat) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); return new THREE.LineSegments(g, mat); }
+function drawBed() {
+  for (const c of [...V.bed.children]) { c.geometry.dispose(); V.bed.remove(c); }
+  const [bx, by] = ST.bed, hx = bx / 2, hy = by / 2, minor = [], major = [];
+  for (let x = -Math.floor(hx / 10) * 10; x <= hx; x += 10) (x % 50 === 0 ? major : minor).push(x, -hy, 0, x, hy, 0);
+  for (let y = -Math.floor(hy / 10) * 10; y <= hy; y += 10) (y % 50 === 0 ? major : minor).push(-hx, y, 0, hx, y, 0);
+  V.bed.add(lines(minor, new THREE.LineBasicMaterial({ color: 0xD3DADF })), lines(major, new THREE.LineBasicMaterial({ color: 0xB3BEC7 })),
+    lines([-hx, -hy, 0, hx, -hy, 0, hx, -hy, 0, hx, hy, 0, hx, hy, 0, -hx, hy, 0, -hx, hy, 0, -hx, -hy, 0], new THREE.LineBasicMaterial({ color: 0x6B7A86 })));
+  draw();
+}
+function setMesh(r) {
+  if (V.mesh) { V.scene.remove(V.mesh, V.lines); V.mesh.geometry.dispose(); V.lines.geometry.dispose(); V.mesh = V.lines = null; }
+  if (r) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(r.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(r.nrm, 3));
+    V.mesh = new THREE.Mesh(g, V.mat); const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(r.edges, 3)); V.lines = new THREE.LineSegments(eg, V.edgeMat); V.lines.visible = ST.edges;
+    V.scene.add(V.mesh, V.lines);
+  }
+  drawDims();
+}
+// The measured size, drawn the way a workshop drawing shows it: a line beside the part, a tick at each end, the number in the middle.
+function drawDims() {
+  for (const c of [...V.dim.children]) { c.geometry.dispose(); V.dim.remove(c); } $('dims').textContent = ''; V.labels = [];
+  const s = ST.mesh?.stats; if (!s || !ST.dims) return draw();
+  const [x0, y0, z0] = s.min, [x1, y1, z1] = s.max, big = Math.max(...s.size), off = clamp(big * .1, 3, 45), t = off * .22, seg = [], L = (a, b) => seg.push(...a, ...b);
+  const want = ST.cur?.size, bad = want ? sizeOff(want, s.size) : [];
+  const label = (axis, p, v) => { const e = el('div', { class: 'dim' + (bad.includes(axis) ? ' off' : '') }, nice(v), el('small', { text: unitName() })); $('dims').append(e); V.labels.push({ el: e, p: new THREE.Vector3(...p) }); };
+  const ya = y0 - off, xa = x1 + off;
+  L([x0, ya, z0], [x1, ya, z0]); L([x0, y0 - t, z0], [x0, ya - t, z0]); L([x1, y0 - t, z0], [x1, ya - t, z0]); L([x0 - t, ya - t, z0], [x0 + t, ya + t, z0]); L([x1 - t, ya - t, z0], [x1 + t, ya + t, z0]); label('x', [(x0 + x1) / 2, ya, z0], s.size[0]);
+  L([xa, y0, z0], [xa, y1, z0]); L([x1 + t, y0, z0], [xa + t, y0, z0]); L([x1 + t, y1, z0], [xa + t, y1, z0]); L([xa - t, y0 - t, z0], [xa + t, y0 + t, z0]); L([xa - t, y1 - t, z0], [xa + t, y1 + t, z0]); label('y', [xa, (y0 + y1) / 2, z0], s.size[1]);
+  L([xa, y1, z0], [xa, y1, z1]); L([x1 + t, y1, z1], [xa + t, y1, z1]); L([xa - t, y1, z0 - t], [xa + t, y1, z0 + t]); L([xa - t, y1, z1 - t], [xa + t, y1, z1 + t]); label('z', [xa, y1, (z0 + z1) / 2], s.size[2]);
+  V.dim.add(lines(seg, V.dimMat)); draw();
+}
+const _v = new THREE.Vector3();
+function draw() {
+  if (!V.r) return; V.r.render(V.scene, V.cam);
+  const w = $('stage').clientWidth, h = $('stage').clientHeight;
+  for (const l of V.labels) { _v.copy(l.p).project(V.cam); l.el.style.transform = `translate(${((_v.x * .5 + .5) * w).toFixed(1)}px,${((-_v.y * .5 + .5) * h).toFixed(1)}px) translate(-50%,-50%)`; l.el.style.visibility = _v.z > 1 ? 'hidden' : 'visible'; }
+}
+function frame(view = 'iso') {
+  const s = ST.mesh?.stats, c = s ? [(s.min[0] + s.max[0]) / 2, (s.min[1] + s.max[1]) / 2, (s.min[2] + s.max[2]) / 2] : [0, 0, 20], rad = s ? Math.hypot(...s.size) / 2 * 1.35 + 4 : 150;
+  const dir = { iso: [.62, -.82, .56], front: [0, -1, .0001], top: [0, -.0001, 1], right: [1, 0, .0001] }[view] || [.62, -.82, .56], l = Math.hypot(...dir);
+  const fit = Math.min(1, V.cam.aspect), d = rad / Math.sin(V.cam.fov * Math.PI / 360) / fit;
+  V.ctl.target.set(...c); V.cam.position.set(c[0] + dir[0] / l * d, c[1] + dir[1] / l * d, c[2] + dir[2] / l * d); V.cam.near = Math.max(.1, d / 200); V.cam.far = d * 20 + 2000; V.cam.updateProjectionMatrix(); V.ctl.update(); draw();
+}
+function thumb() {
+  try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
+}
+
+/* ---------------- reading meshes people bring (STL, OBJ, GLB) ---------------- */
+// Each returns { positions: Float32Array, indices: Uint32Array } with Z up.
+function readSTL(buf) {
+  const dv = new DataView(buf), n = buf.byteLength >= 84 ? dv.getUint32(80, true) : 0;
+  if (buf.byteLength === 84 + n * 50 && n > 0) { const p = new Float32Array(n * 9); for (let t = 0, o = 96; t < n; t++, o += 50) for (let k = 0; k < 9; k++) p[t * 9 + k] = dv.getFloat32(o + k * 4, true); return soup(p); }
+  const txt = new TextDecoder().decode(buf), p = []; for (const m of txt.matchAll(/vertex\s+(\S+)\s+(\S+)\s+(\S+)/g)) p.push(+m[1], +m[2], +m[3]);
+  if (p.length < 9) throw fail('import', 'That STL file has no triangles in it.'); return soup(new Float32Array(p));
+}
+const soup = p => { const idx = new Uint32Array(p.length / 3); for (let i = 0; i < idx.length; i++) idx[i] = i; return { positions: p, indices: idx }; };
+function readOBJ(buf) {
+  const txt = new TextDecoder().decode(buf), v = [], idx = [];
+  for (const line of txt.split('\n')) {
+    const a = line.trim().split(/\s+/);
+    if (a[0] === 'v') v.push(+a[1], +a[2], +a[3]);
+    else if (a[0] === 'f') { const f = a.slice(1).map(s => { const i = parseInt(s, 10); return i < 0 ? v.length / 3 + i : i - 1; }); for (let k = 1; k + 1 < f.length; k++) idx.push(f[0], f[k], f[k + 1]); }
+  }
+  if (idx.length < 3) throw fail('import', 'That OBJ file has no faces in it.'); return { positions: new Float32Array(v), indices: new Uint32Array(idx) };
+}
+// GLB: a small reader for plain meshes; anything it does not understand goes to three.js's full loader. GLB is metres with Y up.
+function readGLBPlain(buf) {
+  const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('not glb');
+  let o = 12, json = null, bin = null; while (o < buf.byteLength) { const len = dv.getUint32(o, true), type = dv.getUint32(o + 4, true); if (type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, o + 8, len))); else if (type === 0x004E4942) bin = new Uint8Array(buf, o + 8, len); o += 8 + len; }
+  if (!json || !bin || (json.extensionsRequired || []).length) throw new Error('unsupported');
+  const acc = i => { const a = json.accessors[i], bv = json.bufferViews[a.bufferView]; if (a.sparse || !bv || bv.buffer) throw new Error('unsupported'); const n = { SCALAR: 1, VEC3: 3 }[a.type], T = { 5121: Uint8Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array }[a.componentType]; if (!n || !T) throw new Error('unsupported');
+    const start = bin.byteOffset + (bv.byteOffset || 0) + (a.byteOffset || 0), stride = bv.byteStride || T.BYTES_PER_ELEMENT * n, out = new T(a.count * n), view = new DataView(bin.buffer, start), get = { 5121: 'getUint8', 5123: 'getUint16', 5125: 'getUint32', 5126: 'getFloat32' }[a.componentType];
+    for (let k = 0; k < a.count; k++) for (let c = 0; c < n; c++) out[k * n + c] = view[get](k * stride + c * T.BYTES_PER_ELEMENT, true); return out; };
+  const P = [], I = [], M = new THREE.Matrix4(), v = new THREE.Vector3();
+  const walk = (ni, parent) => {
+    const nd = json.nodes[ni], m = new THREE.Matrix4(); if (nd.matrix) m.fromArray(nd.matrix); else m.compose(new THREE.Vector3(...(nd.translation || [0, 0, 0])), new THREE.Quaternion(...(nd.rotation || [0, 0, 0, 1])), new THREE.Vector3(...(nd.scale || [1, 1, 1])));
+    const world = parent.clone().multiply(m);
+    if (nd.mesh !== undefined) for (const pr of json.meshes[nd.mesh].primitives) { if ((pr.mode ?? 4) !== 4) continue; const pos = acc(pr.attributes.POSITION); if (!(pos instanceof Float32Array)) throw new Error('unsupported'); const base = P.length / 3;
+      for (let k = 0; k < pos.length; k += 3) { v.set(pos[k], pos[k + 1], pos[k + 2]).applyMatrix4(world); P.push(v.x * 1000, -v.z * 1000, v.y * 1000); }
+      if (pr.indices !== undefined) { const ix = acc(pr.indices); for (let k = 0; k < ix.length; k++) I.push(base + ix[k]); } else for (let k = 0; k < pos.length / 3; k++) I.push(base + k); }
+    for (const c of nd.children || []) walk(c, world);
+  };
+  for (const r of (json.scenes?.[json.scene ?? 0]?.nodes || [])) walk(r, M);
+  if (I.length < 3) throw new Error('unsupported'); return { positions: new Float32Array(P), indices: new Uint32Array(I) };
+}
+async function readGLB(buf) {
+  try { return readGLBPlain(buf); } catch { }
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)), P = [], I = [], v = new THREE.Vector3();
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse(o => { if (!o.isMesh) return; const g = o.geometry, pa = g.attributes.position, base = P.length / 3; for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); P.push(v.x * 1000, -v.z * 1000, v.y * 1000); } if (g.index) for (let i = 0; i < g.index.count; i++) I.push(base + g.index.getX(i)); else for (let i = 0; i < pa.count; i++) I.push(base + i); });
+  if (I.length < 3) throw fail('import', 'That file has no mesh in it.'); return { positions: new Float32Array(P), indices: new Uint32Array(I) };
+}
+async function readMeshFile(file) {
+  if (file.size > 80e6) throw fail('import', 'That file is larger than 80 MB. Reduce it first.');
+  const buf = await file.arrayBuffer(), ext = (file.name.split('.').pop() || '').toLowerCase();
+  const tri = ext === 'obj' ? readOBJ(buf) : ext === 'glb' ? await readGLB(buf) : ext === 'stl' ? readSTL(buf) : null;
+  if (!tri) throw fail('import', 'Forge opens STL, OBJ and GLB files.');
+  for (let i = 0; i < tri.positions.length; i++) if (!Number.isFinite(tri.positions[i])) throw fail('import', 'That file has broken coordinates in it.');
+  return tri;
+}
+
+/* ---------------- models ---------------- */
+function tidyParams(list) {
+  const out = [], seen = new Set();
+  for (const p of Array.isArray(list) ? list : []) {
+    const key = String(p?.key || '').replace(/[^A-Za-z0-9_]/g, ''); if (!key || seen.has(key) || /^\d/.test(key)) continue; seen.add(key);
+    if (p.type === 'text' || typeof p.value === 'string') { out.push({ key, label: String(p.label || key).slice(0, 40), value: String(p.value ?? '').slice(0, 80), type: 'text' }); continue; }
+    const value = +p.value; if (!Number.isFinite(value)) continue;
+    let min = Number.isFinite(+p.min) ? +p.min : Math.min(value, value / 4), max = Number.isFinite(+p.max) ? +p.max : Math.max(value * 4, value + 10); if (min > value) min = value; if (max < value) max = value; if (max === min) max = min + 1;
+    const step = +p.step > 0 ? +p.step : (max - min > 40 ? 1 : .5);
+    out.push({ key, label: String(p.label || key).slice(0, 40), value, min, max, step, unit: ['mm', 'deg', ''].includes(p.unit) ? p.unit : (p.unit === '°' ? 'deg' : 'mm') });
+  }
+  return out.slice(0, 12);
+}
+const tidySize = s => { const o = {}; for (const a of ['x', 'y', 'z']) { const v = s?.[a]; o[a] = v !== null && v !== undefined && Number.isFinite(+v) && +v > 0 ? +v : null; } return o; };
+// Claude's answer becomes the model (the conversation and the stored shape stay as they are)
+function applyAnswer(m, a) {
+  m.kind = a.kind === 'sculpt' ? 'sculpt' : (m.source && /\bsource\b/.test(a.code) ? m.kind || 'part' : 'part');
+  m.name = String(a.name || m.name || 'Model').slice(0, 60); m.code = String(a.code); m.params = tidyParams(a.params); m.size = tidySize(a.size);
+  if (a.say) m.say = String(a.say).slice(0, 900); if (a.print) m.print = String(a.print).slice(0, 400); m.updated = Date.now();
+}
+const snapshot = m => JSON.parse(JSON.stringify({ kind: m.kind, name: m.name, code: m.code, params: m.params, size: m.size, say: m.say, print: m.print }));
+const restore = (m, s) => Object.assign(m, JSON.parse(JSON.stringify(s)));
+function remember(m, snap) { if (!snap?.code) return; (m.history ||= []).push(snap); if (m.history.length > 8) m.history.shift(); }
+
+/* ---------------- the conversation ---------------- */
+function showMsg(c) {
+  const d = el('div', { class: 'msg ' + c.who }, c.text);
+  if (c.tip) d.append(el('span', { class: 'tip', text: c.tip })); if (c.img) d.append(el('img', { src: c.img, alt: 'Picture you added' }));
+  $('log').append(d); $('log').scrollTop = 1e9; return d;
+}
+function addMsg(who, text, extra = {}) { const c = { who, text, ...extra }; (ST.cur ? (ST.cur.chat ||= []) : ST.draft).push(c); if (ST.cur?.chat.length > 60) ST.cur.chat.splice(0, ST.cur.chat.length - 60); return showMsg(c); }
+function renderChat() { $('log').textContent = ''; for (const c of ST.cur?.chat || ST.draft) showMsg(c); }
+function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); status(null); } }; }
+function status(text) { $('status').hidden = !text; if (text) $('statusText').textContent = text; }
+const friendly = e => e?.code === 'cancelled' ? 'Stopped.' : (e?.message && e.code ? e.message : 'Something went wrong. Try again.');
+
+/* ---------------- make, change, repair ---------------- */
+// Build the model and hold it to its promised size. A failed or wrong build goes back to Claude with the facts, at most twice;
+// the best version seen is the one that stays.
+async function buildChecked(m, wait, request) {
+  let best = null, last = null;
+  for (let round = 0; ; round++) {
+    let r = null, problem = null;
+    wait.say(round ? 'Building the corrected model' : 'Building the solid');
+    try { r = await buildNow(m, ST.quality); } catch (e) { if (e.code !== 'build') throw e; problem = { type: 'error', message: e.message, line: e.line }; }
+    if (r) { const off = sizeOff(m.size, r.stats.size); if (off.length) problem = { type: 'size', off, got: r.stats.size }; else if (!r.stats.watertight) problem = { type: 'open', edges: r.stats.openEdges }; }
+    const score = !r ? 0 : !problem ? 3 : problem.type === 'size' ? 2 : 1;
+    if (r && (!best || score > best.score)) best = { score, r, snap: snapshot(m), problem };
+    last = problem;
+    if (!problem || round >= 2) break;
+    wait.say(problem.type === 'error' ? 'Fixing a problem in the geometry' : problem.type === 'size' ? 'Correcting a size that came out wrong' : 'Closing a gap in the surface');
+    let fix = null; try { fix = await askAIOnce('model_fix', fixPrompt(m, problem, { request }), []); } catch (e) { if (!best) throw e; break; }
+    if (!fix?.code) break; applyAnswer(m, { ...fix, kind: m.kind });
+  }
+  if (!best) return { ok: false, built: false, problem: last };
+  restore(m, best.snap); showBuilt(best.r);
+  return { ok: best.score === 3, built: true, problem: best.problem };
+}
+// An organic shape: the server has it sculpted (about a minute), then it is stored here and handed to the builder.
+async function sculpt(m, spec, pic, wait) {
+  wait.say('Sculpting the shape. This takes about a minute');
+  const usePic = spec.from === 'picture' && pic, started = HOOK.mesh ? await HOOK.mesh(spec, pic) : await (await api('/api/mesh', usePic ? { image: pic.data } : { prompt: String(spec.prompt || m.name) })).json();
+  let buf = started.bytes || null;
+  for (let t0 = Date.now(); !buf;) {
+    if (Date.now() - t0 > 9 * 60e3) throw fail('mesh_failed', 'Sculpting took too long. Try again in a moment.');
+    await sleep(3000); const s = await (await api('/api/mesh?job=' + encodeURIComponent(started.job))).json();
+    if (s.state === 'failed') throw fail('mesh_failed', 'The shape could not be sculpted. Try describing it differently.');
+    if (s.state === 'done') buf = await (await api('/api/mesh?job=' + encodeURIComponent(started.job) + '&file=1')).arrayBuffer();
+  }
+  wait.say('Turning the sculpture into a solid');
+  await setSource(m, await readGLB(buf), { type: 'sculpt', what: String(spec.prompt || '').slice(0, 200) });
+}
+async function setSource(m, tri, info) {
+  await idb.put(m.id, tri); W.has.delete(m.id); m.source = { ...info, triangles: tri.indices.length / 3 };
+  const r = await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice() }, { timeout: 180000 });
+  W.has.add(m.id); m.source.original = r.original; return r;
+}
+function blankModel() { return { id: newId(), name: 'Model', kind: 'part', code: '', params: [], size: { x: null, y: null, z: null }, chat: [], history: [], source: null, thumb: null, created: Date.now(), updated: Date.now() }; }
+
+async function send(text, pic) {
+  text = String(text || '').trim(); if (ST.busy || (!text && !pic)) return; if (!text) text = 'Make this.';
+  setBusy(true);
+  const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
+  addMsg('you', text, pic ? { img: pic.small } : {});
+  const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
+  try {
+    const opts = { meshOn: !!ST.cfg.forge?.meshOn || !!HOOK.mesh, picture: !!pic, stats: ST.mesh?.stats };
+    const ans = await askAIOnce(first ? 'model_make' : 'model_edit', first ? makePrompt(text, opts) : editPrompt(m, text, opts), pic ? [pic.data] : []);
+    if (!ans?.code) { addMsg('forge', String(ans?.say || 'I could not work that out. Say it another way, with the sizes you need.').slice(0, 900)); return; }
+    if (!m) { m = blankModel(); m.chat = ST.draft; ST.draft = []; ST.cur = m; }
+    applyAnswer(m, ans);
+    if (ans.kind === 'sculpt' && ans.mesh && (first || ans.mesh.prompt)) await sculpt(m, ans.mesh, pic, wait);
+    const res = await buildChecked(m, wait, text);
+    if (!res.built) {
+      if (before?.code) { restore(m, before); addMsg('note', `That change could not be built (${res.problem?.message || 'the geometry failed'}), so your model is as it was. Try asking in a different way.`); }
+      else { ST.draft = m.chat; ST.cur = had || null; addMsg('note', `That could not be built (${res.problem?.message || 'the geometry failed'}). Try again with a simpler description.`); }
+      return;
+    }
+    if (!first) remember(m, before);
+    addMsg('forge', m.say || 'Done.', m.print ? { tip: m.print } : {});
+    if (!res.ok && res.problem?.type === 'size') addMsg('note', `Check the size: ${res.problem.off.map(a => `${a.toUpperCase()} measures ${nice(res.problem.got['xyz'.indexOf(a)])} ${unitName()} where ${nice(m.size[a])} was expected`).join(', ')}. Tell me which sizes matter most and I will correct it.`);
+    if (!res.ok && res.problem?.type === 'open') addMsg('note', 'Part of the surface is too thin to close properly. Ask me to thicken it before you print.');
+    if (!ST.models.includes(m)) ST.models.unshift(m);
+    openSheet(); if (first) frame('iso'); m.thumb = thumb(); save();
+  } catch (e) {
+    if (m && before?.code) { restore(m, before); refreshBuild(); } else if (m && !ST.models.includes(m)) { ST.draft = m.chat; ST.cur = had || null; }
+    addMsg('note', friendly(e));
+  } finally { wait.done(); setBusy(false); }
+}
+
+/* ---------------- the sheet (right side) ---------------- */
+function showBuilt(r) { ST.mesh = r; setMesh(r); $('start').hidden = true; $('tools').hidden = false; fillFacts(); }
+function fillFacts() {
+  const s = ST.mesh?.stats, m = ST.cur; if (!s || !m) return;
+  const cell = (id, v) => { $(id).textContent = nice(v); $(id).append(el('small', { text: unitName() })); }; cell('sx', s.size[0]); cell('sy', s.size[1]); cell('sz', s.size[2]);
+  const f = $('facts'); f.textContent = '';
+  const row = (k, v, cls) => f.append(el('dt', { text: k }), el('dd', { class: cls || '', text: v }));
+  const want = m.size, asked = ['x', 'y', 'z'].filter(a => want?.[a] != null);
+  if (asked.length) { const off = sizeOff(want, s.size); row('Sizes you set', off.length ? `${off.map(a => a.toUpperCase()).join(', ')} differs` : `${asked.map(a => nice(want[a])).join(' × ')} ${unitName()} matches`, off.length ? 'bad' : 'ok'); }
+  row('Volume', `${(s.volume / 1000).toFixed(s.volume < 10000 ? 2 : 1)} cm³`);
+  row('Weight in PLA', `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g if solid`);
+  row('Surface', s.watertight && !s.oddEdges ? 'Closed, ready to slice' : `${s.openEdges + s.oddEdges} open edges`, s.watertight && !s.oddEdges ? 'ok' : 'bad');
+  const fits = s.size[0] <= ST.bed[0] && s.size[1] <= ST.bed[1] && s.size[2] <= ST.bed[2]; row('Printer bed', fits ? 'Fits' : 'Too big for this bed', fits ? 'ok' : 'bad');
+  row('Triangles', s.triangles.toLocaleString('en-IN') + (s.quality === 'draft' ? ' (preview)' : ''));
+}
+let building = false, queued = null;
+// Sliders and the code box rebuild the model without asking Claude: a quick preview while dragging, the full build on release.
+async function refreshBuild(quality) {
+  queued = quality || ST.quality; if (building || !ST.cur?.code) return; building = true;
+  while (queued) {
+    const q = queued, m = ST.cur; queued = null;
+    try { if (q !== 'draft') status('Building'); const r = await buildNow(m, q); if (ST.cur === m) { showBuilt(r); $('codeErr').hidden = true; } }
+    catch (e) { if (ST.cur === m) { $('codeErr').hidden = false; $('codeErr').textContent = (e.line ? `Line ${e.line}: ` : '') + e.message; if (e.code !== 'build') addMsg('note', friendly(e)); } }
+  }
+  building = false; status(null);
+}
+function fillParams() {
+  const m = ST.cur, box = $('params'); box.textContent = ''; $('paramBlock').hidden = !m?.params?.length; if (!m) return;
+  for (const p of m.params) {
+    const id = 'p_' + p.key;
+    if (p.type === 'text') { const t = el('input', { type: 'text', id, value: p.value, maxlength: 80 }); t.addEventListener('change', () => { p.value = t.value; m.updated = Date.now(); refreshBuild(); save(); }); box.append(el('div', { class: 'param' }, el('label', { for: id }, p.label), t)); continue; }
+    const num = el('input', { type: 'number', id, value: p.value, step: p.step, 'aria-label': p.label }), rng = el('input', { type: 'range', min: p.min, max: p.max, step: p.step, value: p.value, 'aria-label': p.label + ' slider' });
+    const set = (v, final) => { v = +v; if (!Number.isFinite(v)) return; p.value = v; if (v < p.min) { p.min = v; rng.min = v; } if (v > p.max) { p.max = v; rng.max = v; } m.updated = Date.now(); refreshBuild(final ? ST.quality : 'draft'); if (final) save(); };
+    rng.addEventListener('input', () => { num.value = rng.value; set(rng.value, false); }); rng.addEventListener('change', () => set(rng.value, true));
+    num.addEventListener('change', () => { if (p.unit !== 'deg' && !(+num.value > 0) && p.min > 0) { num.value = p.value; return; } rng.value = num.value; set(num.value, true); });
+    box.append(el('div', { class: 'param' }, el('label', { for: id }, el('span', { text: p.label }), el('span', { class: 'v' }, num, el('small', { text: p.unit === 'deg' ? '°' : p.unit }))), rng));
+  }
+}
+function openSheet() {
+  const m = ST.cur; $('sheet').hidden = !m?.code; if (!m?.code) return;
+  $('mName').value = m.name; $('code').value = m.code; $('codeErr').hidden = true; $('btnUndo').disabled = !m.history?.length; fillParams(); fillFacts(); $('btnGo').textContent = 'Change it';
+  $('say').placeholder = 'Say what to change. For example: make it 10 mm taller, add a second hole, round the corners.';
+}
+function setBusy(b) { ST.busy = b; $('btnGo').disabled = b; for (const e of document.querySelectorAll('#params input, #codeRun, #btnUndo, #mName, #dlMain, #formats button')) e.disabled = b; if (!b && ST.cur) $('btnUndo').disabled = !ST.cur.history?.length; }
+
+/* ---------------- downloads ---------------- */
+async function download(id) {
+  const f = FORMATS.find(x => x.id === id), m = ST.cur; if (!f || !m || ST.busy) return;
+  try {
+    if (!ST.mesh || ST.mesh.stats.quality === 'draft' || building) { await refreshBuild(ST.quality); while (building) await sleep(60); }
+    let mesh = ST.mesh;
+    if (f.max && mesh.stats.triangles > f.max) {       // a format with a ceiling on facets: build a lighter copy just for this file
+      status(`Making a lighter copy for ${f.label}`);
+      for (const [budget, tol] of [[70000, .03], [26000, .08], [9000, .2]]) { mesh = await buildNow(m, 'normal', { budget, tol }); if (mesh.stats.triangles <= f.max) break; }
+      status(null);
+      if (mesh.stats.triangles > f.max) { $('fmtHint').textContent = `This model has too much fine detail for ${f.label} (it holds ${f.max.toLocaleString('en-IN')} flat faces at most). Use 3MF or STL instead.`; return; }
+    }
+    const bytes = await f.write({ positions: mesh.positions, indices: mesh.indices }, m.name), name = `${safeName(m.name).replace(/\s+/g, '-').toLowerCase()}.${f.ext}`;
+    HOOK.saved = { name, bytes, triangles: mesh.stats.triangles };
+    const url = URL.createObjectURL(new Blob([bytes], { type: f.mime })), a = el('a', { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    $('fmtHint').textContent = `Saved ${name} (${bytes.length > 1e6 ? (bytes.length / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes.length / 1000)) + ' KB'}). ${f.note}`;
+  } catch (e) { status(null); $('fmtHint').textContent = 'That file could not be written: ' + (e.message || 'unknown problem') + '.'; }
+}
+
+/* ---------------- opening, switching, listing ---------------- */
+async function openModel(m) {
+  ST.cur = m; ST.mesh = null; setMesh(null); renderChat(); $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false');
+  if (!m) { $('sheet').hidden = true; $('start').hidden = false; $('tools').hidden = true; $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
+  openSheet(); $('start').hidden = true; status('Building');
+  try { showBuilt(await buildNow(m, ST.quality)); frame('iso'); if (!m.thumb) { m.thumb = thumb(); } save(); }
+  catch (e) { addMsg('note', e.code === 'build' ? `This model no longer builds: ${e.message}` : friendly(e)); }
+  status(null);
+}
+function listModels() {
+  const ul = $('mlist'); ul.textContent = ''; $('mEmpty').hidden = ST.models.length > 0;
+  for (const m of ST.models) {
+    const open = el('button', { class: 'open', type: 'button', onclick: () => openModel(m) }, el('b', { text: m.name }), el('small', { text: new Date(m.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + (m.kind === 'sculpt' ? ' · sculpted' : m.source ? ' · opened file' : '') }));
+    const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Delete ' + m.name, text: 'Delete', onclick: () => { if (del.dataset.sure) { ST.models = ST.models.filter(x => x !== m); idb.del(m.id); if (ST.cur === m) openModel(null); save(); listModels(); } else { del.dataset.sure = 1; del.textContent = 'Sure?'; } } });
+    ul.append(el('li', { class: m === ST.cur ? 'on' : '' }, m.thumb ? el('img', { src: m.thumb, alt: '' }) : el('span', { class: 'ph' }), open, del));
+  }
+}
+async function importFile(file) {
+  if (ST.busy) return; setBusy(true); const had = ST.cur; ST.cur = null; ST.draft = []; renderChat();
+  const wait = waiting('Reading the file');
+  try {
+    const tri = await readMeshFile(file), m = blankModel(); m.name = file.name.replace(/\.[^.]+$/, '').slice(0, 60) || 'Opened mesh'; m.kind = 'part';
+    wait.say('Rebuilding it as a solid');
+    const r = await setSource(m, tri, { type: 'file', what: file.name.slice(0, 80) }), big = Math.max(...r.original);
+    m.params = tidyParams([{ key: 'longest', label: 'Longest side', value: +big.toFixed(2), min: +(big / 10).toFixed(2), max: +(big * 5).toFixed(2), step: big > 60 ? 1 : .5, unit: 'mm' }]);
+    m.code = '// The file you opened, rebuilt as a closed solid. "source" is 100 mm along its longest side.\nreturn source.scale(p.longest / 100).onBed();';
+    ST.cur = m; m.chat = [];
+    wait.say('Building the solid'); showBuilt(await buildNow(m, ST.quality));
+    addMsg('forge', `I opened ${file.name} and rebuilt it as a closed solid, ${sizeText(ST.mesh.stats.size)}. Tell me what to change (resize it, add a base, cut a hole, add lettering), or download it in another format.`, { tip: 'Very fine surface detail is smoothed slightly when a mesh is rebuilt.' });
+    ST.models.unshift(m); openSheet(); frame('iso'); m.thumb = thumb(); save();
+  } catch (e) { ST.cur = had || null; renderChat(); addMsg('note', e.code ? e.message : 'That file could not be read.'); if (had) openSheet(); }
+  finally { wait.done(); setBusy(false); }
+}
+async function takePicture(file) {
+  if (!file) return; if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { addMsg('note', 'Add a JPG, PNG or WebP picture.'); return; }
+  const img = await createImageBitmap(file).catch(() => null); if (!img) { addMsg('note', 'That picture could not be read.'); return; }
+  const draw2 = side => { const k = Math.min(1, side / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c; };
+  ST.pic = { data: draw2(1568).toDataURL('image/jpeg', .88), small: draw2(220).toDataURL('image/jpeg', .7) };
+  $('picThumb').src = ST.pic.small; $('picThumb').hidden = false; $('picClear').hidden = false; $('btnPic').textContent = 'Change picture';
+}
+function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; }
+
+/* ---------------- start ---------------- */
+const STARTERS = [
+  ['A name tag 70 mm wide, 22 mm tall and 3 mm thick that says SHLOK in raised letters, with a 5 mm hole on the left for a keyring.', 'Name tag with raised letters', '70 × 22 × 3'],
+  ['A wall hook for a bag. The back plate is 30 mm wide, 70 mm tall and 4 mm thick, with two holes for M4 screws. The hook sticks out 35 mm.', 'Wall hook with two screw holes', '30 × 70, M4'],
+  ['A stand for a phone that is 78 mm wide and 9 mm thick, leaning back 20 degrees, with a gap at the bottom for the charging cable.', 'Phone stand, leaning back 20°', '78 mm phone'],
+  ['An M10 bolt 30 mm long with a hex head, and a matching nut beside it.', 'Bolt and nut with real threads', 'M10 × 30'],
+  ['A small sitting cat, 80 mm tall, with a flat base so it stands.', 'Sitting cat figurine', '80 tall', 'sculpt'],
+];
+async function boot() {
+  try { ST.cfg = await (await fetch('/api/config')).json(); } catch { ST.cfg = {}; }
+  initView();
+  for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('say').value = full; $('say').focus(); } }, short, el('span', { text: dims })))); }
+  for (const f of FORMATS.filter(x => x.id !== 'stl')) $('formats').append(el('button', { type: 'button', text: f.label, title: f.note, onclick: () => download(f.id), onmouseenter: () => { $('fmtHint').textContent = f.note; }, onfocus: () => { $('fmtHint').textContent = f.note; } }));
+  $('dlMain').addEventListener('click', () => download('stl'));
+  $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) return; $('say').value = ''; clearPicture(); send(t, p); });
+  $('say').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('ask').requestSubmit(); });
+  $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files[0])); $('picClear').addEventListener('click', clearPicture);
+  $('btnImport').addEventListener('click', () => $('meshFile').click()); $('meshFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); });
+  const stage = $('stage'); stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('drop'); }); stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
+  stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('drop'); const f = e.dataTransfer?.files?.[0]; if (!f) return; if (/\.(stl|obj|glb)$/i.test(f.name)) importFile(f); else takePicture(f); });
+  for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => frame(b.dataset.view));
+  $('tgDims').addEventListener('click', () => { ST.dims = !ST.dims; $('tgDims').setAttribute('aria-pressed', ST.dims); drawDims(); });
+  $('tgEdges').addEventListener('click', () => { ST.edges = !ST.edges; $('tgEdges').setAttribute('aria-pressed', ST.edges); if (V.lines) V.lines.visible = ST.edges; draw(); });
+  $('tgUnit').textContent = ST.unit === 'in' ? 'inches' : 'mm';
+  $('tgUnit').addEventListener('click', () => { ST.unit = ST.unit === 'mm' ? 'in' : 'mm'; store.set('forge-unit', ST.unit); $('tgUnit').textContent = ST.unit === 'in' ? 'inches' : 'mm'; drawDims(); fillFacts(); });
+  $('quality').addEventListener('change', e => { ST.quality = e.target.value; refreshBuild(); });
+  $('bed').value = ST.bed.join(','); if (!$('bed').value) $('bed').value = '220,220,250';
+  $('bed').addEventListener('change', e => { ST.bed = e.target.value.split(',').map(Number); store.set('forge-bed', ST.bed); drawBed(); fillFacts(); });
+  $('mName').addEventListener('change', e => { if (!ST.cur) return; ST.cur.name = e.target.value.trim().slice(0, 60) || 'Model'; e.target.value = ST.cur.name; save(); });
+  $('codeRun').addEventListener('click', () => { const m = ST.cur; if (!m || ST.busy) return; const t = $('code').value; if (t === m.code) return refreshBuild(); remember(m, snapshot(m)); m.code = t; m.size = { x: null, y: null, z: null }; m.updated = Date.now(); $('btnUndo').disabled = false; refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
+  $('btnUndo').addEventListener('click', () => { const m = ST.cur, s = m?.history?.pop(); if (!s || ST.busy) return; restore(m, s); m.updated = Date.now(); openSheet(); addMsg('note', 'Went back to the version before the last change.'); refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
+  $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('say').focus(); });
+  $('btnModels').addEventListener('click', () => { const d = $('drawer'); d.hidden = !d.hidden; $('btnModels').setAttribute('aria-expanded', !d.hidden); if (!d.hidden) listModels(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); $('btnModels').focus(); } });
+  startWorker().catch(() => { });
+  const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last);
+}
+globalThis.__forge = { ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
+boot();
+
+</script>
+</body>
+</html>

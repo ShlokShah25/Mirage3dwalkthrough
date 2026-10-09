@@ -10,6 +10,21 @@ const ITEMS = JSON.parse(readFileSync(new URL('mock_items.json', here)));
 const SECRET = process.env.RAZORPAY_KEY_SECRET || 'test_secret';
 const readJson = async req => { const c = []; for await (const x of req) c.push(x); try { return JSON.parse(Buffer.concat(c).toString() || '{}'); } catch { return {}; } };
 export const calls = [];
+const meshJobs = new Map();
+// A small GLB for the sculpting stand-in: a "figure" of two round blobs (a body and a head), in metres with Y up, as real services send.
+export function testGLB() {
+  const P = [], I = [];
+  const ball = (cx, cy, cz, r, n = 20) => { const base = P.length / 3; for (let a = 0; a <= n; a++) for (let b = 0; b < n * 2; b++) { const th = Math.PI * a / n, ph = Math.PI * b / n; P.push(cx + r * Math.sin(th) * Math.cos(ph), cy + r * Math.cos(th), cz + r * Math.sin(th) * Math.sin(ph)); }
+    for (let a = 0; a < n; a++) for (let b = 0; b < n * 2; b++) { const p = base + a * n * 2 + b, q = base + a * n * 2 + (b + 1) % (n * 2), r2 = p + n * 2, s = q + n * 2; I.push(p, q, r2, q, s, r2); } };
+  ball(0, .3, 0, .3); ball(0, .72, 0, .2);
+  const pos = new Float32Array(P), idx = new Uint32Array(I), lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]; for (let i = 0; i < pos.length; i++) { lo[i % 3] = Math.min(lo[i % 3], pos[i]); hi[i % 3] = Math.max(hi[i % 3], pos[i]); }
+  const json = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }], meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, mode: 4 }] }], buffers: [{ byteLength: pos.byteLength + idx.byteLength }],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: pos.byteLength }, { buffer: 0, byteOffset: pos.byteLength, byteLength: idx.byteLength }], accessors: [{ bufferView: 0, componentType: 5126, count: pos.length / 3, type: 'VEC3', min: lo, max: hi }, { bufferView: 1, componentType: 5125, count: idx.length, type: 'SCALAR' }] };
+  let jb = Buffer.from(JSON.stringify(json)); jb = Buffer.concat([jb, Buffer.alloc((4 - jb.length % 4) % 4, 0x20)]);
+  const bin = Buffer.concat([Buffer.from(pos.buffer), Buffer.from(idx.buffer)]), head = Buffer.alloc(12), jh = Buffer.alloc(8), bh = Buffer.alloc(8);
+  head.writeUInt32LE(0x46546C67, 0); head.writeUInt32LE(2, 4); head.writeUInt32LE(12 + 8 + jb.length + 8 + bin.length, 8); jh.writeUInt32LE(jb.length, 0); jh.writeUInt32LE(0x4E4F534A, 4); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x004E4942, 4);
+  return Buffer.concat([head, jh, jb, bh, bin]);
+}
 
 function answer(prompt) {
   if (prompt.startsWith('You are an architectural draftsperson')) return TRACE;
@@ -31,6 +46,19 @@ function answer(prompt) {
   if (prompt.startsWith('You are editing') && /THESE PARTS DID NOT WORK/.test(prompt) && /TESTFIX /.test(prompt)) { try { return { summary: 'Repaired.', left: '', ops: JSON.parse(prompt.match(/TESTFIX (\[[^]*?\]) TESTOPS/)[1]) }; } catch (e) { return { summary: 'bad test fix ' + e.message, ops: [] }; } }
   if (prompt.startsWith('You are editing') && /TESTOPS /.test(prompt)) { try { return { summary: 'Test operations applied.', ops: JSON.parse(prompt.match(/TESTOPS (\[[^]*?\])"\n(?:EARLIER|WHERE)/)[1]) }; } catch (e) { return { summary: 'bad test ops ' + e.message, ops: [] }; } }
   if (prompt.startsWith('You are editing')) return /NOOP/.test(prompt) ? { summary: 'Nothing to change.', ops: [] } : { summary: 'Switched to night.', ops: [{ op: 'time', value: 'night' }] };
+  // Forge (3D models). Words in the customer's text steer the canned answer: TESTBREAK (code that fails, then a repair),
+  // TESTSIZE (a wrong size promise, then a repair), TESTSCULPT (an organic shape), TESTQUESTION (an answer with no model).
+  if (prompt.startsWith('You are Forge')) {
+    const plate = (thick, extra = {}) => ({ kind: 'part', name: 'Test plate', say: `A 60 x 40 x ${thick} mm plate with a 6 mm hole.`, params: [{ key: 'width', label: 'Width', value: 60, min: 20, max: 200, step: 1, unit: 'mm' }, { key: 'depth', label: 'Depth', value: 40, min: 20, max: 200, step: 1, unit: 'mm' }, { key: 'thick', label: 'Thickness', value: thick, min: 1.2, max: 20, step: 0.2, unit: 'mm' }, { key: 'label', label: 'Wording', value: 'OK', type: 'text' }], code: "const plate = extrude(rect(p.width, p.depth, { r: 4 }), p.thick);\nconst hole = cylinder(3, p.thick + 2).move(-p.width / 2 + 9, 0, -1);\nconst word = extrude(text(p.label, 9), 1).move(6, 0, p.thick - 0.6);\nreturn cut(plate, hole, word);", size: { x: 60, y: 40, z: thick }, print: 'Print flat, no supports.', ...extra });
+    if (/A model you wrote has a problem/.test(prompt)) return plate(5, { say: 'A 60 x 40 x 5 mm plate with a 6 mm hole (corrected).' });
+    const asked = (prompt.match(/THE CUSTOMER (?:NOW )?ASKS\n([^]*)$/) || [])[1] || '';
+    if (/TESTQUESTION/.test(asked)) return { say: 'Yes, it prints flat without supports.' };
+    if (/TESTBREAK/.test(asked)) return plate(5, { code: 'const plate = box(p.width, p.depth, p.thick);\nreturn plate.nothing(3);' });
+    if (/TESTSIZE/.test(asked)) return plate(5, { size: { x: 60, y: 40, z: 9 } });
+    if (/TESTSCULPT/.test(asked)) return { kind: 'sculpt', name: 'Test figure', say: 'A sculpted figure 80 mm tall on a round base.', params: [{ key: 'height', label: 'Height', value: 80, min: 30, max: 200, step: 1, unit: 'mm' }], code: "const figure = source.fit({ z: p.height - 2 }).moveZ(2);\nconst base = cylinder(p.height * 0.3, 3);\nreturn union(figure, base).clip({ zmax: p.height });", size: { x: null, y: null, z: 80 }, print: 'Print upright.', mesh: { prompt: 'a small round figure', from: 'words' } };
+    if (/THE MODEL NOW/.test(prompt)) return plate(8, { say: 'Made it 8 mm thick.' });
+    return plate(5);
+  }
   if (prompt.includes('placing furniture')) {
     if (/EMPTYROOM/.test(prompt)) return { items: [] };
     const names = [...prompt.matchAll(/ROOM "([^"]+)"/g)].map(m => m[1]);
@@ -79,6 +107,14 @@ export function startFakes() {
   const fal = http.createServer(async (req, res) => {
     const b = await readJson(req); calls.push({ fal: req.url, auth: req.headers.authorization, prompt: b.prompt, ratio: b.aspect_ratio, hasImage: String(b.image_url || '').startsWith('data:image/') });
     if (/FAILME/.test(b.prompt || '')) return res.writeHead(500, { 'content-type': 'application/json' }).end('{"detail":"boom"}');
+    // Forge's sculpting service: a queued job that is "in progress" once, then done, and hands back a small GLB
+    const sendJ = (o, s = 200) => res.writeHead(s, { 'content-type': 'application/json' }).end(JSON.stringify(o)), self = 'http://localhost:4003';
+    let q = /^\/queue\/(.+)\/requests\/([^/]+)(\/status)?$/.exec(req.url);
+    if (q && q[3]) { const j = meshJobs.get(q[2]); if (!j) return sendJ({ detail: 'no such request' }, 404); return sendJ({ status: j.polls++ ? 'COMPLETED' : 'IN_PROGRESS', request_id: q[2] }); }
+    if (q) return meshJobs.has(q[2]) ? sendJ({ model_mesh: { url: `${self}/files/${q[2]}.glb`, content_type: 'model/gltf-binary' } }) : sendJ({ detail: 'no such request' }, 404);
+    if (req.url.startsWith('/queue/')) { if (/MESHFAIL/.test(String(b.input_image_url || b.image_url))) return sendJ({ detail: 'Exhausted balance' }, 403); const id = 'req' + (meshJobs.size + 1), base = `${self}${req.url.replace(/\/v[\d.]+.*$/, '')}/requests/${id}`; meshJobs.set(id, { polls: 0 }); return sendJ({ request_id: id, status_url: base + '/status', response_url: base }); }
+    if (req.url.startsWith('/files/')) return res.writeHead(200, { 'content-type': 'model/gltf-binary' }).end(testGLB());
+    if (/flux\/schnell/.test(req.url)) return sendJ({ images: [{ url: /MESHFAIL/.test(b.prompt || '') ? 'https://fal.test/MESHFAIL.png' : 'https://fal.test/picture.png', width: 1024, height: 1024 }] });
     if (/elevenlabs/.test(req.url)) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ audio: { url: 'https://fal.test/mira.mp3' } }));
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ images: [{ url: String(b.image_url), width: 1344, height: 768 }], has_nsfw_concepts: [false] }));
   }).listen(4003);

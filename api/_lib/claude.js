@@ -12,8 +12,20 @@ export function imageBlock(dataUrl) {
 }
 
 // Pull the first complete JSON object out of the model's text.
+function escapeInStrings(t) {
+  let out = '', inStr = false, esc = false;
+  for (const c of t) {
+    if (!inStr) { if (c === '"') inStr = true; out += c; continue; }
+    if (esc) { esc = false; out += c; continue; }
+    if (c === '\\') { esc = true; out += c; } else if (c === '"') { inStr = false; out += c; }
+    else if (c === '\n') out += '\\n'; else if (c === '\r') out += '\\r'; else if (c === '\t') out += '\\t'; else out += c;
+  }
+  return out;
+}
 export function extractJSON(text) {
   let t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  try { return JSON.parse(t); } catch { }
+  t = escapeInStrings(t);        // a long text value (a model's code) sometimes arrives with real line breaks inside the quotes
   try { return JSON.parse(t); } catch { }
   const s = t.indexOf('{'); if (s < 0) return null;
   let depth = 0, inStr = false, esc = false;

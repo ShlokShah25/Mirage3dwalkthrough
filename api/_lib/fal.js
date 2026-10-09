@@ -44,3 +44,40 @@ export async function falSpeech(text, { voice = env('MIRA_VOICE', 'Charlotte'), 
   } catch (e) { if (e?.name === 'AbortError') throw new HttpError(504, 'voice_failed', 'Voice took too long.'); throw e; }
   finally { clearTimeout(t); }
 }
+
+// ---- Forge: organic shapes. Words become a clean picture of the object, and the picture becomes a mesh. ----
+const falHost = () => env('FAL_URL', 'https://fal.run').replace(/\/$/, ''), queueHost = () => env('FAL_QUEUE_URL', 'https://queue.fal.run').replace(/\/$/, '');
+const falFail = (status, said) => new HttpError(502, /balance|exhaust|locked|credit|payment|billing/i.test(said) || status === 402 ? 'mesh_credit' : status === 401 || status === 403 ? 'mesh_key' : 'mesh_failed', 'The shape could not be made just now. Try again in a minute.');
+export async function falTextImage(prompt, model, { timeoutMs = 90000 } = {}) {
+  const key = env('FAL_KEY'); if (!key) throw new HttpError(503, 'mesh_off', 'Sculpted shapes are not switched on yet.');
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${falHost()}/${model}`, { method: 'POST', signal: ac.signal, headers: { authorization: 'Key ' + key, 'content-type': 'application/json' }, body: JSON.stringify({ prompt, image_size: 'square_hd', num_images: 1 }) });
+    const j = await r.json().catch(() => ({})), out = j.images?.[0]?.url;
+    if (!r.ok || !out) { const said = JSON.stringify(j).slice(0, 300); console.error('fal image', r.status, said); throw falFail(r.status, said); }
+    return out;
+  } catch (e) { if (e?.name === 'AbortError') throw new HttpError(504, 'mesh_failed', 'The picture took too long. Try again.'); throw e; }
+  finally { clearTimeout(t); }
+}
+// Start an image-to-3D job. Returns the two addresses fal gives back for checking on it and fetching the result.
+export async function falMeshStart(imageUrl, model) {
+  const key = env('FAL_KEY'); if (!key) throw new HttpError(503, 'mesh_off', 'Sculpted shapes are not switched on yet.');
+  // the two model families name their picture input differently, and both can skip textures (a print needs only the shape)
+  const input = /tripo/i.test(model) ? { image_url: imageUrl, texture: 'no', pbr: false } : { input_image_url: imageUrl, textured_mesh: false };
+  const r = await fetch(`${queueHost()}/${model}`, { method: 'POST', headers: { authorization: 'Key ' + key, 'content-type': 'application/json' }, body: JSON.stringify(input) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.status_url || !j.response_url) { const said = JSON.stringify(j).slice(0, 300); console.error('fal mesh submit', r.status, said); throw falFail(r.status, said); }
+  for (const u of [j.status_url, j.response_url]) if (!String(u).startsWith(queueHost() + '/')) throw new HttpError(502, 'mesh_failed', 'The shape service answered strangely. Try again.');
+  return { statusUrl: j.status_url, responseUrl: j.response_url };
+}
+// → { state: 'working' } | { state: 'done', url } | { state: 'failed' }
+export async function falMeshCheck(job) {
+  const key = env('FAL_KEY'), h = { authorization: 'Key ' + key };
+  const r = await fetch(job.statusUrl, { headers: h }), j = await r.json().catch(() => ({}));
+  if (!r.ok) { console.error('fal mesh status', r.status, JSON.stringify(j).slice(0, 300)); return r.status >= 500 ? { state: 'working' } : { state: 'failed' }; }
+  if (j.status === 'IN_QUEUE' || j.status === 'IN_PROGRESS') return { state: 'working', queue: j.queue_position ?? null };
+  if (j.status !== 'COMPLETED' || j.error) { console.error('fal mesh job', JSON.stringify(j).slice(0, 300)); return { state: 'failed' }; }
+  const rr = await fetch(job.responseUrl, { headers: h }), out = await rr.json().catch(() => ({})), url = out.model_mesh?.url || out.base_model?.url || out.model_glb?.url || out.mesh?.url;
+  if (!rr.ok || !url) { console.error('fal mesh result', rr.status, JSON.stringify(out).slice(0, 300)); return { state: 'failed' }; }
+  return { state: 'done', url };
+}

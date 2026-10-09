@@ -250,6 +250,15 @@ export async function allowGuide(uid) {
   if (await dailyCount(uid, 'guide') >= cap) throw new HttpError(429, 'rate_limited', paid ? 'Your guide has talked a lot today. She will be back tomorrow.' : `Free accounts get ${cap} guide messages a day. Get a Home Pass to keep talking.`);
 }
 
+// ---- Forge (3D models): free for now, with a daily count per kind of request ----
+export async function allowForge(uid, kind, cap) {
+  if (await dailyCount(uid, kind) >= cap) throw new HttpError(429, 'rate_limited', `That is ${cap} for today. Forge is free for now, with a daily limit. Come back tomorrow.`);
+}
+export async function allowMesh(uid, cap) {
+  if (await dailyCount(uid, 'model_mesh') >= cap) throw new HttpError(429, 'rate_limited', `Sculpted shapes are limited to ${cap} a day for now. Come back tomorrow.`);
+  return (await db.insert('usage', { user_id: uid, kind: 'model_mesh', model: 'fal' }))?.id || null;
+}
+
 // ---- Mira's voice ----
 export async function allowVoice(uid) {
   const sub = await getSub(uid), paid = freeMode() || subActive(sub) || (await db.count('passes', { user_id: uid })) > 0;

@@ -263,5 +263,33 @@ for (let i = 0; i < 4; i++) { const u = `55555555-dddd-4ddd-8ddd-00000000000${i}
 cfg = await (await fetch(B + '/api/config')).json(); assert.equal(cfg.launch.amount, 249900); assert.equal(cfg.launch.spotsLeft, 45); ok('after 5 sales the price steps up to ₹2,499 for the next 45');
 process.env.LAUNCH_OFFER = 'off'; cfg = await (await fetch(B + '/api/config')).json(); assert.equal(cfg.launch.active, false); assert.equal(cfg.launch.amount, 399900); ok('LAUNCH_OFFER=off returns to ₹3,999'); delete process.env.LAUNCH_OFFER;
 
+// --- Forge: 3D models ---
+process.env.FAL_QUEUE_URL = 'http://localhost:4003/queue';
+const Z = '66666666-eeee-4eee-8eee-000000000001', Z2 = '66666666-eeee-4eee-8eee-000000000002', FORGE_ASK = 'You are Forge, a mechanical designer.\n\nTHE CUSTOMER ASKS\n';
+for (const p of ['/forge', '/forge-worker.js', '/fonts/forge-sans.ttf']) assert.equal((await fetch(B + p)).status, 200, p); ok('the Forge page, its builder and its lettering fonts are served');
+cfg = await (await fetch(B + '/api/config', { cache: 'no-store' })).json(); assert.equal(cfg.forge.meshOn, true); assert.equal(cfg.forge.makesPerDay, 25);
+r = await ai(Z, { kind: 'model_make', prompt: FORGE_ASK + 'a plate 60 x 40 x 5 with a hole' }); assert.ok(r.done); assert.match(r.json.code, /return cut\(plate/); assert.deepEqual(r.json.size, { x: 60, y: 40, z: 5 }); assert.equal(calls.filter(c => c.model).at(-1).model, 'claude-opus-5-5');
+r = await ai(Z, { kind: 'model_edit', prompt: 'You are Forge.\nTHE MODEL NOW\n{}\nTHE CUSTOMER NOW ASKS\nmake it 8 thick' }); assert.equal(r.json.size.z, 8); assert.equal(calls.filter(c => c.model).at(-1).model, 'claude-sonnet-5');
+r = await ai(Z, { kind: 'model_fix', prompt: 'You are Forge. A model you wrote has a problem.' }); assert.match(r.json.say, /corrected/); ok('Forge writes, changes and repairs a model (the strongest model writes, the everyday one edits)');
+r = await ai(Z, { kind: 'model_edit', prompt: 'You are Forge.\nTHE MODEL NOW\n{}\nTHE CUSTOMER NOW ASKS\nTESTQUESTION will it print?' }); assert.ok(r.done && !r.json.code && r.json.say); ok('a question about a model is answered without changing it');
+for (let i = 0; i < 24; i++) await ai(Z, { kind: 'model_make', prompt: FORGE_ASK + 'another' });
+r = await ai(Z, { kind: 'model_make', prompt: FORGE_ASK + 'one too many' }); assert.equal(r.status, 429); assert.equal(r.error.code, 'rate_limited'); ok('Forge is capped at 25 new models a day per person');
+const mcall = async (u, path, data) => { const x = await fetch(B + path, { method: data ? 'POST' : 'GET', headers: { authorization: 'Bearer ' + (u.startsWith('guest:') ? u : tok(u)), 'content-type': 'application/json' }, body: data ? JSON.stringify(data) : undefined }); return x; };
+r = await mcall(Z, '/api/mesh', { prompt: 'x' }); assert.equal(r.status, 400);
+r = await mcall(Z, '/api/mesh', { prompt: 'a small sitting cat' }); assert.equal(r.status, 200); const job = (await r.json()).job; assert.match(job, /^m_/);
+assert.match(calls.filter(c => c.fal && /schnell/.test(c.fal)).at(-1).prompt, /A single a small sitting cat.*pure white seamless background/); assert.equal(calls.filter(c => c.fal && /^\/queue\/fal-ai\/hunyuan3d\/v2$/.test(c.fal)).at(-1).auth, 'Key fal_test');
+assert.equal((await (await mcall(Z, '/api/mesh?job=' + job)).json()).state, 'working'); assert.equal((await (await mcall(Z, '/api/mesh?job=' + job)).json()).state, 'done');
+assert.equal((await mcall(Z2, '/api/mesh?job=' + job)).status, 404);
+r = await mcall(Z, '/api/mesh?job=' + job + '&file=1'); assert.equal(r.status, 200); const glb = new Uint8Array(await r.arrayBuffer()); assert.equal(String.fromCharCode(...glb.slice(0, 4)), 'glTF'); assert.ok(glb.length > 5000); ok('a sculpted shape: words become a picture, the picture a mesh, and only its owner can fetch it');
+r = await mcall(Z, '/api/mesh', { prompt: 'MESHFAIL thing' }); assert.equal(r.status, 502); assert.equal((await r.json()).error.code, 'mesh_credit'); ok('an empty fal balance is reported as such');
+r = await mcall(Z, '/api/mesh', { image: 'data:image/png;base64,' + Buffer.from('a photo').toString('base64') }); assert.equal(r.status, 200); assert.equal((await r.json()).picture, null); ok('a picture of the object can be sculpted directly');
+delete process.env.FAL_KEY; assert.equal((await mcall(Z, '/api/mesh', { prompt: 'a small sitting cat' })).status, 503); process.env.FAL_KEY = 'fal_test'; ok('without FAL_KEY sculpting is cleanly off');
+process.env.FREE_MODE = 'on';
+const GF = 'guest:guestsecret_FFFFFFFFFFFFFFFFFFFF';
+r = await mcall(GF, '/api/ai', { kind: 'model_make', prompt: FORGE_ASK + 'a plate' }); assert.equal(r.status, 200); assert.match(await r.text(), /"done":true/);
+for (let i = 0; i < 6; i++) assert.equal((await mcall(GF, '/api/mesh', { prompt: 'a small sitting cat' })).status, 200, 'guest mesh ' + i);
+assert.equal((await mcall(GF, '/api/mesh', { prompt: 'a small sitting cat' })).status, 429); ok('guests can use Forge, with 6 sculpted shapes a day');
+process.env.FREE_MODE = 'off';
+
 console.log(`\nAll ${step} checks passed.`);
 fakes.close(); process.exit(0);

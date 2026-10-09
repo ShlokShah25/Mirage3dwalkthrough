@@ -6,6 +6,8 @@ Floor plan in, furnished 3D home out. This repo is the whole site: landing page,
 public/            what visitors load
   index.html       landing page
   app.html         the 3D app (built from the studio source)
+  forge.html       Forge: describe a part, get a printable 3D model (built from forge-src/)
+  forge-worker.js  Forge's geometry engine, run beside the page
   terms, privacy, refunds, contact .html   draft legal pages (fill in the [brackets])
 api/               server functions (run on Vercel)
   ai.js            the only route to Claude: checks the plan, meters usage, streams answers
@@ -15,6 +17,7 @@ api/               server functions (run on Vercel)
   billing.js       Home Pass, top-ups, Pro / Pro Max, verify, change plan, cancel
   razorpay-webhook.js   payment and subscription events from Razorpay
   render.js        "Make it real": turns the current 3D view into a photo-real image (fal.ai)
+  mesh.js          Forge's sculpted shapes: words or a picture become a mesh (fal.ai)
   config.js        public keys and prices for the browser
   _lib/            shared code (pricing lives in _lib/env.js)
 supabase/schema.sql    database tables and security rules
@@ -59,6 +62,21 @@ Every change is checked as built (`applyOps`): operations that could not be appl
 `app-src/cat4.js` adds statement pieces her concepts can use: RGB LED strips and neon in any colour, acoustic panels, a studio desk and speakers, guitars, cinema recliners and screen, a linear fireplace wall, a glass wine wall, a window seat, a timber slat ceiling and a home gym.
 
 Graphics default to **Auto quality**: full quality to start, stepping down a level whenever most frames over a few seconds are slow, and remembering the level for that device. Shadows are redrawn only when something changes, and the panels over the 3D view no longer blur what is behind them.
+
+## Forge (3D models for printing)
+
+A separate page at `/forge`, on the same server. A customer describes an object (and may add a sketch or photo); Forge returns a closed solid that measures what they asked, with sliders for its sizes and downloads in STL, 3MF, OBJ, STEP, GLB, USDZ, PLY, DAE and AMF. Source is in `forge-src/`; `python3 forge-src/build.py` writes `public/forge.html` and `public/forge-worker.js`.
+
+- **How a model is made.** Claude does not draw triangles. It writes a short program in a small modelling vocabulary (`box`, `cylinder`, `extrude`, `revolve`, `text`, `thread`, `union`, `cut`, `fillet` …, listed in `forge-src/prompts.js`) plus the parameters a customer may adjust and the overall size it promises. The program runs in the browser.
+- **The geometry engine** (`forge-src/kernel.js`, no dependencies). Every shape is a distance field, so any program gives a valid solid. The mesher (octree dual contouring) keeps flat faces flat and edges sharp, merges flat regions into large triangles, and produces a closed surface: every edge is shared by exactly two triangles, which is what slicers need. A box comes out as 12 triangles; curves follow the true surface to about 0.01 mm at standard detail.
+- **Sizes are checked, not trusted.** After each build the mesh is measured and compared with the promised size (0.05 mm or 0.2 %). A build that fails or measures wrong goes back to Claude once or twice with the error or the measured numbers (`model_fix`, on the everyday model); the best version is kept and anything still off is said in the conversation. The measured width, depth and height are drawn around the model as dimension lines.
+- **Sliders do not call Claude.** Moving a parameter re-runs the program locally: a quick preview while dragging, a full build on release. The code can be read and edited by hand under "See or edit the model's code".
+- **Sculpted shapes** (animals, figures, anything organic). Claude answers with `kind: "sculpt"`; `/api/mesh` has fal.ai make a clean picture from the words (`FAL_3D_IMAGE_MODEL`, default `fal-ai/flux/schnell`) and a mesh from the picture (`FAL_3D_MODEL`, default `fal-ai/hunyuan3d/v2`), or sculpts straight from a picture the customer attached. The mesh is rebuilt in the browser as a solid (`voxelize`), so Claude's program can size it exactly, flatten its underside, add a base or lettering, or hollow it. Needs `FAL_KEY`; without it Forge builds a simplified version from the vocabulary instead.
+- **Opening a mesh.** An STL, OBJ or GLB can be opened, rebuilt as a closed solid, changed by conversation and saved in any of the formats.
+- **Safety.** The program Claude writes runs in a web worker that has given up network and storage access before any model code runs.
+- **Models used.** New models: `MODEL_FORGE` (defaults to `MODEL_COMPLEX`, Opus). Changes and repairs: `MODEL_FORGE_EDIT` (defaults to `MODEL_DEFAULT`, Sonnet).
+- **Limits** (`FORGE` in `api/_lib/env.js`): 25 new models, 120 changes and 6 sculpted shapes a day per person; for guests, also a site-wide ceiling. Forge is free for now. Models are kept in the visitor's browser, not on the server.
+- **Formats.** STL, 3MF, OBJ, PLY, AMF and DAE are in millimetres with Z up; GLB and USDZ are in metres with Y up, as those formats expect. STEP is a solid made of flat faces (one per triangle, up to 30,000; a lighter copy is built for it when needed): CAD programs open it as a solid body, but a hole in it is facets, not a true cylinder.
 
 ## Pricing and limits
 

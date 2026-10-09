@@ -1,7 +1,7 @@
 // Guests (no sign-in) are handled without the database: limits live in this server's memory and reset each day
 // (or when the server restarts). Nothing about a guest is stored; their homes stay in their own browser.
 import { randomUUID } from 'node:crypto';
-import { PRICING, FREE, GUEST, MODELS, DEEP } from './env.js';
+import { PRICING, FREE, GUEST, MODELS, DEEP, FORGE } from './env.js';
 import { HttpError } from './http.js';
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -20,6 +20,9 @@ const CAPS = () => ({
   guide: [PRICING.guide.paidPerDay, 20000, 'messages to Mira'],
   voice: [PRICING.voice.paidPerDay, 20000, 'spoken lines'],
   render: [FREE.rendersPerDay, 300, 'photo-real renders'],
+  model_make: [FORGE.makesPerDay, FORGE.siteMakesPerDay, '3D models'],
+  model_edit: [FORGE.editsPerDay, FORGE.siteMakesPerDay * 6, 'changes to 3D models'],
+  model_mesh: [FORGE.meshesPerDay, FORGE.siteMeshesPerDay, 'sculpted shapes'],
 });
 export function take(uid, kind) {
   roll(); const [mine, site, what] = CAPS()[kind];
@@ -81,6 +84,8 @@ export function authorizeGuest(user, b) {
       return { homeId, model: MODELS.default(), maxTokens: 24000, effort: 'high' };
     }
     case 'refurnish': take(uid, 'edit'); return { homeId, model: MODELS.design(), maxTokens: 32000, effort: 'high', after: j => { if (!items(j)) giveBack(uid, 'edit'); }, onFail: () => giveBack(uid, 'edit') };
+    case 'model_make': take(uid, 'model_make'); return { homeId: null, model: MODELS.forge(), maxTokens: 24000, effort: 'medium', onFail: () => giveBack(uid, 'model_make') };
+    case 'model_edit': case 'model_fix': take(uid, 'model_edit'); return { homeId: null, model: MODELS.forgeEdit(), maxTokens: 24000, effort: 'medium', onFail: () => giveBack(uid, 'model_edit') };
     case 'guide_pro': take(uid, 'guide'); return { homeId, model: MODELS.default(), maxTokens: 6000, effort: 'low' };
     case 'guide': take(uid, 'guide'); return { homeId, model: MODELS.fast(), maxTokens: 3000 };
   }

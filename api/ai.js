@@ -4,13 +4,13 @@
 import { createHash } from 'node:crypto';
 import { requireUser } from './_lib/auth.js';
 import { route, body, HttpError } from './_lib/http.js';
-import { MODELS, LIMITS } from './_lib/env.js';
+import { MODELS, LIMITS, FORGE } from './_lib/env.js';
 import { db } from './_lib/db.js';
 import { streamClaude, extractJSON } from './_lib/claude.js';
 import * as E from './_lib/entitle.js';
 import { authorizeGuest } from './_lib/guest.js';
 
-const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_fix', 'edit_followup', 'refurnish', 'guide'];
+const KINDS = ['plan_read', 'plan_check', 'plan_deep', 'guide_pro', 'teaser', 'style', 'design', 'edit', 'edit_fix', 'edit_followup', 'refurnish', 'guide', 'model_make', 'model_edit', 'model_fix'];
 
 async function authorize(user, b) {
   const { kind } = b, uid = user.id;
@@ -64,6 +64,10 @@ async function authorize(user, b) {
       await E.allowGuide(uid);
       return { homeId: b.homeId ? String(b.homeId).slice(0, 80) : null, model: MODELS.default(), maxTokens: 6000, effort: 'low', usageKind: 'guide' };
     }
+    // Forge: write a 3D model from a description (and pictures), change one, or repair one whose code failed or came out the wrong size
+    case 'model_make': await E.allowForge(uid, 'model_make', FORGE.makesPerDay); return { homeId: null, model: MODELS.forge(), maxTokens: 24000, effort: 'medium' };
+    case 'model_edit': await E.allowForge(uid, 'model_edit', FORGE.editsPerDay); return { homeId: null, model: MODELS.forgeEdit(), maxTokens: 24000, effort: 'medium' };
+    case 'model_fix': await E.allowForge(uid, 'model_fix', FORGE.editsPerDay); return { homeId: null, model: MODELS.forgeEdit(), maxTokens: 24000, effort: 'medium' };
     case 'guide': {
       await E.allowGuide(uid);
       return { homeId: b.homeId ? String(b.homeId).slice(0, 80) : null, model: MODELS.fast(), maxTokens: 3000 };
