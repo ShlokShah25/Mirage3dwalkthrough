@@ -82,8 +82,8 @@ const cleanIn = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n
 function modelBlock(m, stats) {
   const o = { kind: m.kind, name: m.name, params: m.params, code: m.code, size: m.size };
   let s = 'THE MODEL NOW\n' + JSON.stringify(o);
-  if (m.source) s += `\nThis model has a ${m.source.type === 'sculpt' ? 'sculpted' : 'customer-supplied'} shape available as "source" (${m.source.what || 'no description'}).`;
-  if (stats) s += `\nMEASURED after building: ${stats.size.map(v => +v.toFixed(2)).join(' x ')} mm (x, y, z), volume ${(stats.volume / 1000).toFixed(1)} cm3.`;
+  if (m.source) s += `\nThis model has a ${m.source.type === 'sculpt' ? 'sculpted' : 'customer-supplied'} shape available as "source" (${m.source.what || 'no description'}): a closed solid 100 mm along its longest side, centred on x = 0 and y = 0, standing on z = 0, so source.scale(k).onBed() is that shape k times bigger and the code above places it exactly where the pictures show it.${m.source.type === 'file' ? ' Any code you write rebuilds the file as a closed solid, which also repairs gaps in it.' : ''}`;
+  if (stats) s += `\nMEASURED after building: ${stats.size.map(v => +v.toFixed(2)).join(' x ')} mm (x, y, z), spanning x ${stats.min[0].toFixed(1)} to ${stats.max[0].toFixed(1)}, y ${stats.min[1].toFixed(1)} to ${stats.max[1].toFixed(1)}, z ${stats.min[2].toFixed(1)} to ${stats.max[2].toFixed(1)}; volume ${(stats.volume / 1000).toFixed(1)} cm3.`;
   return s;
 }
 const talkBlock = m => { const t = (m?.chat || []).filter(c => c.who === 'you' || c.who === 'forge').slice(-8, -1); return t.length ? 'EARLIER IN THE CONVERSATION\n' + t.map(c => `${c.who === 'you' ? 'Customer' : 'You'}: ${cleanIn(c.text, 400)}`).join('\n') + '\n\n' : ''; };
@@ -114,13 +114,13 @@ ${o.meshOn ? SCULPT_ON : SCULPT_OFF}
 
 ${RULES}
 8. Change what was asked and leave the rest as it is: keep the parameter keys and their current values unless the change is about them, and keep every size the customer set earlier. Reply with the complete model, not a patch.
-9. Include "mesh" only when a NEW sculpted shape is needed; without it the existing "source" stays.
+9. Splitting a model to print in pieces: cut it with clip() along a plane, lay each piece on its flat cut face, put the pieces side by side with a 5 mm gap, and when it helps add round pegs on one face and matching holes 0.3 mm larger on the other. Include "mesh" only when a NEW sculpted shape is needed; without it the existing "source" stays.
 10. If the customer only asks a question, answer it in "say" and leave out every other field.
 
 ${REPLY}
 
 ${modelBlock(m, o.stats)}
-
+${o.views ? `\nPICTURES OF THE MODEL NOW: the first ${o.views} attached images show it from a front corner, from the front (looking toward +y), from the right side (looking toward -x) and from above, on a 10 mm grid with its width, depth and height drawn in blue. Use them to find where things are on the shape (an ear, a handle, a flat face) and work out their coordinates.\n` : ''}
 ${talkBlock(m)}${o.picture ? 'The customer attached a picture with this request. Read any sizes written on it and use them exactly.\n\n' : ''}THE CUSTOMER NOW ASKS
 ${cleanIn(text, 4000)}`;
 }

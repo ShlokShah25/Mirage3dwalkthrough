@@ -559,7 +559,7 @@ function finishMesh(positions, indices, info = {}) {
     for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = find(tri[i + k]), b = find(tri[i + (k + 1) % 3]); if (a !== b && len2(a, b) < 1e-12) { par.set(Math.max(a, b), Math.min(a, b)); any = true; } }
     if (any) { const out = []; for (let i = 0; i < tri.length; i += 3) { const a = find(tri[i]), b = find(tri[i + 1]), c = find(tri[i + 2]); if (a !== b && b !== c && a !== c) out.push(a, b, c); } tri = out; } }
   // 2. three corners on one line: the middle corner lies on the long edge, so split the neighbour across that edge at it instead
-  for (let pass = 0; pass < 4; pass++) {
+  for (let pass = 0; pass < (info.keep ? 0 : 4); pass++) {
     const bad = []; for (let i = 0; i < tri.length; i += 3) if (area2(tri[i], tri[i + 1], tri[i + 2]) < TINY) bad.push(i); if (!bad.length) break;
     const nV = positions.length / 3, own = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) own.set(tri[i + k] * nV + tri[i + (k + 1) % 3], i);
     const dead = new Set(); let fixed = 0;
@@ -570,7 +570,7 @@ function finishMesh(positions, indices, info = {}) {
     if (!fixed) break;
   }
   // 3. last resort: any small hole left in the surface (a field that is not smooth enough somewhere) is closed with a fan of triangles
-  { const nV0 = positions.length / 3, used = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = tri[i + k], b = tri[i + (k + 1) % 3]; used.set(a * nV0 + b, (used.get(a * nV0 + b) || 0) + 1); }
+  if (!info.keep) { const nV0 = positions.length / 3, used = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = tri[i + k], b = tri[i + (k + 1) % 3]; used.set(a * nV0 + b, (used.get(a * nV0 + b) || 0) + 1); }
     const holeNext = new Map(); for (const key of used.keys()) { const a = Math.floor(key / nV0), b = key % nV0; if (!used.has(b * nV0 + a) && !holeNext.has(b)) holeNext.set(b, a); }   // the hole runs b → a along each edge with no partner
     if (holeNext.size) { const extra = [], P = Array.from(positions), seen = new Set();
       for (const start of holeNext.keys()) { if (seen.has(start)) continue; const loop = []; let v = start; while (v !== undefined && !seen.has(v) && loop.length < 400) { seen.add(v); loop.push(v); v = holeNext.get(v); }
@@ -604,6 +604,7 @@ const IN_WORKER = typeof WorkerGlobalScope !== 'undefined' && self instanceof Wo
 const LOCKED = ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts', 'indexedDB', 'caches', 'BroadcastChannel', 'Worker', 'SharedWorker', 'WebTransport', 'RTCPeerConnection', 'navigator', 'location', 'Function', 'eval'];
 const HIDDEN = ['fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'indexedDB', 'caches', 'navigator', 'location', 'Function', 'self', 'globalThis', 'postMessage'];   // names the code sees as undefined
 const BANNED = /\b(?:constructor|prototype|__proto__|eval|Function|globalThis|import\s*\()/;
+const RAW = new Map();              // id → the opened mesh itself (corners joined), so a file can be shown and saved exactly as it came
 const SOURCES = new Map();          // id → the imported shape as a solid, 100 mm along its longest side, centred, sitting on the bed
 const API_NAMES = Object.keys(API);
 const MakeFn = Function;            // kept before the lock below hides it
@@ -669,7 +670,15 @@ function forScreen(positions, indices, creaseDeg = 32) {
   return { pos, nrm, edges: new Float32Array(edges) };
 }
 
+// a file shown as it came: its own triangles, resized, centred and standing on the bed
+function asOpened(msg) {
+  const raw = RAW.get(msg.sourceId); if (!raw) throw new Error('The opened file is no longer loaded. Open it again.');
+  const b = raw.bb, s = +msg.scale > 0 ? +msg.scale : 1, cx = (b[0] + b[3]) / 2, cy = (b[1] + b[4]) / 2, P = new Float32Array(raw.positions.length);
+  for (let i = 0; i < P.length; i += 3) { P[i] = (raw.positions[i] - cx) * s; P[i + 1] = (raw.positions[i + 1] - cy) * s; P[i + 2] = (raw.positions[i + 2] - b[2]) * s; }
+  return finishMesh(P, raw.indices.slice(), { keep: true, asOpened: true });
+}
 function build(msg) {
+  if (msg.passthrough) { const t0 = Date.now(), mesh = asOpened(msg), view = forScreen(mesh.positions, mesh.indices); return { positions: mesh.positions, indices: mesh.indices, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view }; }
   const t0 = Date.now(), src = msg.sourceId ? SOURCES.get(msg.sourceId) : null;
   const solid = runCode(msg.code, msg.params || {}, src);
   const q = { ...(QUALITY[msg.quality] || QUALITY.normal), ...(msg.budget > 0 ? { budget: msg.budget } : {}), ...(msg.tol > 0 ? { tol: msg.tol } : {}) };
@@ -680,13 +689,30 @@ function build(msg) {
 }
 
 // An imported or sculpted mesh (millimetres or not, Z up) becomes a solid: 100 mm along its longest side, centred, on the bed.
+// STL files repeat every corner for every triangle: join corners that are at the same place so edges are shared
+function weld(positions, indices) {
+  const n = positions.length / 3, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) { const v = positions[i * 3 + a]; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+  const q = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1e-6 || 1e-9, map = new Map(), remap = new Uint32Array(n), P = [];
+  for (let i = 0; i < n; i++) { const k = Math.round(positions[i * 3] / q) + ',' + Math.round(positions[i * 3 + 1] / q) + ',' + Math.round(positions[i * 3 + 2] / q); let j = map.get(k); if (j === undefined) { j = P.length / 3; map.set(k, j); P.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]); } remap[i] = j; }
+  const I = []; for (let t = 0; t < indices.length; t += 3) { const a = remap[indices[t]], b = remap[indices[t + 1]], c = remap[indices[t + 2]]; if (a !== b && b !== c && a !== c) I.push(a, b, c); }
+  return { positions: new Float32Array(P), indices: new Uint32Array(I), bb: [lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]] };
+}
+// the grid the shape is rebuilt on: as fine as about 0.4 % of its longest side, within a memory budget (cells)
+function gridRes(bb, cells) {
+  const e = [bb[3] - bb[0], bb[4] - bb[1], bb[5] - bb[2]], ext = Math.max(...e); let res = 260;
+  while (res > 120 && e.reduce((m, v) => m * (v / (ext / res) + 9), 1) > cells) res = Math.floor(res * .92);
+  return res;
+}
 function addSource(msg, say) {
-  const g = voxelize(msg.positions, msg.indices, msg.res || 176, f => say({ type: 'progress', job: msg.job, f }));
+  const raw = weld(msg.positions, msg.indices);
+  if (RAW.size >= 3) RAW.delete(RAW.keys().next().value); RAW.set(msg.id, raw);
+  const g = voxelize(raw.positions, raw.indices, msg.res || gridRes(raw.bb, msg.cells || 5e6), f => say({ type: 'progress', job: msg.job, f }));
   const b = g.bb, ext = Math.max(b[3] - b[0], b[4] - b[1], b[5] - b[2]), s = 100 / ext;
   const solid = g.scale(s).center('xy').onBed();
   if (SOURCES.size >= 3) SOURCES.delete(SOURCES.keys().next().value);
   SOURCES.set(msg.id, solid);
-  return { size: [(b[3] - b[0]) * s, (b[4] - b[1]) * s, (b[5] - b[2]) * s], original: [b[3] - b[0], b[4] - b[1], b[5] - b[2]] };
+  const rb = raw.bb; return { size: [(b[3] - b[0]) * s, (b[4] - b[1]) * s, (b[5] - b[2]) * s], original: [rb[3] - rb[0], rb[4] - rb[1], rb[5] - rb[2]] };
 }
 
 function handle(msg, say) {

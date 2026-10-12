@@ -559,7 +559,7 @@ function finishMesh(positions, indices, info = {}) {
     for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = find(tri[i + k]), b = find(tri[i + (k + 1) % 3]); if (a !== b && len2(a, b) < 1e-12) { par.set(Math.max(a, b), Math.min(a, b)); any = true; } }
     if (any) { const out = []; for (let i = 0; i < tri.length; i += 3) { const a = find(tri[i]), b = find(tri[i + 1]), c = find(tri[i + 2]); if (a !== b && b !== c && a !== c) out.push(a, b, c); } tri = out; } }
   // 2. three corners on one line: the middle corner lies on the long edge, so split the neighbour across that edge at it instead
-  for (let pass = 0; pass < 4; pass++) {
+  for (let pass = 0; pass < (info.keep ? 0 : 4); pass++) {
     const bad = []; for (let i = 0; i < tri.length; i += 3) if (area2(tri[i], tri[i + 1], tri[i + 2]) < TINY) bad.push(i); if (!bad.length) break;
     const nV = positions.length / 3, own = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) own.set(tri[i + k] * nV + tri[i + (k + 1) % 3], i);
     const dead = new Set(); let fixed = 0;
@@ -570,7 +570,7 @@ function finishMesh(positions, indices, info = {}) {
     if (!fixed) break;
   }
   // 3. last resort: any small hole left in the surface (a field that is not smooth enough somewhere) is closed with a fan of triangles
-  { const nV0 = positions.length / 3, used = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = tri[i + k], b = tri[i + (k + 1) % 3]; used.set(a * nV0 + b, (used.get(a * nV0 + b) || 0) + 1); }
+  if (!info.keep) { const nV0 = positions.length / 3, used = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = tri[i + k], b = tri[i + (k + 1) % 3]; used.set(a * nV0 + b, (used.get(a * nV0 + b) || 0) + 1); }
     const holeNext = new Map(); for (const key of used.keys()) { const a = Math.floor(key / nV0), b = key % nV0; if (!used.has(b * nV0 + a) && !holeNext.has(b)) holeNext.set(b, a); }   // the hole runs b → a along each edge with no partner
     if (holeNext.size) { const extra = [], P = Array.from(positions), seen = new Set();
       for (const start of holeNext.keys()) { if (seen.has(start)) continue; const loop = []; let v = start; while (v !== undefined && !seen.has(v) && loop.length < 400) { seen.add(v); loop.push(v); v = holeNext.get(v); }

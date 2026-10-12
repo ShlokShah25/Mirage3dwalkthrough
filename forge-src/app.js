@@ -113,12 +113,16 @@ async function work(msg, { timeout = 90000, onStep } = {}) {
 async function ensureSource(m) {
   if (!m.source) return null; if (!W.w) await startWorker(); if (W.has.has(m.id)) return m.id;
   const tri = await idb.get(m.id); if (!tri) throw fail('source_lost', 'The shape this model was made from is no longer stored in this browser. Make or open it again.');
-  await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice() }, { timeout: 180000 });
+  await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice(), cells: (navigator.deviceMemory || 8) <= 4 ? 2.5e6 : 5e6 }, { timeout: 180000 });
   W.has.add(m.id); return m.id;
 }
 const values = m => Object.fromEntries((m.params || []).map(p => [p.key, p.value]));
+// An opened file whose code nobody has changed is shown and saved exactly as it came: its own triangles, only resized.
+const IMPORT_CODE = '// The file you opened, exactly as it came. Any change rebuilds it as a closed solid; "source" is that solid, 100 mm along its longest side.\nreturn source.scale(p.longest / 100).onBed();';
+const asOpened = m => m.source?.type === 'file' && m.code === IMPORT_CODE && m.source.original;
 async function buildNow(m, quality = 'normal', extra = {}) {
   const sourceId = await ensureSource(m);
+  if (asOpened(m) && !extra.budget) return work({ type: 'build', passthrough: true, sourceId, quality, scale: values(m).longest / Math.max(...m.source.original) }, { timeout: 90000 });
   return work({ type: 'build', code: m.code, params: values(m), quality, sourceId, ...extra }, { timeout: quality === 'fine' ? 240000 : 90000 });
 }
 
@@ -183,6 +187,14 @@ function frame(view = 'iso') {
   const dir = { iso: [.62, -.82, .56], front: [0, -1, .0001], top: [0, -.0001, 1], right: [1, 0, .0001] }[view] || [.62, -.82, .56], l = Math.hypot(...dir);
   const fit = Math.min(1, V.cam.aspect), d = rad / Math.sin(V.cam.fov * Math.PI / 360) / fit;
   V.ctl.target.set(...c); V.cam.position.set(c[0] + dir[0] / l * d, c[1] + dir[1] / l * d, c[2] + dir[2] / l * d); V.cam.near = Math.max(.1, d / 200); V.cam.far = d * 20 + 2000; V.cam.updateProjectionMatrix(); V.ctl.update(); draw();
+}
+function viewShots() {
+  const keep = { p: V.cam.position.clone(), t: V.ctl.target.clone() }, out = [], dims = ST.dims;
+  try {
+    ST.dims = true; drawDims();
+    for (const v of ['iso', 'front', 'right', 'top']) { frame(v); const src = $('view'), c = document.createElement('canvas'); c.width = 768; c.height = Math.round(768 * src.height / src.width); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height); out.push(c.toDataURL('image/jpeg', .82)); }
+  } catch { } finally { ST.dims = dims; drawDims(); V.cam.position.copy(keep.p); V.ctl.target.copy(keep.t); V.ctl.update(); draw(); }
+  return out;
 }
 function thumb() {
   try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
@@ -316,7 +328,8 @@ async function sculpt(m, spec, pic, wait) {
 }
 async function setSource(m, tri, info) {
   await idb.put(m.id, tri); W.has.delete(m.id); m.source = { ...info, triangles: tri.indices.length / 3 };
-  const r = await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice() }, { timeout: 180000 });
+  const small = (navigator.deviceMemory || 8) <= 4 || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
+  const r = await work({ type: 'source', id: m.id, positions: tri.positions.slice(), indices: tri.indices.slice(), cells: small ? 2.5e6 : 5e6 }, { timeout: 180000 });
   W.has.add(m.id); m.source.original = r.original; return r;
 }
 function blankModel() { return { id: newId(), name: 'Model', kind: 'part', code: '', params: [], size: { x: null, y: null, z: null }, chat: [], history: [], source: null, thumb: null, created: Date.now(), updated: Date.now() }; }
@@ -328,8 +341,10 @@ async function send(text, pic) {
   addMsg('you', text, pic ? { img: pic.small } : {});
   const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
   try {
-    const opts = { meshOn: !!ST.cfg.forge?.meshOn || !!HOOK.mesh, picture: !!pic, stats: ST.mesh?.stats };
-    const ans = await askAIOnce(first ? 'model_make' : 'model_edit', first ? makePrompt(text, opts) : editPrompt(m, text, opts), pic ? [pic.data] : []);
+    // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
+    const views = !first && m.source && ST.mesh ? viewShots() : [];
+    const opts = { meshOn: !!ST.cfg.forge?.meshOn || !!HOOK.mesh, picture: !!pic, stats: ST.mesh?.stats, views: views.length };
+    const ans = await askAIOnce(first ? 'model_make' : 'model_edit', first ? makePrompt(text, opts) : editPrompt(m, text, opts), [...views, ...(pic ? [pic.data] : [])]);
     if (!ans?.code) { addMsg('forge', String(ans?.say || 'I could not work that out. Say it another way, with the sizes you need.').slice(0, 900)); return; }
     if (!m) { m = blankModel(); m.chat = ST.draft; ST.draft = []; ST.cur = m; }
     applyAnswer(m, ans);
@@ -439,13 +454,14 @@ async function importFile(file) {
   const wait = waiting('Reading the file');
   try {
     const tri = await readMeshFile(file), m = blankModel(); m.name = file.name.replace(/\.[^.]+$/, '').slice(0, 60) || 'Opened mesh'; m.kind = 'part';
-    wait.say('Rebuilding it as a solid');
+    wait.say('Reading the shape');
     const r = await setSource(m, tri, { type: 'file', what: file.name.slice(0, 80) }), big = Math.max(...r.original);
     m.params = tidyParams([{ key: 'longest', label: 'Longest side', value: +big.toFixed(2), min: +(big / 10).toFixed(2), max: +(big * 5).toFixed(2), step: big > 60 ? 1 : .5, unit: 'mm' }]);
-    m.code = '// The file you opened, rebuilt as a closed solid. "source" is 100 mm along its longest side.\nreturn source.scale(p.longest / 100).onBed();';
+    m.code = IMPORT_CODE;
     ST.cur = m; m.chat = [];
-    wait.say('Building the solid'); showBuilt(await buildNow(m, ST.quality));
-    addMsg('forge', `I opened ${file.name} and rebuilt it as a closed solid, ${sizeText(ST.mesh.stats.size)}. Tell me what to change (resize it, add a base, cut a hole, add lettering), or download it in another format.`, { tip: 'Very fine surface detail is smoothed slightly when a mesh is rebuilt.' });
+    wait.say('Opening it'); showBuilt(await buildNow(m, ST.quality));
+    const st = ST.mesh.stats, closed = st.watertight && !st.oddEdges;
+    addMsg('forge', `I opened ${file.name} exactly as it is: ${sizeText(st.size)}, ${st.triangles.toLocaleString('en-IN')} triangles. Change its size with the slider, download it in another format, or tell me what to change: cut it, split it, add a hole, a base or lettering, hollow it, merge it with new parts.`, { tip: closed ? 'Until you ask for a change, downloads keep your original triangles. A change rebuilds it as a closed solid; very fine detail softens by about 0.4 % of its size.' : `Its surface has ${st.openEdges + st.oddEdges} gaps, so a slicer may complain. Say "repair it" and I will rebuild it as a closed solid.` });
     ST.models.unshift(m); openSheet(); frame('iso'); m.thumb = thumb(); save();
   } catch (e) { ST.cur = had || null; renderChat(); addMsg('note', e.code ? e.message : 'That file could not be read.'); if (had) openSheet(); }
   finally { wait.done(); setBusy(false); }
@@ -476,7 +492,7 @@ async function boot() {
   $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) return; $('say').value = ''; clearPicture(); send(t, p); });
   $('say').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('ask').requestSubmit(); });
   $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files[0])); $('picClear').addEventListener('click', clearPicture);
-  $('btnImport').addEventListener('click', () => $('meshFile').click()); $('meshFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); });
+  $('btnImport').addEventListener('click', () => $('meshFile').click()); $('btnOpen').addEventListener('click', () => { if (!ST.busy) $('meshFile').click(); }); $('meshFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); });
   const stage = $('stage'); stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('drop'); }); stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
   stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('drop'); const f = e.dataTransfer?.files?.[0]; if (!f) return; if (/\.(stl|obj|glb)$/i.test(f.name)) importFile(f); else takePicture(f); });
   for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => frame(b.dataset.view));
