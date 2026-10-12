@@ -14,6 +14,7 @@ const isOpts = o => o && typeof o === 'object' && !(o instanceof Shape) && !(o i
 class Shape {
   // subclasses set: bb = [x0, y0, x1, y1] (where the shape is), L (how steep the field can be, 1 for a true distance)
   move(x = 0, y = 0) { return new Xf2(this, 0, num(x, 0), num(y, 0), 1, false); }
+  moveX(v) { return this.move(v, 0); } moveY(v) { return this.move(0, v); }
   rotate(deg) { return new Xf2(this, num(deg, 0) * D2R, 0, 0, 1, false); }
   scale(s) { return new Xf2(this, 0, 0, 0, pos(s, 1, 'scale'), false); }
   mirror(axis = 'x') { return new Mirror2(this, axis === 'y' ? 1 : 0); }
@@ -375,7 +376,7 @@ function voxelize(positions, indices, res = 176, onStep) {
   const dOut = edt(1); onStep?.(.45); const dIn = edt(0); onStep?.(.6);
   for (let i = 0; i < N; i++) f[i] = inside[i] ? -(Math.sqrt(dIn[i]) - .5) : Math.sqrt(dOut[i]) - .5;
   // 3. near the surface, replace the grid estimate with the true distance to the triangles, so the surface is as smooth as the mesh
-  const band = 2, near = new Float32Array(N).fill(INFV);
+  const band = 3, near = new Float32Array(N).fill(INFV);
   for (let t = 0; t < nT; t++) {
     const A = P(t, 0), B = P(t, 1), C = P(t, 2), i0 = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]) - band)), i1 = Math.min(nx - 1, Math.ceil(Math.max(A[0], B[0], C[0]) + band)), j0 = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]) - band)), j1 = Math.min(ny - 1, Math.ceil(Math.max(A[1], B[1], C[1]) + band)), k0 = Math.max(0, Math.floor(Math.min(A[2], B[2], C[2]) - band)), k1 = Math.min(nz - 1, Math.ceil(Math.max(A[2], B[2], C[2]) + band));
     const abx = B[0] - A[0], aby = B[1] - A[1], abz = B[2] - A[2], acx = C[0] - A[0], acy = C[1] - A[1], acz = C[2] - A[2];
@@ -395,7 +396,9 @@ function voxelize(positions, indices, res = 176, onStep) {
     }
     if (onStep && (t & 16383) === 0) onStep(.6 + .4 * t / nT);
   }
-  for (let i = 0; i < N; i++) if (near[i] < band * band && Math.abs(f[i]) <= band + 1.5) { const d = Math.sqrt(near[i]); f[i] = inside[i] ? -d : d; }   // only by the real surface: faces buried deep inside the solid are ignored
+  // by the real surface the true distance replaces the grid estimate, fading back to the estimate 2 to 3 cells out so the field has no
+  // step in it (a step would tear the surface of a hollowed or offset shape); faces buried deep inside the solid are ignored
+  for (let i = 0; i < N; i++) if (near[i] < band * band) { const fe = Math.abs(f[i]), w = fe <= 2 ? 1 : fe >= 3 ? 0 : 3 - fe; if (w > 0) { const d = Math.sqrt(near[i]), ex = inside[i] ? -d : d; f[i] = w * ex + (1 - w) * f[i]; } }
   for (let i = 0; i < N; i++) f[i] *= c;
   return new Grid3({ a: f, c, nx, ny, nz, x0, y0, z0, bb: [lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]] });
 }
@@ -566,6 +569,16 @@ function finishMesh(positions, indices, info = {}) {
       tri[i] = qB; tri[i + 1] = m; tri[i + 2] = c; tri[j] = m; tri[j + 1] = pA; tri[j + 2] = c; dead.add(i); dead.add(j); fixed++; }
     if (!fixed) break;
   }
+  // 3. last resort: any small hole left in the surface (a field that is not smooth enough somewhere) is closed with a fan of triangles
+  { const nV0 = positions.length / 3, used = new Map(); for (let i = 0; i < tri.length; i += 3) for (let k = 0; k < 3; k++) { const a = tri[i + k], b = tri[i + (k + 1) % 3]; used.set(a * nV0 + b, (used.get(a * nV0 + b) || 0) + 1); }
+    const holeNext = new Map(); for (const key of used.keys()) { const a = Math.floor(key / nV0), b = key % nV0; if (!used.has(b * nV0 + a) && !holeNext.has(b)) holeNext.set(b, a); }   // the hole runs b → a along each edge with no partner
+    if (holeNext.size) { const extra = [], P = Array.from(positions), seen = new Set();
+      for (const start of holeNext.keys()) { if (seen.has(start)) continue; const loop = []; let v = start; while (v !== undefined && !seen.has(v) && loop.length < 400) { seen.add(v); loop.push(v); v = holeNext.get(v); }
+        if (v !== start || loop.length < 3) continue;
+        if (loop.length === 3) { extra.push(loop[0], loop[1], loop[2]); continue; }
+        let cx = 0, cy = 0, cz = 0; for (const q of loop) { cx += P[q * 3]; cy += P[q * 3 + 1]; cz += P[q * 3 + 2]; } const c = P.length / 3; P.push(cx / loop.length, cy / loop.length, cz / loop.length);
+        for (let k = 0; k < loop.length; k++) extra.push(loop[k], loop[(k + 1) % loop.length], c); }
+      if (extra.length) { positions = new Float32Array(P); tri = tri.concat(extra); info = { ...info, patched: extra.length / 3 }; } } }
   indices = tri; const keep = []; let vol = 0, area = 0;
   for (let i = 0; i < indices.length; i += 3) {
     const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3, ax = positions[a], ay = positions[a + 1], az = positions[a + 2], bx = positions[b], by = positions[b + 1], bz = positions[b + 2], cx = positions[c], cy = positions[c + 1], cz = positions[c + 2];

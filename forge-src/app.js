@@ -348,6 +348,7 @@ async function send(text, pic) {
     openSheet(); if (first) frame('iso'); m.thumb = thumb(); save();
   } catch (e) {
     if (m && before?.code) { restore(m, before); refreshBuild(); } else if (m && !ST.models.includes(m)) { ST.draft = m.chat; ST.cur = had || null; }
+    if (!e?.code) console.error('[forge]', e);
     addMsg('note', friendly(e));
   } finally { wait.done(); setBusy(false); }
 }
