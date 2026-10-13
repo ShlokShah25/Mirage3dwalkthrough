@@ -143,7 +143,7 @@ function initView() {
   V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
   new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
 }
-function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); draw(); }
+function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); if (DM.on && ST.mesh === DM.r) offsetView(true); draw(); }
 function lines(pts, mat) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); return new THREE.LineSegments(g, mat); }
 function drawBed() {
   for (const c of [...V.bed.children]) { c.geometry.dispose(); V.bed.remove(c); }
@@ -196,6 +196,24 @@ function viewShots() {
   } catch { } finally { ST.dims = dims; drawDims(); V.cam.position.copy(keep.p); V.ctl.target.copy(keep.t); V.ctl.update(); draw(); }
   return out;
 }
+// The first screen's sample part: an M10 bolt and nut, built here in the browser like any model, slowly turning, sizes drawn.
+const DEMO = {"code": "const R = p.flats / Math.sqrt(3);\nconst pts = [];\nfor (let i = 0; i < 6; i++) {\n  const a = i * Math.PI / 3;\n  pts.push([R * Math.cos(a), R * Math.sin(a)]);\n}\nconst hex = polygon(pts);\nconst off = R + 3;\nconst headPart = extrude(hex, p.head);\nconst shank = thread(p.dia, p.pitch, p.length + 0.5).moveZ(p.head - 0.5);\nconst bolt = union(headPart, shank).moveX(-off);\nconst nutBody = extrude(hex, p.nutH);\nconst nutHole = thread(p.dia + p.fit, p.pitch, p.nutH + 2).moveZ(-1);\nconst nutPart = cut(nutBody, nutHole).moveX(off);\nreturn union(bolt, nutPart);", "params": [{"key": "length", "value": 30}, {"key": "dia", "value": 10}, {"key": "pitch", "value": 1.5}, {"key": "flats", "value": 16}, {"key": "head", "value": 6.4}, {"key": "nutH", "value": 8}, {"key": "fit", "value": 0.4}]};
+const DM = { on: false, raf: 0, r: null };
+async function startDemo() {
+  if (DM.on || matchMedia('(max-width: 900px)').matches) return; DM.on = true;
+  try { DM.r ||= await work({ type: 'build', code: DEMO.code, params: Object.fromEntries(DEMO.params.map(p => [p.key, p.value])), quality: 'normal' }); } catch { DM.on = false; return; }
+  if (!DM.on || ST.cur) return;
+  ST.mesh = DM.r; setMesh(DM.r); $('demoNote').hidden = false; offsetView(true); frame('iso');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  V.ctl.autoRotate = true; V.ctl.autoRotateSpeed = .55;
+  const step = () => { if (!DM.on) return; V.ctl.update(); draw(); DM.raf = requestAnimationFrame(step); }; DM.raf = requestAnimationFrame(step);
+}
+function endDemo() {
+  if (!DM.on) return; DM.on = false; cancelAnimationFrame(DM.raf); V.ctl.autoRotate = false; $('demoNote').hidden = true; offsetView(false);
+  if (ST.mesh === DM.r) { ST.mesh = null; setMesh(null); }
+}
+// on the first screen the part sits in the right half of the sheet, beside the request box
+function offsetView(on) { const c = $('view'), w = c.clientWidth, h = c.clientHeight; if (on && w > 900) V.cam.setViewOffset(w, h, -w * .24, 0, w, h); else V.cam.clearViewOffset(); V.cam.updateProjectionMatrix(); draw(); }
 function thumb() {
   try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
 }
@@ -286,8 +304,21 @@ function showMsg(c) {
 }
 function addMsg(who, text, extra = {}) { const c = { who, text, ...extra }; (ST.cur ? (ST.cur.chat ||= []) : ST.draft).push(c); if (ST.cur?.chat.length > 60) ST.cur.chat.splice(0, ST.cur.chat.length - 60); return showMsg(c); }
 function renderChat() { $('log').textContent = ''; for (const c of ST.cur?.chat || ST.draft) showMsg(c); }
-function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); status(null); } }; }
-function status(text) { $('status').hidden = !text; if (text) $('statusText').textContent = text; }
+function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); statusDone(); } }; }
+let statusT = null, statusT0 = 0;
+function status(text) {
+  $('status').hidden = !text; clearInterval(statusT);
+  if (!text) return; $('statusText').textContent = text; if (!statusT0) statusT0 = Date.now();
+  const tick = () => { const s = Math.round((Date.now() - statusT0) / 1000); $('statusTime').textContent = s >= 3 ? s + ' s' : ''; }; tick(); statusT = setInterval(tick, 1000);
+}
+function statusDone() { status(null); statusT0 = 0; }
+// The first screen (nothing open, nothing asked yet) shows the request box over a sample part; after that, the bench.
+function setScreen() {
+  const empty = !ST.cur && !ST.draft.length && !ST.busy; document.body.classList.toggle('empty', empty); $('start').hidden = !empty;
+  if (!empty) endDemo(); else startDemo();
+  $('crumb').hidden = !ST.cur; if (ST.cur) $('crumb').textContent = ST.cur.name;
+  $('titleblock').hidden = !ST.cur || !ST.mesh; resize();
+}
 const friendly = e => e?.code === 'cancelled' ? 'Stopped.' : (e?.message && e.code ? e.message : 'Something went wrong. Try again.');
 
 /* ---------------- make, change, repair ---------------- */
@@ -338,7 +369,7 @@ async function send(text, pic) {
   text = String(text || '').trim(); if (ST.busy || (!text && !pic)) return; if (!text) text = 'Make this.';
   setBusy(true);
   const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
-  addMsg('you', text, pic ? { img: pic.small } : {});
+  addMsg('you', text, pic ? { img: pic.small } : {}); setScreen();
   const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
   try {
     // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
@@ -369,10 +400,14 @@ async function send(text, pic) {
 }
 
 /* ---------------- the sheet (right side) ---------------- */
-function showBuilt(r) { ST.mesh = r; setMesh(r); $('start').hidden = true; $('tools').hidden = false; fillFacts(); }
+function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); }
 function fillFacts() {
   const s = ST.mesh?.stats, m = ST.cur; if (!s || !m) return;
   const cell = (id, v) => { $(id).textContent = nice(v); $(id).append(el('small', { text: unitName() })); }; cell('sx', s.size[0]); cell('sy', s.size[1]); cell('sz', s.size[2]);
+  const offAxes = sizeOff(m.size, s.size);
+  for (const [i, a] of ['x', 'y', 'z'].entries()) { const e = $('a' + a), w = m.size?.[a]; e.textContent = w != null ? `asked ${nice(w)}${offAxes.includes(a) ? ', differs' : ', matches'}` : ''; e.className = 'asked' + (offAxes.includes(a) ? ' bad' : ''); }
+  $('tbName').textContent = m.name; $('tbSize').textContent = `${nice(s.size[0])} × ${nice(s.size[1])} × ${nice(s.size[2])}`; $('tbMass').textContent = `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g`;
+  $('tbDate').textContent = new Date(m.updated || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); $('crumb').textContent = m.name; $('titleblock').hidden = false;
   const f = $('facts'); f.textContent = '';
   const row = (k, v, cls) => f.append(el('dt', { text: k }), el('dd', { class: cls || '', text: v }));
   const want = m.size, asked = ['x', 'y', 'z'].filter(a => want?.[a] != null);
@@ -435,8 +470,8 @@ async function download(id) {
 /* ---------------- opening, switching, listing ---------------- */
 async function openModel(m) {
   ST.cur = m; ST.mesh = null; setMesh(null); renderChat(); $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false');
-  if (!m) { $('sheet').hidden = true; $('start').hidden = false; $('tools').hidden = true; $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
-  openSheet(); $('start').hidden = true; status('Building');
+  if (!m) { $('sheet').hidden = true; $('tools').hidden = true; setScreen(); $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
+  openSheet(); setScreen(); status('Building');
   try { showBuilt(await buildNow(m, ST.quality)); frame('iso'); if (!m.thumb) { m.thumb = thumb(); } save(); }
   catch (e) { addMsg('note', e.code === 'build' ? `This model no longer builds: ${e.message}` : friendly(e)); }
   status(null);
@@ -444,9 +479,10 @@ async function openModel(m) {
 function listModels() {
   const ul = $('mlist'); ul.textContent = ''; $('mEmpty').hidden = ST.models.length > 0;
   for (const m of ST.models) {
-    const open = el('button', { class: 'open', type: 'button', onclick: () => openModel(m) }, el('b', { text: m.name }), el('small', { text: new Date(m.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + (m.kind === 'sculpt' ? ' · sculpted' : m.source ? ' · opened file' : '') }));
+    const open = el('button', { class: 'open', type: 'button', 'aria-label': 'Open ' + m.name, onclick: () => openModel(m) }, m.thumb ? el('img', { src: m.thumb, alt: '' }) : el('span', { class: 'ph' }));
+    const when = new Date(m.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + (m.kind === 'sculpt' ? ', sculpted' : m.source ? ', from a file' : '');
     const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Delete ' + m.name, text: 'Delete', onclick: () => { if (del.dataset.sure) { ST.models = ST.models.filter(x => x !== m); idb.del(m.id); if (ST.cur === m) openModel(null); save(); listModels(); } else { del.dataset.sure = 1; del.textContent = 'Sure?'; } } });
-    ul.append(el('li', { class: m === ST.cur ? 'on' : '' }, m.thumb ? el('img', { src: m.thumb, alt: '' }) : el('span', { class: 'ph' }), open, del));
+    ul.append(el('li', { class: m === ST.cur ? 'on' : '' }, open, el('div', { class: 'meta' }, el('div', { style: 'min-width:0' }, el('b', { text: m.name }), el('small', { text: when })), del)));
   }
 }
 async function importFile(file) {
@@ -472,8 +508,9 @@ async function takePicture(file) {
   const draw2 = side => { const k = Math.min(1, side / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c; };
   ST.pic = { data: draw2(1568).toDataURL('image/jpeg', .88), small: draw2(220).toDataURL('image/jpeg', .7) };
   $('picThumb').src = ST.pic.small; $('picThumb').hidden = false; $('picClear').hidden = false; $('btnPic').textContent = 'Change picture';
+  $('heroThumb').src = ST.pic.small; $('heroThumb').hidden = false; $('heroPic').textContent = 'Change picture';
 }
-function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; }
+function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; $('heroThumb').hidden = true; $('heroPic').textContent = 'Add a picture or sketch'; }
 
 /* ---------------- start ---------------- */
 const STARTERS = [
@@ -486,9 +523,14 @@ const STARTERS = [
 async function boot() {
   try { ST.cfg = await (await fetch('/api/config')).json(); } catch { ST.cfg = {}; }
   initView();
-  for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('say').value = full; $('say').focus(); } }, short, el('span', { text: dims })))); }
+  for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('heroSay').value = full; $('heroSay').focus(); } }, short, el('span', { text: dims })))); }
   for (const f of FORMATS.filter(x => x.id !== 'stl')) $('formats').append(el('button', { type: 'button', text: f.label, title: f.note, onclick: () => download(f.id), onmouseenter: () => { $('fmtHint').textContent = f.note; }, onfocus: () => { $('fmtHint').textContent = f.note; } }));
   $('dlMain').addEventListener('click', () => download('stl'));
+  $('heroAsk').addEventListener('submit', e => { e.preventDefault(); const t = $('heroSay').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) { $('heroSay').focus(); return; } $('heroSay').value = ''; clearPicture(); send(t, p); });
+  $('heroSay').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('heroAsk').requestSubmit(); } });
+  $('heroPic').addEventListener('click', () => $('picFile').click());
+  const closeGallery = () => { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); };
+  $('galClose').addEventListener('click', closeGallery);
   $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) return; $('say').value = ''; clearPicture(); send(t, p); });
   $('say').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('ask').requestSubmit(); });
   $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files[0])); $('picClear').addEventListener('click', clearPicture);
@@ -506,11 +548,11 @@ async function boot() {
   $('mName').addEventListener('change', e => { if (!ST.cur) return; ST.cur.name = e.target.value.trim().slice(0, 60) || 'Model'; e.target.value = ST.cur.name; save(); });
   $('codeRun').addEventListener('click', () => { const m = ST.cur; if (!m || ST.busy) return; const t = $('code').value; if (t === m.code) return refreshBuild(); remember(m, snapshot(m)); m.code = t; m.size = { x: null, y: null, z: null }; m.updated = Date.now(); $('btnUndo').disabled = false; refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
   $('btnUndo').addEventListener('click', () => { const m = ST.cur, s = m?.history?.pop(); if (!s || ST.busy) return; restore(m, s); m.updated = Date.now(); openSheet(); addMsg('note', 'Went back to the version before the last change.'); refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
-  $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('say').focus(); });
+  $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('heroSay').focus(); });
   $('btnModels').addEventListener('click', () => { const d = $('drawer'); d.hidden = !d.hidden; $('btnModels').setAttribute('aria-expanded', !d.hidden); if (!d.hidden) listModels(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); $('btnModels').focus(); } });
   startWorker().catch(() => { });
-  const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last);
+  const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last); else setScreen();
 }
 globalThis.__forge = { ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
 boot();

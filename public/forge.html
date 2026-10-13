@@ -6,21 +6,21 @@
 <meta name="description" content="Describe a part and its sizes. Forge builds an exact 3D model you can print, and exports STL, 3MF, STEP, OBJ, GLB and more.">
 <meta name="theme-color" content="#F6F8F9">
 <title>Forge — describe a part, get a 3D model you can print</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%2312202B'/%3E%3Cpath d='M14 46 32 14l18 32z' fill='%23F26A1B'/%3E%3Cpath d='M10 52h44' stroke='%23E8ECEE' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2313212C'/%3E%3Cpath d='M32 12 50 22v20L32 52 14 42V22z' fill='none' stroke='%23F26A1B' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M14 22l18 10 18-10M32 32v20' fill='none' stroke='%23F26A1B' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
 <style>
   :root{
     color-scheme: light;
-    --paper:#E8ECEE; --film:#EEF1F3; --panel:#F6F8F9; --white:#FFFFFF;
-    --ink:#12202B; --ink2:#44535F; --ink3:#6B7A86;
-    --line:#B9C4CC; --line2:#D5DCE1;
-    --blue:#1F5FBF; --blue-soft:#E3ECF9;
-    --orange:#F26A1B; --orange-deep:#C9500B; --orange-soft:#FDEBDD;
+    --paper:#E9EDEF; --sheet:#F1F4F5; --panel:#F7F9FA; --white:#FFFFFF;
+    --ink:#13212C; --ink2:#43525E; --ink3:#6A7884;
+    --rule:#C3CCD2; --rule2:#DCE2E6; --frame:#7D8B96;
+    --blue:#1F5FBF; --blue-soft:#E2EBF8;
+    --orange:#F26A1B; --orange-deep:#C9500B;
     --body:'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --cond:'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
-    --top:52px;
+    --top:56px;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -29,149 +29,202 @@
   button{cursor:pointer}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
   [hidden]{display:none !important}
+  .num{font-family:var(--cond);font-variant-numeric:tabular-nums}
 
   /* ---- top bar ---- */
-  .top{height:var(--top);display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
-  .brand{display:flex;align-items:baseline;gap:8px;text-decoration:none;color:var(--ink)}
-  .brand b{font:700 22px/1 var(--cond);letter-spacing:.01em}
-  .brand span{font-size:13px;color:var(--ink3)}
-  .top nav{margin-left:auto;display:flex;align-items:center;gap:6px}
-  .quiet{white-space:nowrap;background:none;border:1px solid transparent;border-radius:3px;padding:6px 10px;color:var(--ink2);text-decoration:none;font-size:14px}
-  .quiet:hover{border-color:var(--line);color:var(--ink)}
+  .top{height:var(--top);display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--rule)}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+  .brand svg{width:26px;height:26px;flex:none}
+  .brand b{font:700 23px/1 var(--cond);letter-spacing:.005em}
+  .brand span{font-size:13px;color:var(--ink3);margin-top:3px}
+  .crumb{font:600 16px/1 var(--cond);color:var(--ink2);padding-left:14px;border-left:1px solid var(--rule);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw}
+  .top nav{margin-left:auto;display:flex;align-items:center;gap:4px}
+  .quiet{white-space:nowrap;background:none;border:1px solid transparent;border-radius:4px;padding:7px 11px;color:var(--ink2);text-decoration:none;font-size:14px}
+  .quiet:hover{border-color:var(--rule);color:var(--ink);background:var(--white)}
   .quiet[aria-pressed="true"]{border-color:var(--blue);color:var(--blue);background:var(--blue-soft)}
 
-  /* ---- the bench: talk | stage | sheet ---- */
-  .bench{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(280px,330px);height:calc(100% - var(--top))}
-  .bench:has(> .sheet[hidden]){grid-template-columns:minmax(280px,340px) minmax(0,1fr)}
+  /* ---- the bench ---- */
+  .bench{display:grid;grid-template-columns:minmax(290px,340px) minmax(0,1fr) minmax(290px,340px);height:calc(100% - var(--top))}
+  .bench:has(> .sheet[hidden]){grid-template-columns:minmax(290px,340px) minmax(0,1fr)}
+  body.empty .bench,body.empty .bench:has(> .sheet[hidden]){grid-template-columns:minmax(0,1fr)}
+  body.empty .talk{display:none}
   .talk,.sheet{background:var(--panel);display:flex;flex-direction:column;min-height:0}
-  .talk{border-right:1px solid var(--line)}
-  .sheet{border-left:1px solid var(--line);overflow-y:auto}
+  .talk{border-right:1px solid var(--rule)}
+  .sheet{border-left:1px solid var(--rule);overflow-y:auto}
 
   /* conversation */
-  .log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:14px}
   .msg{max-width:100%;overflow-wrap:anywhere}
-  .msg.you{align-self:flex-end;background:var(--white);border:1px solid var(--line);border-radius:3px;padding:8px 11px;max-width:92%}
-  .msg.you img{display:block;max-width:140px;max-height:120px;border:1px solid var(--line2);margin-top:6px}
-  .msg.forge{border-left:2px solid var(--blue);padding:1px 0 1px 11px}
-  .msg.forge .tip{display:block;margin-top:5px;color:var(--ink2);font-size:14px}
-  .msg.note{color:var(--ink2);font-size:14px;padding-left:13px;position:relative}
+  .msg.you{align-self:flex-end;background:var(--white);border:1px solid var(--rule);border-radius:6px 6px 2px 6px;padding:9px 12px;max-width:92%}
+  .msg.you img{display:block;max-width:150px;max-height:120px;border-radius:4px;margin-top:7px}
+  .msg.forge{border-left:2px solid var(--blue);padding:1px 0 1px 12px}
+  .msg.forge .tip{display:block;margin-top:6px;color:var(--ink2);font-size:14px}
+  .msg.note{color:var(--ink2);font-size:14px;padding-left:14px;position:relative}
   .msg.note::before{content:"";position:absolute;left:0;top:.5em;width:6px;height:6px;background:var(--orange)}
   .msg.wait{color:var(--ink2);font-size:14px;display:flex;align-items:center;gap:9px}
-  .msg.wait i{flex:none;width:28px;height:2px;background:linear-gradient(90deg,var(--blue) 40%,var(--line) 40%);background-size:200% 100%;animation:run 1.1s linear infinite}
+  .msg.wait i,.plot i{flex:none;width:28px;height:2px;background:linear-gradient(90deg,var(--blue) 40%,var(--rule) 40%);background-size:200% 100%;animation:run 1.1s linear infinite}
   @keyframes run{to{background-position:-200% 0}}
-  .ask{border-top:1px solid var(--line);padding:12px;display:grid;gap:8px}
-  .ask textarea{width:100%;min-height:76px;max-height:200px;resize:vertical;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:9px 10px;line-height:1.4}
-  .ask textarea::placeholder{color:var(--ink3)}
-  .ask .row{display:flex;gap:8px;align-items:center}
+  .ask{border-top:1px solid var(--rule);padding:12px;display:grid;gap:8px;background:var(--panel)}
+  .ask textarea{width:100%;min-height:78px;max-height:200px;resize:vertical;border:1px solid var(--rule);border-radius:6px;background:var(--white);padding:10px 11px;line-height:1.4}
+  .ask textarea::placeholder,.hero textarea::placeholder{color:var(--ink3)}
+  .row{display:flex;gap:8px;align-items:center}
   .attach{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
-  .attach img{width:34px;height:34px;object-fit:cover;border:1px solid var(--line)}
-  .go{background:var(--orange);color:#fff;border:0;border-radius:3px;padding:9px 18px;font:600 15px/1 var(--cond);letter-spacing:.02em}
+  .attach img{width:34px;height:34px;object-fit:cover;border-radius:4px;border:1px solid var(--rule)}
+  .go{background:var(--orange);color:#fff;border:0;border-radius:6px;padding:10px 18px;font:600 16px/1 var(--cond);letter-spacing:.02em}
   .go:hover{background:var(--orange-deep)}
-  .go:disabled{background:var(--line);color:var(--ink3);cursor:default}
-  .plain{background:var(--white);border:1px solid var(--line);border-radius:3px;padding:7px 11px;font-size:14px}
+  .go:disabled{background:var(--rule);color:var(--ink3);cursor:default}
+  .plain{background:var(--white);border:1px solid var(--rule);border-radius:6px;padding:8px 12px;font-size:14px}
   .plain:hover{border-color:var(--ink2)}
-  .plain:disabled{color:var(--ink3);cursor:default;border-color:var(--line2)}
+  .plain:disabled{color:var(--ink3);cursor:default;border-color:var(--rule2)}
 
-  /* stage */
-  .stage{position:relative;min-width:0;min-height:0;background:var(--film);overflow:hidden}
+  /* ---- the stage: a drawing sheet ---- */
+  .stage{position:relative;min-width:0;min-height:0;background:var(--sheet);overflow:hidden}
   #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  .frame{position:absolute;inset:14px;border:1.5px solid var(--frame);pointer-events:none}
+  .frame::after{content:"";position:absolute;inset:16px;border:1px solid var(--rule)}
+  .zones{position:absolute;display:flex;justify-content:space-around;font:500 11px/1 var(--cond);color:var(--frame);pointer-events:none}
+  .zones.h{left:30px;right:30px;top:16px;height:14px;align-items:center}
+  .zones.v{top:30px;bottom:30px;left:16px;width:14px;flex-direction:column;align-items:center}
   #dims{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-  .dim{position:absolute;left:0;top:0;white-space:nowrap;font:600 14px/1 var(--cond);color:var(--blue);background:var(--film);padding:2px 5px;border:1px solid var(--blue);border-radius:2px;font-variant-numeric:tabular-nums;will-change:transform}
+  .dim{position:absolute;left:0;top:0;white-space:nowrap;font:600 14px/1 var(--cond);color:var(--blue);background:var(--sheet);padding:2px 5px;border:1px solid var(--blue);border-radius:2px;font-variant-numeric:tabular-nums;will-change:transform}
   .dim small{font:500 11px/1 var(--cond);margin-left:2px}
   .dim.off{border-color:var(--orange);color:var(--orange-deep)}
-  .tools{position:absolute;left:12px;top:12px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 24px)}
-  .tools .quiet{background:var(--panel);border-color:var(--line);padding:5px 9px;font-size:13px}
-  .status{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:7px 14px;border-radius:3px;font-size:14px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 24px)}
-  .status i{flex:none;width:28px;height:2px;background:linear-gradient(90deg,var(--orange) 40%,rgba(255,255,255,.3) 40%);background-size:200% 100%;animation:run 1.1s linear infinite}
-  .start{position:absolute;inset:0;display:grid;place-items:center;padding:24px;overflow-y:auto;background:rgba(238,241,243,.9)}
-  .start-in{max-width:560px}
-  .start h1{font:700 clamp(30px,4.4vw,46px)/1.04 var(--cond);margin:0 0 12px;letter-spacing:-.005em}
-  .start p{margin:0 0 20px;color:var(--ink2);max-width:52ch}
-  .starters{display:grid;gap:8px;margin:0 0 18px;padding:0;list-style:none}
-  .starters button{width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline}
-  .starters button:hover{border-color:var(--blue)}
-  .starters button span{color:var(--blue);font:600 13px/1 var(--cond);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .drop{outline:2px dashed var(--blue);outline-offset:-10px}
+  .tools{position:absolute;left:44px;top:42px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 88px)}
+  .tools .quiet{background:var(--panel);border-color:var(--rule);padding:5px 9px;font-size:13px}
+  /* title block, as on a workshop drawing: what this sheet shows */
+  .titleblock{position:absolute;right:30px;bottom:30px;display:grid;grid-template-columns:auto auto auto;background:var(--panel);border:1.5px solid var(--frame);font-size:12px;pointer-events:none;max-width:calc(100% - 60px)}
+  .titleblock > div{padding:5px 9px 6px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);min-width:0}
+  .titleblock > div:nth-child(3n){border-right:0}
+  .titleblock > div:nth-last-child(-n+3){border-bottom:0}
+  .titleblock .wide{grid-column:1 / -1;border-right:0}
+  .titleblock span{display:block;color:var(--ink3);font-size:11px;line-height:1.2}
+  .titleblock b{display:block;font:600 15px/1.2 var(--cond);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .titleblock .wide b{font-size:18px;max-width:340px}
+  .plot{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:6px;font-size:14px;display:flex;gap:11px;align-items:center;max-width:calc(100% - 60px)}
+  .plot i{background:linear-gradient(90deg,var(--orange) 40%,rgba(255,255,255,.28) 40%);background-size:200% 100%}
+  .plot .num{color:rgba(255,255,255,.65)}
 
-  /* the sheet: laid out like the title block of a drawing */
-  .sheet h2{font:600 13px/1 var(--body);color:var(--ink3);margin:0;padding:14px 16px 8px}
-  .block{border-bottom:1px solid var(--line)}
-  .name{width:100%;border:0;border-bottom:1px solid var(--line);background:none;padding:14px 16px 12px;font:700 22px/1.1 var(--cond)}
+  /* first screen: a sample part on the sheet, and the request in front of it */
+  .start{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;padding:56px 64px;gap:40px;overflow-y:auto}
+  .hero{max-width:560px;justify-self:end;width:100%;position:relative}
+  .start::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(241,244,245,.94) 0%,rgba(241,244,245,.86) 42%,rgba(241,244,245,0) 62%);pointer-events:none}
+  .hero h1{font:700 clamp(32px,4vw,52px)/1.02 var(--cond);margin:0 0 14px;letter-spacing:-.01em}
+  .hero p{margin:0 0 22px;color:var(--ink2);max-width:50ch;font-size:16px}
+  .hero form{background:var(--white);border:1px solid var(--rule);border-radius:10px;padding:12px;box-shadow:0 1px 0 var(--rule2)}
+  .hero form:focus-within{border-color:var(--blue)}
+  .hero textarea{width:100%;min-height:96px;border:0;resize:none;padding:4px 4px 8px;line-height:1.45;font-size:16px;background:none}
+  .hero textarea:focus{outline:none}
+  .hero .row{border-top:1px solid var(--rule2);padding-top:10px}
+  .hero .go{padding:11px 22px;font-size:17px}
+  .starters{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  .starters button{background:var(--panel);border:1px solid var(--rule);border-radius:999px;padding:6px 12px;font-size:14px;display:flex;gap:8px;align-items:baseline}
+  .starters button:hover{border-color:var(--blue);background:var(--white)}
+  .starters button{text-align:left}
+  .starters button span{white-space:nowrap;color:var(--blue);font:600 13px/1 var(--cond);font-variant-numeric:tabular-nums}
+  .hero .alt{margin:18px 0 0;font-size:14px;color:var(--ink2)}
+  .hero .alt button{background:none;border:0;padding:0;color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+  .demo-note{justify-self:start;align-self:end;font-size:13px;color:var(--ink3);max-width:30ch;margin-bottom:60px}
+  .drop{outline:2px dashed var(--blue);outline-offset:-22px}
+
+  /* ---- the sheet panel: sizes, adjust, download ---- */
+  .sheet h2{font:600 13px/1 var(--body);color:var(--ink3);margin:0;padding:16px 16px 9px}
+  .block{border-bottom:1px solid var(--rule)}
+  .name{width:100%;border:0;border-bottom:1px solid var(--rule);background:none;padding:15px 16px 13px;font:700 22px/1.1 var(--cond)}
   .name:focus{outline:none;background:var(--white);box-shadow:inset 0 -2px 0 var(--blue)}
-  .cells{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
-  .cell{padding:10px 6px 11px 14px;border-right:1px solid var(--line2);min-width:0}
+  .cells{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule);margin:0}
+  .cell{padding:11px 6px 12px 14px;border-right:1px solid var(--rule2);min-width:0}
   .cell:first-child{padding-left:16px}
   .cell:last-child{border-right:0}
-  .cell dt{font-size:12px;color:var(--ink3);margin:0 0 3px}
+  .cell dt{font-size:12px;color:var(--ink3);margin:0 0 4px}
   .cell dd{margin:0;font:600 22px/1 var(--cond);font-variant-numeric:tabular-nums;white-space:nowrap}
   .cell dd small{font:500 11px/1 var(--cond);color:var(--ink3);margin-left:2px}
-  .facts{margin:0;padding:8px 16px 12px;display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px}
+  .cell .asked{display:block;margin-top:5px;font:500 12px/1.2 var(--cond);color:var(--blue);white-space:nowrap}
+  .cell .asked.bad{color:var(--orange-deep)}
+  .facts{margin:0;padding:10px 16px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
   .facts dt{color:var(--ink3)}
   .facts dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
   .ok{color:var(--blue)} .bad{color:var(--orange-deep)}
-  .params{padding:0 16px 14px;display:grid;gap:12px}
-  .param label{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:3px}
+  .params{padding:0 16px 16px;display:grid;gap:13px}
+  .param label{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;margin-bottom:4px}
   .param .v{display:flex;align-items:center;gap:4px}
-  .param input[type=number],.param input[type=text]{width:74px;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:3px 6px;text-align:right;font:600 14px/1.2 var(--cond);font-variant-numeric:tabular-nums}
+  .param input[type=number],.param input[type=text]{width:86px;border:1px solid var(--rule);border-radius:4px;background:var(--white);padding:4px 6px;text-align:right;font:600 14px/1.2 var(--cond);font-variant-numeric:tabular-nums}
   .param input[type=text]{width:100%;text-align:left}
   .param small{color:var(--ink3);font-size:12px;min-width:18px}
   .param input[type=range]{width:100%;accent-color:var(--blue);margin:0}
   .export{padding:0 16px 14px;display:grid;gap:8px}
-  .export .go{width:100%;padding:11px 14px;font-size:16px}
+  .export .go{width:100%;padding:12px 14px;font-size:17px}
   .formats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-  .formats button{background:var(--white);border:1px solid var(--line);border-radius:3px;padding:7px 4px;font:600 14px/1 var(--cond)}
+  .formats button{background:var(--white);border:1px solid var(--rule);border-radius:4px;padding:8px 4px;font:600 14px/1 var(--cond)}
   .formats button:hover{border-color:var(--blue);color:var(--blue)}
   .hint{font-size:13px;color:var(--ink3);margin:0;min-height:2.6em}
   .row2{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:0 16px 12px;font-size:14px}
-  .row2 select{border:1px solid var(--line);border-radius:3px;background:var(--white);padding:4px 6px;max-width:60%}
-  details.code{padding:0 16px 16px}
-  details.code summary{cursor:pointer;font-size:14px;color:var(--ink2);padding:12px 0 8px}
-  details.code textarea{width:100%;height:240px;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:8px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;tab-size:2;resize:vertical}
-  details.code .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .row2 select{border:1px solid var(--rule);border-radius:4px;background:var(--white);padding:5px 6px;max-width:60%}
+  details.code{padding:0 16px 18px}
+  details.code summary{cursor:pointer;font-size:14px;color:var(--ink2);padding:13px 0 8px}
+  details.code textarea{width:100%;height:240px;border:1px solid var(--rule);border-radius:4px;background:var(--white);padding:8px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;tab-size:2;resize:vertical}
+  details.code .row{margin-top:8px}
   .codeerr{color:var(--orange-deep);font-size:13px;margin:6px 0 0}
 
-  /* my models */
-  .drawer{position:fixed;top:var(--top);right:0;bottom:0;width:min(360px,100%);background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:12px 16px 20px;z-index:5}
-  .drawer h2{font:700 20px/1 var(--cond);margin:6px 0 12px}
-  .mlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-  .mlist li{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:3px;background:var(--white);padding:6px}
-  .mlist li.on{border-color:var(--blue)}
-  .mlist img,.mlist .ph{width:64px;height:48px;object-fit:cover;background:var(--film);display:block}
-  .mlist button.open{background:none;border:0;text-align:left;padding:0;min-width:0}
-  .mlist b{display:block;font:600 16px/1.15 var(--cond);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ---- my models: a gallery over the bench ---- */
+  .gallery{position:fixed;top:var(--top);left:0;right:0;bottom:0;background:rgba(233,237,239,.97);overflow-y:auto;padding:28px 32px 40px;z-index:5}
+  .gallery header{display:flex;align-items:baseline;gap:16px;max-width:1180px;margin:0 auto 18px}
+  .gallery h2{font:700 30px/1 var(--cond);margin:0}
+  .gallery header p{margin:0;color:var(--ink3);font-size:14px}
+  .gallery header .quiet{margin-left:auto}
+  .mlist{list-style:none;margin:0 auto;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;max-width:1180px}
+  .mlist li{background:var(--white);border:1px solid var(--rule);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+  .mlist li.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+  .mlist button.open{background:none;border:0;padding:0;text-align:left;display:block}
+  .mlist img,.mlist .ph{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--sheet);display:block;border-bottom:1px solid var(--rule2)}
+  .mlist .meta{display:flex;align-items:center;gap:8px;padding:10px 12px}
+  .mlist b{display:block;font:600 17px/1.15 var(--cond);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mlist small{color:var(--ink3);font-size:12px}
-  .mlist .del{background:none;border:0;color:var(--ink3);padding:6px;font-size:13px}
+  .mlist .del{margin-left:auto;background:none;border:0;color:var(--ink3);padding:4px;font-size:13px}
   .mlist .del:hover{color:var(--orange-deep)}
 
-  /* small screens: the model on top, then the conversation, then the sheet */
-  @media (max-width: 980px){
-    html,body{height:auto}
-    .bench,.bench:has(> .sheet[hidden]){display:flex;flex-direction:column;height:auto}
-    .stage{order:-1;height:46vh;min-height:300px;position:sticky;top:0;z-index:2;border-bottom:1px solid var(--line)}
-    .bench:has(> .sheet[hidden]) .stage{height:auto;min-height:0;position:static}
-    .bench:has(> .sheet[hidden]) .start{position:static}
-    .bench:has(> .sheet[hidden]) #view{display:none}
-    .brand span{display:none}
-    .top{gap:8px;padding:0 10px}
-    .talk{border-right:0;border-bottom:1px solid var(--line)}
-    .log{max-height:none;overflow:visible}
-    .sheet{border-left:0;overflow:visible}
-    .start h1{font-size:28px}
-    .top nav .hide-s{display:none}
+  /* ---- small screens: the sheet on top, then the conversation, then the details ---- */
+  @media (max-width: 1000px){
+    .start{grid-template-columns:1fr;padding:40px 28px;align-content:start}
+    .hero{justify-self:start}
+    .demo-note{display:none}
   }
-  @media (prefers-reduced-motion: reduce){ .msg.wait i,.status i{animation:none} }
+  @media (max-width: 900px){
+    html,body{height:auto}
+    .bench,.bench:has(> .sheet[hidden]),body.empty .bench{display:flex;flex-direction:column;height:auto}
+    .stage{order:-1;height:48vh;min-height:300px;position:sticky;top:0;z-index:2;border-bottom:1px solid var(--rule)}
+    body.empty .stage{height:auto;min-height:calc(100vh - var(--top));position:relative}
+    body.empty #view,body.empty #dims{display:none}
+    body.empty .start{position:relative}
+    .talk{border-right:0;border-bottom:1px solid var(--rule)}
+    .log{overflow:visible}
+    .sheet{border-left:0;overflow:visible}
+    .brand span,.crumb,.zones,.top nav .hide-s{display:none}
+    .top{gap:6px;padding:0 10px}
+    .top nav .quiet{padding:6px 7px;font-size:13px}
+    .start::before{background:rgba(241,244,245,.9)}
+    html,body{overflow-x:hidden}
+    .titleblock{display:none}
+    .frame{inset:8px}
+    .tools{left:18px;top:18px}
+    .gallery{padding:20px 16px}
+  }
+  @media (prefers-reduced-motion: reduce){ .msg.wait i,.plot i{animation:none} }
 </style>
 </head>
 <body>
 
 
 <header class="top">
-  <a class="brand" href="/forge"><b>Forge</b><span>by Mirage</span></a>
+  <a class="brand" href="/forge" aria-label="Forge home">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 54 20v24L32 56 10 44V20z" fill="none" stroke="#F26A1B" stroke-width="4.5" stroke-linejoin="round"/><path d="M10 20l22 12 22-12M32 32v24" fill="none" stroke="#13212C" stroke-width="4.5" stroke-linejoin="round"/></svg>
+    <b>Forge</b><span>by Mirage</span>
+  </a>
+  <div class="crumb" id="crumb" hidden></div>
   <nav>
     <button class="quiet" id="btnNew" type="button">New model</button>
     <button class="quiet" id="btnOpen" type="button">Open STL</button>
     <button class="quiet" id="btnModels" type="button" aria-expanded="false">My models</button>
-    <a class="quiet hide-s" href="/">Mirage home</a>
+    <a class="quiet hide-s" href="/">Mirage</a>
   </nav>
 </header>
 
@@ -179,15 +232,15 @@
   <section class="talk" aria-label="Conversation">
     <div class="log" id="log" aria-live="polite"></div>
     <form class="ask" id="ask">
-      <label for="say" hidden>Describe the object</label>
-      <textarea id="say" placeholder="Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes." rows="3"></textarea>
+      <label for="say" hidden>Say what to change</label>
+      <textarea id="say" placeholder="Say what to change. For example: make it 10 mm taller, add a second hole, split it in two." rows="3"></textarea>
       <div class="row">
         <div class="attach">
           <button class="plain" id="btnPic" type="button">Add a picture</button>
           <img id="picThumb" alt="" hidden>
           <button class="quiet" id="picClear" type="button" hidden>Remove</button>
         </div>
-        <button class="go" id="btnGo" type="submit">Make it</button>
+        <button class="go" id="btnGo" type="submit">Change it</button>
       </div>
       <input type="file" id="picFile" accept="image/jpeg,image/png,image/webp" hidden>
     </form>
@@ -195,6 +248,9 @@
 
   <section class="stage" id="stage" aria-label="3D view">
     <canvas id="view"></canvas>
+    <div class="frame" aria-hidden="true"></div>
+    <div class="zones h" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+    <div class="zones v" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span></div>
     <div id="dims" aria-hidden="true"></div>
     <div class="tools" id="tools" hidden>
       <button class="quiet" type="button" data-view="iso">Corner</button>
@@ -205,24 +261,42 @@
       <button class="quiet" type="button" id="tgEdges" aria-pressed="true">Edges</button>
       <button class="quiet" type="button" id="tgUnit">mm</button>
     </div>
+    <div class="titleblock" id="titleblock" hidden aria-label="Drawing details">
+      <div class="wide"><span>Part</span><b id="tbName">–</b></div>
+      <div><span>Size, mm</span><b id="tbSize">–</b></div>
+      <div><span>In PLA</span><b id="tbMass">–</b></div>
+      <div><span>Drawn</span><b id="tbDate">–</b></div>
+    </div>
     <div class="start" id="start">
-      <div class="start-in">
-        <h1>Say what you need. Get a part that measures what you said.</h1>
-        <p>Forge writes the geometry for you, checks every size against your numbers, and gives you a closed solid ready for a 3D printer, in STL and nine other formats.</p>
+      <div class="hero">
+        <h1>Describe a part. Get one that measures exactly what you said.</h1>
+        <p>Forge designs it, measures every size against your numbers, and hands you a closed solid ready to print, as STL or nine other formats.</p>
+        <form id="heroAsk">
+          <label for="heroSay" hidden>Describe the object</label>
+          <textarea id="heroSay" placeholder="A bracket 60 mm wide with two 5 mm holes, 4 mm thick…" rows="3"></textarea>
+          <div class="row">
+            <div class="attach">
+              <button class="plain" id="heroPic" type="button">Add a picture or sketch</button>
+              <img id="heroThumb" alt="" hidden>
+            </div>
+            <button class="go" id="heroGo" type="submit">Make it</button>
+          </div>
+        </form>
         <ul class="starters" id="starters"></ul>
-        <button class="plain" id="btnImport" type="button">Open a mesh you already have (STL, OBJ or GLB)</button>
+        <p class="alt">Already have a model? <button type="button" id="btnImport">Open an STL, OBJ or GLB</button> to resize, convert or change it.</p>
         <input type="file" id="meshFile" accept=".stl,.obj,.glb,model/stl,model/obj,model/gltf-binary" hidden>
       </div>
+      <p class="demo-note" id="demoNote" hidden>The part behind is built live in your browser: an M10 bolt and nut, threads included, measured to the hundredth of a millimetre.</p>
     </div>
-    <div class="status" id="status" hidden><i></i><span id="statusText"></span></div>
+    <div class="plot" id="status" hidden><i></i><span id="statusText"></span><span class="num" id="statusTime"></span></div>
   </section>
 
   <aside class="sheet" id="sheet" aria-label="Sizes, settings and download" hidden>
     <input class="name" id="mName" aria-label="Model name" maxlength="60">
     <dl class="cells">
-      <div class="cell"><dt>Width (X)</dt><dd id="sx">–</dd></div>
-      <div class="cell"><dt>Depth (Y)</dt><dd id="sy">–</dd></div>
-      <div class="cell"><dt>Height (Z)</dt><dd id="sz">–</dd></div>
+      <div class="cell"><dt>Width (X)</dt><dd id="sx">–</dd><span class="asked" id="ax"></span></div>
+      <div class="cell"><dt>Depth (Y)</dt><dd id="sy">–</dd><span class="asked" id="ay"></span></div>
+      <div class="cell"><dt>Height (Z)</dt><dd id="sz">–</dd><span class="asked" id="az"></span></div>
     </dl>
     <div class="block">
       <dl class="facts" id="facts"></dl>
@@ -252,10 +326,10 @@
   </aside>
 </main>
 
-<div class="drawer" id="drawer" hidden>
-  <h2>My models</h2>
+<div class="gallery" id="drawer" hidden role="dialog" aria-label="My models">
+  <header><h2>My models</h2><p>Kept in this browser.</p><button class="quiet" id="galClose" type="button">Close</button></header>
   <ul class="mlist" id="mlist"></ul>
-  <p class="hint" id="mEmpty" hidden>Models you make are kept in this browser. Nothing here yet.</p>
+  <p class="hint" id="mEmpty" hidden style="max-width:1180px;margin:0 auto">Nothing here yet. Models you make or open appear here.</p>
 </div>
 
 <script type="importmap">
@@ -710,7 +784,7 @@ function initView() {
   V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
   new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
 }
-function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); draw(); }
+function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); if (DM.on && ST.mesh === DM.r) offsetView(true); draw(); }
 function lines(pts, mat) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); return new THREE.LineSegments(g, mat); }
 function drawBed() {
   for (const c of [...V.bed.children]) { c.geometry.dispose(); V.bed.remove(c); }
@@ -763,6 +837,24 @@ function viewShots() {
   } catch { } finally { ST.dims = dims; drawDims(); V.cam.position.copy(keep.p); V.ctl.target.copy(keep.t); V.ctl.update(); draw(); }
   return out;
 }
+// The first screen's sample part: an M10 bolt and nut, built here in the browser like any model, slowly turning, sizes drawn.
+const DEMO = {"code": "const R = p.flats / Math.sqrt(3);\nconst pts = [];\nfor (let i = 0; i < 6; i++) {\n  const a = i * Math.PI / 3;\n  pts.push([R * Math.cos(a), R * Math.sin(a)]);\n}\nconst hex = polygon(pts);\nconst off = R + 3;\nconst headPart = extrude(hex, p.head);\nconst shank = thread(p.dia, p.pitch, p.length + 0.5).moveZ(p.head - 0.5);\nconst bolt = union(headPart, shank).moveX(-off);\nconst nutBody = extrude(hex, p.nutH);\nconst nutHole = thread(p.dia + p.fit, p.pitch, p.nutH + 2).moveZ(-1);\nconst nutPart = cut(nutBody, nutHole).moveX(off);\nreturn union(bolt, nutPart);", "params": [{"key": "length", "value": 30}, {"key": "dia", "value": 10}, {"key": "pitch", "value": 1.5}, {"key": "flats", "value": 16}, {"key": "head", "value": 6.4}, {"key": "nutH", "value": 8}, {"key": "fit", "value": 0.4}]};
+const DM = { on: false, raf: 0, r: null };
+async function startDemo() {
+  if (DM.on || matchMedia('(max-width: 900px)').matches) return; DM.on = true;
+  try { DM.r ||= await work({ type: 'build', code: DEMO.code, params: Object.fromEntries(DEMO.params.map(p => [p.key, p.value])), quality: 'normal' }); } catch { DM.on = false; return; }
+  if (!DM.on || ST.cur) return;
+  ST.mesh = DM.r; setMesh(DM.r); $('demoNote').hidden = false; offsetView(true); frame('iso');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  V.ctl.autoRotate = true; V.ctl.autoRotateSpeed = .55;
+  const step = () => { if (!DM.on) return; V.ctl.update(); draw(); DM.raf = requestAnimationFrame(step); }; DM.raf = requestAnimationFrame(step);
+}
+function endDemo() {
+  if (!DM.on) return; DM.on = false; cancelAnimationFrame(DM.raf); V.ctl.autoRotate = false; $('demoNote').hidden = true; offsetView(false);
+  if (ST.mesh === DM.r) { ST.mesh = null; setMesh(null); }
+}
+// on the first screen the part sits in the right half of the sheet, beside the request box
+function offsetView(on) { const c = $('view'), w = c.clientWidth, h = c.clientHeight; if (on && w > 900) V.cam.setViewOffset(w, h, -w * .24, 0, w, h); else V.cam.clearViewOffset(); V.cam.updateProjectionMatrix(); draw(); }
 function thumb() {
   try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
 }
@@ -853,8 +945,21 @@ function showMsg(c) {
 }
 function addMsg(who, text, extra = {}) { const c = { who, text, ...extra }; (ST.cur ? (ST.cur.chat ||= []) : ST.draft).push(c); if (ST.cur?.chat.length > 60) ST.cur.chat.splice(0, ST.cur.chat.length - 60); return showMsg(c); }
 function renderChat() { $('log').textContent = ''; for (const c of ST.cur?.chat || ST.draft) showMsg(c); }
-function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); status(null); } }; }
-function status(text) { $('status').hidden = !text; if (text) $('statusText').textContent = text; }
+function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); statusDone(); } }; }
+let statusT = null, statusT0 = 0;
+function status(text) {
+  $('status').hidden = !text; clearInterval(statusT);
+  if (!text) return; $('statusText').textContent = text; if (!statusT0) statusT0 = Date.now();
+  const tick = () => { const s = Math.round((Date.now() - statusT0) / 1000); $('statusTime').textContent = s >= 3 ? s + ' s' : ''; }; tick(); statusT = setInterval(tick, 1000);
+}
+function statusDone() { status(null); statusT0 = 0; }
+// The first screen (nothing open, nothing asked yet) shows the request box over a sample part; after that, the bench.
+function setScreen() {
+  const empty = !ST.cur && !ST.draft.length && !ST.busy; document.body.classList.toggle('empty', empty); $('start').hidden = !empty;
+  if (!empty) endDemo(); else startDemo();
+  $('crumb').hidden = !ST.cur; if (ST.cur) $('crumb').textContent = ST.cur.name;
+  $('titleblock').hidden = !ST.cur || !ST.mesh; resize();
+}
 const friendly = e => e?.code === 'cancelled' ? 'Stopped.' : (e?.message && e.code ? e.message : 'Something went wrong. Try again.');
 
 /* ---------------- make, change, repair ---------------- */
@@ -905,7 +1010,7 @@ async function send(text, pic) {
   text = String(text || '').trim(); if (ST.busy || (!text && !pic)) return; if (!text) text = 'Make this.';
   setBusy(true);
   const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
-  addMsg('you', text, pic ? { img: pic.small } : {});
+  addMsg('you', text, pic ? { img: pic.small } : {}); setScreen();
   const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
   try {
     // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
@@ -936,10 +1041,14 @@ async function send(text, pic) {
 }
 
 /* ---------------- the sheet (right side) ---------------- */
-function showBuilt(r) { ST.mesh = r; setMesh(r); $('start').hidden = true; $('tools').hidden = false; fillFacts(); }
+function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); }
 function fillFacts() {
   const s = ST.mesh?.stats, m = ST.cur; if (!s || !m) return;
   const cell = (id, v) => { $(id).textContent = nice(v); $(id).append(el('small', { text: unitName() })); }; cell('sx', s.size[0]); cell('sy', s.size[1]); cell('sz', s.size[2]);
+  const offAxes = sizeOff(m.size, s.size);
+  for (const [i, a] of ['x', 'y', 'z'].entries()) { const e = $('a' + a), w = m.size?.[a]; e.textContent = w != null ? `asked ${nice(w)}${offAxes.includes(a) ? ', differs' : ', matches'}` : ''; e.className = 'asked' + (offAxes.includes(a) ? ' bad' : ''); }
+  $('tbName').textContent = m.name; $('tbSize').textContent = `${nice(s.size[0])} × ${nice(s.size[1])} × ${nice(s.size[2])}`; $('tbMass').textContent = `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g`;
+  $('tbDate').textContent = new Date(m.updated || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); $('crumb').textContent = m.name; $('titleblock').hidden = false;
   const f = $('facts'); f.textContent = '';
   const row = (k, v, cls) => f.append(el('dt', { text: k }), el('dd', { class: cls || '', text: v }));
   const want = m.size, asked = ['x', 'y', 'z'].filter(a => want?.[a] != null);
@@ -1002,8 +1111,8 @@ async function download(id) {
 /* ---------------- opening, switching, listing ---------------- */
 async function openModel(m) {
   ST.cur = m; ST.mesh = null; setMesh(null); renderChat(); $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false');
-  if (!m) { $('sheet').hidden = true; $('start').hidden = false; $('tools').hidden = true; $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
-  openSheet(); $('start').hidden = true; status('Building');
+  if (!m) { $('sheet').hidden = true; $('tools').hidden = true; setScreen(); $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
+  openSheet(); setScreen(); status('Building');
   try { showBuilt(await buildNow(m, ST.quality)); frame('iso'); if (!m.thumb) { m.thumb = thumb(); } save(); }
   catch (e) { addMsg('note', e.code === 'build' ? `This model no longer builds: ${e.message}` : friendly(e)); }
   status(null);
@@ -1011,9 +1120,10 @@ async function openModel(m) {
 function listModels() {
   const ul = $('mlist'); ul.textContent = ''; $('mEmpty').hidden = ST.models.length > 0;
   for (const m of ST.models) {
-    const open = el('button', { class: 'open', type: 'button', onclick: () => openModel(m) }, el('b', { text: m.name }), el('small', { text: new Date(m.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + (m.kind === 'sculpt' ? ' · sculpted' : m.source ? ' · opened file' : '') }));
+    const open = el('button', { class: 'open', type: 'button', 'aria-label': 'Open ' + m.name, onclick: () => openModel(m) }, m.thumb ? el('img', { src: m.thumb, alt: '' }) : el('span', { class: 'ph' }));
+    const when = new Date(m.updated).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + (m.kind === 'sculpt' ? ', sculpted' : m.source ? ', from a file' : '');
     const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Delete ' + m.name, text: 'Delete', onclick: () => { if (del.dataset.sure) { ST.models = ST.models.filter(x => x !== m); idb.del(m.id); if (ST.cur === m) openModel(null); save(); listModels(); } else { del.dataset.sure = 1; del.textContent = 'Sure?'; } } });
-    ul.append(el('li', { class: m === ST.cur ? 'on' : '' }, m.thumb ? el('img', { src: m.thumb, alt: '' }) : el('span', { class: 'ph' }), open, del));
+    ul.append(el('li', { class: m === ST.cur ? 'on' : '' }, open, el('div', { class: 'meta' }, el('div', { style: 'min-width:0' }, el('b', { text: m.name }), el('small', { text: when })), del)));
   }
 }
 async function importFile(file) {
@@ -1039,8 +1149,9 @@ async function takePicture(file) {
   const draw2 = side => { const k = Math.min(1, side / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c; };
   ST.pic = { data: draw2(1568).toDataURL('image/jpeg', .88), small: draw2(220).toDataURL('image/jpeg', .7) };
   $('picThumb').src = ST.pic.small; $('picThumb').hidden = false; $('picClear').hidden = false; $('btnPic').textContent = 'Change picture';
+  $('heroThumb').src = ST.pic.small; $('heroThumb').hidden = false; $('heroPic').textContent = 'Change picture';
 }
-function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; }
+function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; $('heroThumb').hidden = true; $('heroPic').textContent = 'Add a picture or sketch'; }
 
 /* ---------------- start ---------------- */
 const STARTERS = [
@@ -1053,9 +1164,14 @@ const STARTERS = [
 async function boot() {
   try { ST.cfg = await (await fetch('/api/config')).json(); } catch { ST.cfg = {}; }
   initView();
-  for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('say').value = full; $('say').focus(); } }, short, el('span', { text: dims })))); }
+  for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('heroSay').value = full; $('heroSay').focus(); } }, short, el('span', { text: dims })))); }
   for (const f of FORMATS.filter(x => x.id !== 'stl')) $('formats').append(el('button', { type: 'button', text: f.label, title: f.note, onclick: () => download(f.id), onmouseenter: () => { $('fmtHint').textContent = f.note; }, onfocus: () => { $('fmtHint').textContent = f.note; } }));
   $('dlMain').addEventListener('click', () => download('stl'));
+  $('heroAsk').addEventListener('submit', e => { e.preventDefault(); const t = $('heroSay').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) { $('heroSay').focus(); return; } $('heroSay').value = ''; clearPicture(); send(t, p); });
+  $('heroSay').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('heroAsk').requestSubmit(); } });
+  $('heroPic').addEventListener('click', () => $('picFile').click());
+  const closeGallery = () => { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); };
+  $('galClose').addEventListener('click', closeGallery);
   $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) return; $('say').value = ''; clearPicture(); send(t, p); });
   $('say').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('ask').requestSubmit(); });
   $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files[0])); $('picClear').addEventListener('click', clearPicture);
@@ -1073,11 +1189,11 @@ async function boot() {
   $('mName').addEventListener('change', e => { if (!ST.cur) return; ST.cur.name = e.target.value.trim().slice(0, 60) || 'Model'; e.target.value = ST.cur.name; save(); });
   $('codeRun').addEventListener('click', () => { const m = ST.cur; if (!m || ST.busy) return; const t = $('code').value; if (t === m.code) return refreshBuild(); remember(m, snapshot(m)); m.code = t; m.size = { x: null, y: null, z: null }; m.updated = Date.now(); $('btnUndo').disabled = false; refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
   $('btnUndo').addEventListener('click', () => { const m = ST.cur, s = m?.history?.pop(); if (!s || ST.busy) return; restore(m, s); m.updated = Date.now(); openSheet(); addMsg('note', 'Went back to the version before the last change.'); refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
-  $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('say').focus(); });
+  $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('heroSay').focus(); });
   $('btnModels').addEventListener('click', () => { const d = $('drawer'); d.hidden = !d.hidden; $('btnModels').setAttribute('aria-expanded', !d.hidden); if (!d.hidden) listModels(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); $('btnModels').focus(); } });
   startWorker().catch(() => { });
-  const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last);
+  const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last); else setScreen();
 }
 globalThis.__forge = { ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
 boot();
