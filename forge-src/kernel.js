@@ -222,6 +222,41 @@ class Diff3 extends Solid {
   d(x, y, z) { const r = this.a.d(x, y, z), k = this.k, b = this.b, bd = bb3dist(b.bb, x, y, z); if (bd > k && -bd <= r - k) return r; if (k === 0 && b.dMin && b.k === 0) { const u = b.dMin(x, y, z, -r); return u < -r ? -u : r; } const v = -b.d(x, y, z); return k > 0 ? smax(r, v, k) : (r > v ? r : v); }
 }
 
+// A solid with a colour. Moving, turning, sizing, hollowing or cutting it keeps the colour; joined with other solids, each keeps its own,
+// and the model is made as one body per colour (what a multi-colour printer needs: a filament per body).
+class Colored extends Solid { constructor(k, col) { super(); this.k = k; this.col = col; this.bb = k.bb; this.L = k.L; } d(x, y, z) { return this.k.d(x, y, z); } }
+for (const m of ['move', 'moveX', 'moveY', 'moveZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotateAbout', 'scale', 'mirror', 'grow', 'shrink', 'round', 'shell', 'clip', 'center', 'onBed', 'fit']) Colored.prototype[m] = function (...a) { return new Colored(this.k[m](...a), this.col); };
+// A group of coloured bodies moved, sized, clipped or hollowed as one: the same change is made to each body, so each keeps its colour.
+const hasColor = q => q instanceof Colored || (q instanceof Union3 && !q.k && q.ks.some(hasColor));
+const eachBody = (c, f) => c instanceof Colored ? new Colored(f(c.k), c.col) : (c instanceof Union3 && !c.k && hasColor(c)) ? new Union3(c.ks.map(x => eachBody(x, f)), 0) : f(c);
+for (const m of ['move', 'moveX', 'moveY', 'moveZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotateAbout', 'scale', 'mirror', 'grow', 'shrink', 'round', 'shell', 'clip', 'center', 'onBed', 'fit']) {
+  const orig = Solid.prototype[m];
+  Solid.prototype[m] = function (...a) {
+    if (!(this instanceof Union3) || this.k || !hasColor(this)) return orig.apply(this, a);
+    const r = orig.apply(this, a);   // the change as worked out for the whole group (center, onBed and fit depend on the group's size)
+    if (r instanceof Xf3 && r.k === this) return eachBody(this, q => new Xf3(q, r.m, r.t, r.s));
+    if (r instanceof Scale3 && r.k === this) return eachBody(this, q => new Scale3(q, r.sx, r.sy, r.sz));
+    if (r === this) return this;
+    return eachBody(this, q => q[m](...a));
+  };
+}
+const HEX = /^#[0-9a-f]{6}$/i;
+const NAMED = { black: '#1b1b1b', white: '#f2f2f0', orange: '#f26a1b', red: '#c8312b', blue: '#1f5fbf', green: '#2f7d4a', yellow: '#f2c230', grey: '#8a8f94', gray: '#8a8f94', gold: '#c9a227', silver: '#c4c8cc', brown: '#7a4b2a', pink: '#e98aa8', purple: '#6c3fa0', teal: '#1f8a8a' };
+function color(solid, c) {
+  if (!(solid instanceof Solid)) throw new Error('color needs a solid: color(solid, "#rrggbb")');
+  const hex = HEX.test(String(c)) ? String(c).toLowerCase() : NAMED[String(c).toLowerCase()];
+  if (!hex) throw new Error(`color(…, "${c}"): give a colour as "#rrggbb" or a plain name (black, white, orange, red, blue, green, yellow, grey, gold, silver, brown, pink, purple, teal)`);
+  return new Colored(solid instanceof Colored ? solid.k : solid, hex);
+}
+// the bodies a model is made of: [{ col, solid }], one per colour (col null when the model has no colours)
+function colorParts(s) {
+  const out = [], walk = q => { if (q instanceof Colored) out.push({ col: q.col, solid: q.k }); else if (q instanceof Union3 && !q.k) q.ks.forEach(walk); else out.push({ col: null, solid: q }); };
+  walk(s);
+  if (!out.some(p => p.col)) return [{ col: null, solid: s }];
+  const by = new Map(); for (const p of out) { const k = p.col || '#d8d4cc'; if (!by.has(k)) by.set(k, []); by.get(k).push(p.solid); }
+  return [...by].map(([col, list]) => ({ col, solid: list.length === 1 ? list[0] : new Union3(groupFar(list), 0) }));
+}
+
 /* ---------------- the modelling vocabulary (what a model's code may call) ---------------- */
 const flat = a => a.flat(Infinity).filter(Boolean);
 function takeOpts(args) { const o = args.length && isOpts(args[args.length - 1]) ? args.pop() : {}; return o; }
@@ -229,8 +264,8 @@ const kOf = o => Math.max(0, num(o.fillet ?? o.blend ?? o.smooth, 0));
 const dimOf = list => { const d = list[0] instanceof Shape ? 2 : 3; for (const q of list) { if (!(q instanceof Shape) && !(q instanceof Solid)) throw new Error('union/cut/intersect take shapes or solids, got ' + (q === undefined ? 'undefined' : typeof q)); if ((q instanceof Shape ? 2 : 3) !== d) throw new Error('Cannot combine a flat shape with a solid: extrude the shape first'); } return d; };
 function union(...args) { const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('union needs at least one solid'); if (ks.length === 1) return ks[0]; const k = kOf(o); if (dimOf(ks) === 2) return new Union2(ks, k); if (!k) return new Union3(groupFar(ks), 0);
   const b = bbUnion(ks.map(q => q.bb)); return new Inter3([new Union3(ks, k), new Slab3(b)], 0); }   // a blended join would bulge where two faces are flush (both resting on the bed): the box that holds the parts trims that off
-function cut(a, ...rest) { const o = takeOpts(rest), tools = flat(rest); if (!(a instanceof Solid) && !(a instanceof Shape)) throw new Error('cut needs a solid to cut from'); if (!tools.length) return a; const k = kOf(o), d = dimOf([a, ...tools]), tool = tools.length === 1 ? tools[0] : (d === 2 ? new Union2(tools, 0) : new Union3(groupFar(tools), 0)); return d === 2 ? new Diff2(a, tool, k) : new Diff3(a, tool, k); }
-function intersect(...args) { const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('intersect needs at least one solid'); if (ks.length === 1) return ks[0]; return dimOf(ks) === 2 ? new Inter2(ks, kOf(o)) : new Inter3(ks, kOf(o)); }
+function cut(a, ...rest) { if (a instanceof Colored) return new Colored(cut(a.k, ...rest), a.col); if (a instanceof Union3 && !a.k && hasColor(a)) return eachBody(a, q => cut(q, ...rest)); const o = takeOpts(rest), tools = flat(rest); if (!(a instanceof Solid) && !(a instanceof Shape)) throw new Error('cut needs a solid to cut from'); if (!tools.length) return a; const k = kOf(o), d = dimOf([a, ...tools]), tool = tools.length === 1 ? tools[0] : (d === 2 ? new Union2(tools, 0) : new Union3(groupFar(tools), 0)); return d === 2 ? new Diff2(a, tool, k) : new Diff3(a, tool, k); }
+function intersect(...args) { if (args[0] instanceof Colored) return new Colored(intersect(args[0].k, ...args.slice(1)), args[0].col); const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('intersect needs at least one solid'); if (ks.length === 1) return ks[0]; return dimOf(ks) === 2 ? new Inter2(ks, kOf(o)) : new Inter3(ks, kOf(o)); }
 // Many parts in one union (a field of holes, a row of fins) are bundled by neighbourhood, so a point only asks the nearby ones.
 function groupFar(ks) {
   if (ks.length <= 10) return ks;
@@ -589,10 +624,14 @@ function finishMesh(positions, indices, info = {}) {
   // every edge should be used by exactly two triangles, once in each direction
   const em = new Map(), nV = positions.length / 3; for (let i = 0; i < idx.length; i += 3) for (let k = 0; k < 3; k++) { const a = idx[i + k], b = idx[i + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a; em.set(key, (em.get(key) || 0) + (a < b ? 1 : 1024)); }
   let open = 0, odd = 0; for (const v of em.values()) { if (v === 1 || v === 1024) open++; else if (v !== 1025) odd++; }
+  // separate pieces: triangles joined through shared corners
+  const par = new Int32Array(nV).map((_, i) => i), root = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  for (let i = 0; i < idx.length; i += 3) { const a = root(idx[i]), b = root(idx[i + 1]), c = root(idx[i + 2]); par[b] = a; par[root(c)] = a; }
+  const roots = new Set(); for (let i = 0; i < idx.length; i++) roots.add(root(idx[i]));
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], used = new Uint8Array(nV); for (let i = 0; i < idx.length; i++) used[idx[i]] = 1;
   for (let i = 0; i < nV; i++) if (used[i]) for (let a = 0; a < 3; a++) { const v = positions[i * 3 + a]; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
-  return { positions, indices: idx, stats: { triangles: idx.length / 3, volume: vol, area, min: lo, max: hi, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], openEdges: open, oddEdges: odd, watertight: open === 0, ...info } };
+  return { positions, indices: idx, stats: { triangles: idx.length / 3, volume: vol, area, min: lo, max: hi, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], openEdges: open, oddEdges: odd, watertight: open === 0, pieces: roots.size, ...info } };
 }
 
-const API = { box, cylinder, cone, sphere, torus, tube, capsule, rod, halfspace, extrude, revolve, thread, union, cut, difference: cut, subtract: cut, intersect, rect, circle, ellipse, polygon, ngon, star, slot, ring, sector, text, array, polar, grid };
-export { API, Solid, Shape, meshSolid, finishMesh, voxelize, addFont, parseFont, FONTS, Grid3, union, cut, intersect };
+const API = { color, colour: color, box, cylinder, cone, sphere, torus, tube, capsule, rod, halfspace, extrude, revolve, thread, union, cut, difference: cut, subtract: cut, intersect, rect, circle, ellipse, polygon, ngon, star, slot, ring, sector, text, array, polar, grid };
+export { API, Solid, Shape, Colored, colorParts, meshSolid, finishMesh, voxelize, addFont, parseFont, FONTS, Grid3, union, cut, intersect };

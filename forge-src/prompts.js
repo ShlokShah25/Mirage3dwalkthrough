@@ -35,6 +35,7 @@ SOLIDS
            .fit({ z: 80 }) scales the whole solid evenly, about the origin, so that side measures that much (follow with .onBed())
            .bounds() gives { min, max, size, center }
   combine: union(a, b, ..., { fillet: r })   cut(body, tool, ..., { fillet: r })   intersect(a, b, ...)   fillet blends the joint with a radius
+  colour:  color(solid, '#rrggbb' or a plain name such as 'black' or 'orange') gives a solid a colour; it keeps it when moved, hollowed or cut. A model with colours is made as one body per colour, which is how a multi-colour printer (several filaments) prints it. Bodies of different colours must not overlap: cut the inner one out of the outer one, so they meet face to face. Return them joined: return union(color(a, 'black'), color(b, 'orange')).
   repeat:  array(solid, n, [dx, dy, dz])   polar(solid, n, { radius, start, angle }) (each copy moved out radius along +x, then turned about the Z axis, the first by start degrees from +x)   grid(solid, nx, ny, dx, dy) (centred on the origin)
   union, cut and intersect take any number of solids or arrays of them. A fillet never makes the model bigger than its parts.
 

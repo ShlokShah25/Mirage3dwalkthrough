@@ -139,6 +139,7 @@ function initView() {
   const fill = new THREE.DirectionalLight(0xffffff, .7); fill.position.set(-1, .8, .6); V.scene.add(fill);
   V.bed = new THREE.Group(); V.dim = new THREE.Group(); V.scene.add(V.bed, V.dim);
   V.mat = new THREE.MeshStandardMaterial({ color: 0xF26A1B, roughness: .6, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  V.matCol = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   V.edgeMat = new THREE.LineBasicMaterial({ color: 0x12202B, transparent: true, opacity: .5 });
   V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
   new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
@@ -158,7 +159,8 @@ function setMesh(r) {
   if (V.mesh) { V.scene.remove(V.mesh, V.lines); V.mesh.geometry.dispose(); V.lines.geometry.dispose(); V.mesh = V.lines = null; }
   if (r) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(r.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(r.nrm, 3));
-    V.mesh = new THREE.Mesh(g, V.mat); const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(r.edges, 3)); V.lines = new THREE.LineSegments(eg, V.edgeMat); V.lines.visible = ST.edges;
+    if (r.col) g.setAttribute('color', new THREE.BufferAttribute(r.col, 3));   // a model in colours shows each body in its own
+    V.mesh = new THREE.Mesh(g, r.col ? V.matCol : V.mat); const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(r.edges, 3)); V.lines = new THREE.LineSegments(eg, V.edgeMat); V.lines.visible = ST.edges;
     V.scene.add(V.mesh, V.lines);
   }
   drawDims();
@@ -214,6 +216,65 @@ function endDemo() {
 }
 // on the first screen the part sits in the right half of the sheet, beside the request box
 function offsetView(on) { const c = $('view'), w = c.clientWidth, h = c.clientHeight; if (on && w > 900) V.cam.setViewOffset(w, h, -w * .24, 0, w, h); else V.cam.clearViewOffset(); V.cam.updateProjectionMatrix(); draw(); }
+/* ---------------- while Forge works: a living form on the sheet, then the part prints in ---------------- */
+// Making a new part: a soft orange form breathes and morphs on the bed, its construction wire in blueprint blue.
+// Changing a part: a blue scan plane sweeps up and down through it. When the result arrives it is revealed layer by layer,
+// rising from the bed the way a printer builds it. (Skipped when the viewer asks for reduced motion.)
+const GN = { on: false, mode: null, t: 0, blob: null, wire: null, base: null, scan: null, reveal: null, raf: 0, last: 0, manual: false };
+const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function genStart(mode) {
+  if (GN.on || still()) return; GN.on = true; GN.mode = mode; GN.t = 0; GN.reveal = null;
+  if (mode === 'make') {
+    if (!GN.blob) {
+      // a smooth form (shared corners, so it shades softly) and a coarser construction wire that morphs with it
+      const geo = new THREE.SphereGeometry(1, 128, 96), wgeo = new THREE.SphereGeometry(1, 28, 18);
+      GN.base = Float32Array.from(geo.attributes.position.array); GN.wbase = Float32Array.from(wgeo.attributes.position.array);
+      GN.blob = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xF26A1B, roughness: .28, metalness: 0, clearcoat: .6, clearcoatRoughness: .25 }));
+      GN.wire = new THREE.LineSegments(new THREE.WireframeGeometry(wgeo), new THREE.LineBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .28 })); GN.wgeo = wgeo;
+    }
+    GN.blob.scale.setScalar(30); GN.wire.scale.setScalar(31.5); GN.blob.position.set(0, 0, 36); GN.wire.position.copy(GN.blob.position);
+    V.scene.add(GN.blob, GN.wire); if (!ST.mesh) frameBox([-38, -38, 0], [38, 38, 70]);
+  } else if (ST.mesh) {
+    const s = ST.mesh.stats, w = s.size[0] * 1.25 + 6, d = s.size[1] * 1.25 + 6;
+    if (!GN.scan) GN.scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false }));
+    GN.scan.scale.set(w, d, 1); GN.scan.position.set((s.min[0] + s.max[0]) / 2, (s.min[1] + s.max[1]) / 2, s.min[2]); V.scene.add(GN.scan);
+  }
+  GN.last = performance.now(); if (!GN.manual) GN.raf = requestAnimationFrame(genLoop);
+}
+function genLoop(now) { if (!GN.on) return; const dt = Math.min(.1, (now - GN.last) / 1000); GN.last = now; genFrame(dt); GN.raf = requestAnimationFrame(genLoop); }
+function genFrame(dt) {
+  GN.t += dt; const t = GN.t;
+  if (GN.blob && GN.blob.parent) {
+    const f = (x, y, z) => 1 + .17 * Math.sin(3.1 * x + 1.6 * t) * Math.sin(2.3 * y + 1.1 * t) + .11 * Math.sin(4.2 * z + 2.0 * t + 2 * x) + .07 * Math.sin(5.3 * (x + y) - 2.4 * t);
+    const morph = (geo, b) => { const pa = geo.attributes.position, a = pa.array; for (let i = 0; i < a.length; i += 3) { const x = b[i], y = b[i + 1], z = b[i + 2], k = f(x, y, z); a[i] = x * k; a[i + 1] = y * k; a[i + 2] = z * k * .92; } pa.needsUpdate = true; };
+    morph(GN.blob.geometry, GN.base); GN.blob.geometry.computeVertexNormals();
+    morph(GN.wgeo, GN.wbase); GN.wire.geometry.dispose(); GN.wire.geometry = new THREE.WireframeGeometry(GN.wgeo);
+    GN.blob.rotation.z = t * .35; GN.wire.rotation.z = GN.blob.rotation.z;
+  }
+  if (GN.scan && GN.scan.parent && ST.mesh) { const s = ST.mesh.stats, u = .5 - .5 * Math.cos(t * 1.4); GN.scan.position.z = s.min[2] + u * s.size[2]; }
+  if (GN.reveal) {
+    const r = GN.reveal; r.t += dt; const u = Math.min(1, r.t / r.dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    CLIP.constant = r.z0 + (r.z1 - r.z0 + .5) * e;
+    if (GN.blob?.parent) { const k = Math.max(0, 1 - r.t / .55); GN.blob.scale.setScalar(26 * k + .01); GN.wire.scale.setScalar(26.6 * k + .01); if (!k) V.scene.remove(GN.blob, GN.wire); }
+    if (u >= 1) { genStop(); drawDims(); return; }
+  }
+  draw();
+}
+const CLIP = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+// called when a built part is shown: rise it in from the bed, then stop
+function genReveal() {
+  if (!GN.on || !ST.mesh) return genStop();
+  if (GN.scan) V.scene.remove(GN.scan);
+  const s = ST.mesh.stats; GN.reveal = { t: 0, dur: Math.min(1.8, .9 + s.size[2] / 120), z0: s.min[2] - .5, z1: s.max[2] };
+  V.r.localClippingEnabled = true; for (const m of [V.mat, V.matCol, V.edgeMat]) m.clippingPlanes = [CLIP]; CLIP.constant = GN.reveal.z0;
+  for (const c of [...V.dim.children]) c.visible = false; $('dims').style.visibility = 'hidden';
+}
+function genStop() {
+  GN.on = false; GN.reveal = null; cancelAnimationFrame(GN.raf);
+  if (GN.blob) V.scene.remove(GN.blob, GN.wire); if (GN.scan) V.scene.remove(GN.scan);
+  for (const m of [V.mat, V.matCol, V.edgeMat]) m.clippingPlanes = []; $('dims').style.visibility = ''; for (const c of V.dim.children) c.visible = true; draw();
+}
+function frameBox(min, max) { const keep = ST.mesh; ST.mesh = { stats: { min, max, size: [0, 1, 2].map(i => max[i] - min[i]) } }; frame('iso'); ST.mesh = keep; }
 function thumb() {
   try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
 }
@@ -370,7 +431,7 @@ async function send(text, pic) {
   setBusy(true);
   const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
   addMsg('you', text, pic ? { img: pic.small } : {}); setScreen();
-  const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
+  const wait = waiting(first ? 'Working out the geometry' : 'Working out the change'); genStart(first ? 'make' : 'edit');
   try {
     // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
     const views = !first && m.source && ST.mesh ? viewShots() : [];
@@ -396,11 +457,11 @@ async function send(text, pic) {
     if (m && before?.code) { restore(m, before); refreshBuild(); } else if (m && !ST.models.includes(m)) { ST.draft = m.chat; ST.cur = had || null; }
     if (!e?.code) console.error('[forge]', e);
     addMsg('note', friendly(e));
-  } finally { wait.done(); setBusy(false); }
+  } finally { wait.done(); setBusy(false); if (GN.on && !GN.reveal) genStop(); }
 }
 
 /* ---------------- the sheet (right side) ---------------- */
-function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); }
+function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); if (GN.on && !GN.reveal) genReveal(); }
 function fillFacts() {
   const s = ST.mesh?.stats, m = ST.cur; if (!s || !m) return;
   const cell = (id, v) => { $(id).textContent = nice(v); $(id).append(el('small', { text: unitName() })); }; cell('sx', s.size[0]); cell('sy', s.size[1]); cell('sz', s.size[2]);
@@ -416,6 +477,8 @@ function fillFacts() {
   row('Weight in PLA', `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g if solid`);
   row('Surface', s.watertight && !s.oddEdges ? 'Closed, ready to slice' : `${s.openEdges + s.oddEdges} open edges`, s.watertight && !s.oddEdges ? 'ok' : 'bad');
   const fits = s.size[0] <= ST.bed[0] && s.size[1] <= ST.bed[1] && s.size[2] <= ST.bed[2]; row('Printer bed', fits ? 'Fits' : 'Too big for this bed', fits ? 'ok' : 'bad');
+  if (s.pieces > 1) row('Separate pieces', String(s.pieces) + (ST.mesh.parts?.length > 1 ? ' (counting each colour)' : ''));
+  if (ST.mesh.parts?.length > 1) { const dd = el('dd'); for (const pt of ST.mesh.parts) dd.append(el('span', { title: pt.color, style: `display:inline-block;width:14px;height:14px;border-radius:3px;margin-left:5px;vertical-align:-2px;border:1px solid rgba(0,0,0,.25);background:${pt.color}` })); f.append(el('dt', { text: `${ST.mesh.parts.length} colours` }), dd); }
   row('Triangles', s.triangles.toLocaleString('en-IN') + (s.quality === 'draft' ? ' (preview)' : ''));
 }
 let building = false, queued = null;
@@ -460,7 +523,7 @@ async function download(id) {
       status(null);
       if (mesh.stats.triangles > f.max) { $('fmtHint').textContent = `This model has too much fine detail for ${f.label} (it holds ${f.max.toLocaleString('en-IN')} flat faces at most). Use 3MF or STL instead.`; return; }
     }
-    const bytes = await f.write({ positions: mesh.positions, indices: mesh.indices }, m.name), name = `${safeName(m.name).replace(/\s+/g, '-').toLowerCase()}.${f.ext}`;
+    const bytes = await f.write({ positions: mesh.positions, indices: mesh.indices, parts: mesh.parts || null }, m.name), name = `${safeName(m.name).replace(/\s+/g, '-').toLowerCase()}.${f.ext}`;
     HOOK.saved = { name, bytes, triangles: mesh.stats.triangles };
     const url = URL.createObjectURL(new Blob([bytes], { type: f.mime })), a = el('a', { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
     $('fmtHint').textContent = `Saved ${name} (${bytes.length > 1e6 ? (bytes.length / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes.length / 1000)) + ' KB'}). ${f.note}`;
@@ -554,5 +617,5 @@ async function boot() {
   startWorker().catch(() => { });
   const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last); else setScreen();
 }
-globalThis.__forge = { ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
+globalThis.__forge = { GN, genFrame, genStart, genReveal, genStop, DM, ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
 boot();

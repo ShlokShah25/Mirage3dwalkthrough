@@ -354,8 +354,13 @@ function normalOf(p, a, b, c, out) {
 function compact(m) {
   const p = m.positions, idx = m.indices, map = new Int32Array(p.length / 3).fill(-1), pos = []; const out = new Uint32Array(idx.length);
   for (let i = 0; i < idx.length; i++) { let k = map[idx[i]]; if (k < 0) { k = map[idx[i]] = pos.length / 3; pos.push(p[idx[i] * 3], p[idx[i] * 3 + 1], p[idx[i] * 3 + 2]); } out[i] = k; }
-  return { positions: new Float32Array(pos), indices: out };
+  return { positions: new Float32Array(pos), indices: out, parts: m.parts || null };
 }
+// colour helpers: a part's colour as 0..1 numbers and as #RRGGBBFF (3MF)
+const rgb01 = h => { const c = parseInt(h.slice(1), 16); return [(c >> 16 & 255) / 255, (c >> 8 & 255) / 255, (c & 255) / 255]; };
+const partOf = (m, t) => { for (const p of m.parts || []) if (t >= p.t0 && t < p.t1) return p; return null; };
+// per-corner colours (corners belong to one body each, so one colour per corner)
+function vertexColors(m) { const n = m.positions.length / 3, c = new Float32Array(n * 3).fill(.85); for (const p of m.parts || []) { const v = rgb01(p.color); for (let t = p.t0; t < p.t1; t++) for (let k = 0; k < 3; k++) c.set(v, m.indices[t * 3 + k] * 3); } return c; }
 
 /* ---- STL ---- */
 function toSTL(m, name) {
@@ -372,16 +377,19 @@ function toSTLAscii(m, name) {
 /* ---- OBJ ---- */
 function toOBJ(m0, name) {
   const m = compact(m0), p = m.positions, idx = m.indices, out = [`# ${safeName(name)} - made with Forge`, '# units: millimetres, Z up', `o ${safeName(name).replace(/\s+/g, '_')}`];
-  for (let i = 0; i < p.length; i += 3) out.push(`v ${F(p[i])} ${F(p[i + 1])} ${F(p[i + 2])}`);
-  for (let t = 0; t < idx.length; t += 3) out.push(`f ${idx[t] + 1} ${idx[t + 1] + 1} ${idx[t + 2] + 1}`);
+  const vc = m.parts ? vertexColors(m) : null; if (vc) out.push('# vertex colours follow each corner (r g b, 0 to 1); one object per colour');
+  for (let i = 0; i < p.length; i += 3) out.push(`v ${F(p[i])} ${F(p[i + 1])} ${F(p[i + 2])}` + (vc ? ` ${F(vc[i])} ${F(vc[i + 1])} ${F(vc[i + 2])}` : ''));
+  const ranges = m.parts || [{ t0: 0, t1: idx.length / 3 }];
+  ranges.forEach((r, k) => { if (m.parts) out.push(`o ${safeName(name).replace(/\s+/g, '_')}_${k + 1}_${r.color.slice(1)}`); for (let t = r.t0 * 3; t < r.t1 * 3; t += 3) out.push(`f ${idx[t] + 1} ${idx[t + 1] + 1} ${idx[t + 2] + 1}`); });
   return enc.encode(out.join('\n') + '\n');
 }
 /* ---- PLY (binary) ---- */
 function toPLY(m0, name) {
   const m = compact(m0), p = m.positions, idx = m.indices, nV = p.length / 3, nT = idx.length / 3;
-  const head = enc.encode(`ply\nformat binary_little_endian 1.0\ncomment ${safeName(name)} - made with Forge - units mm\nelement vertex ${nV}\nproperty float x\nproperty float y\nproperty float z\nelement face ${nT}\nproperty list uchar int vertex_indices\nend_header\n`);
-  const buf = new Uint8Array(head.length + nV * 12 + nT * 13), dv = new DataView(buf.buffer); buf.set(head); let o = head.length;
-  for (let i = 0; i < p.length; i++, o += 4) dv.setFloat32(o, p[i], true);
+  const vc = m.parts ? vertexColors(m) : null, per = vc ? 15 : 12;
+  const head = enc.encode(`ply\nformat binary_little_endian 1.0\ncomment ${safeName(name)} - made with Forge - units mm\nelement vertex ${nV}\nproperty float x\nproperty float y\nproperty float z\n${vc ? 'property uchar red\nproperty uchar green\nproperty uchar blue\n' : ''}element face ${nT}\nproperty list uchar int vertex_indices\nend_header\n`);
+  const buf = new Uint8Array(head.length + nV * per + nT * 13), dv = new DataView(buf.buffer); buf.set(head); let o = head.length;
+  for (let i = 0; i < nV; i++) { for (let k = 0; k < 3; k++, o += 4) dv.setFloat32(o, p[i * 3 + k], true); if (vc) for (let k = 0; k < 3; k++, o++) dv.setUint8(o, Math.round(vc[i * 3 + k] * 255)); }
   for (let t = 0; t < nT; t++) { dv.setUint8(o, 3); o++; for (let k = 0; k < 3; k++, o += 4) dv.setInt32(o, idx[t * 3 + k], true); }
   return buf;
 }
@@ -404,11 +412,16 @@ async function zip(files, { compress = true, align = 0 } = {}) {
 }
 /* ---- 3MF ---- */
 async function to3MF(m0, name) {
-  const m = compact(m0), p = m.positions, idx = m.indices, v = [], t = [];
-  for (let i = 0; i < p.length; i += 3) v.push(`<vertex x="${F(p[i])}" y="${F(p[i + 1])}" z="${F(p[i + 2])}"/>`);
-  for (let i = 0; i < idx.length; i += 3) t.push(`<triangle v1="${idx[i]}" v2="${idx[i + 1]}" v3="${idx[i + 2]}"/>`);
-  const nm = safeName(name).replace(/[<>&"]/g, ' ');
-  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n<metadata name="Title">${nm}</metadata>\n<metadata name="Application">Forge</metadata>\n<resources>\n<object id="1" name="${nm}" type="model">\n<mesh>\n<vertices>\n${v.join('\n')}\n</vertices>\n<triangles>\n${t.join('\n')}\n</triangles>\n</mesh>\n</object>\n</resources>\n<build>\n<item objectid="1"/>\n</build>\n</model>\n`;
+  const m = compact(m0), nm = safeName(name).replace(/[<>&"]/g, ' ');
+  const meshXml = sub => { const p = sub.positions, idx = sub.indices, v = [], t = []; for (let i = 0; i < p.length; i += 3) v.push(`<vertex x="${F(p[i])}" y="${F(p[i + 1])}" z="${F(p[i + 2])}"/>`); for (let i = 0; i < idx.length; i += 3) t.push(`<triangle v1="${idx[i]}" v2="${idx[i + 1]}" v3="${idx[i + 2]}"/>`); return `<mesh>\n<vertices>\n${v.join('\n')}\n</vertices>\n<triangles>\n${t.join('\n')}\n</triangles>\n</mesh>`; };
+  let res, item;
+  if (m.parts && m.parts.length > 1) {   // a multi-colour print: one body per colour, the parts of one object, each with its colour
+    const hexA = h => h.toUpperCase() + 'FF', subs = m.parts.map(pt => compact({ positions: m.positions, indices: m.indices.subarray(pt.t0 * 3, pt.t1 * 3) }));
+    res = `<basematerials id="1">\n${m.parts.map((pt, k) => `<base name="Colour ${k + 1}" displaycolor="${hexA(pt.color)}"/>`).join('\n')}\n</basematerials>\n` + subs.map((sub, k) => `<object id="${k + 2}" name="${nm} colour ${k + 1}" type="model" pid="1" pindex="${k}">\n${meshXml(sub)}\n</object>`).join('\n') +
+      `\n<object id="${subs.length + 2}" name="${nm}" type="model">\n<components>\n${subs.map((_, k) => `<component objectid="${k + 2}"/>`).join('\n')}\n</components>\n</object>`;
+    item = subs.length + 2;
+  } else { res = `<object id="1" name="${nm}" type="model">\n${meshXml(m)}\n</object>`; item = 1; }
+  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n<metadata name="Title">${nm}</metadata>\n<metadata name="Application">Forge</metadata>\n<resources>\n${res}\n</resources>\n<build>\n<item objectid="${item}"/>\n</build>\n</model>\n`;
   return zip([
     { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
     { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
@@ -419,8 +432,10 @@ async function to3MF(m0, name) {
 function toAMF(m0, name) {
   const m = compact(m0), p = m.positions, idx = m.indices, out = ['<?xml version="1.0" encoding="UTF-8"?>', '<amf unit="millimeter" version="1.1">', `<metadata type="name">${safeName(name).replace(/[<>&"]/g, ' ')}</metadata>`, '<object id="0"><mesh><vertices>'];
   for (let i = 0; i < p.length; i += 3) out.push(`<vertex><coordinates><x>${F(p[i])}</x><y>${F(p[i + 1])}</y><z>${F(p[i + 2])}</z></coordinates></vertex>`);
-  out.push('</vertices><volume>'); for (let i = 0; i < idx.length; i += 3) out.push(`<triangle><v1>${idx[i]}</v1><v2>${idx[i + 1]}</v2><v3>${idx[i + 2]}</v3></triangle>`);
-  out.push('</volume></mesh></object>', '</amf>'); return enc.encode(out.join('\n') + '\n');
+  out.push('</vertices>');
+  for (const [k, r] of (m.parts || [{ t0: 0, t1: idx.length / 3 }]).entries()) { out.push(m.parts ? `<volume materialid="${k + 1}">` : '<volume>'); for (let i = r.t0 * 3; i < r.t1 * 3; i += 3) out.push(`<triangle><v1>${idx[i]}</v1><v2>${idx[i + 1]}</v2><v3>${idx[i + 2]}</v3></triangle>`); out.push('</volume>'); }
+  out.push('</mesh></object>'); if (m.parts) for (const [k, r] of m.parts.entries()) { const c = rgb01(r.color); out.push(`<material id="${k + 1}"><metadata type="name">Colour ${k + 1}</metadata><color><r>${F(c[0])}</r><g>${F(c[1])}</g><b>${F(c[2])}</b></color></material>`); }
+  out.push('</amf>'); return enc.encode(out.join('\n') + '\n');
 }
 /* ---- Collada (DAE) ---- */
 function toDAE(m0, name) {
@@ -435,10 +450,14 @@ function yUpMetres(m0) {       // corners are split per triangle so each face ke
 }
 function toGLB(m0, name) {
   const { pos, nor, lo, hi, n } = yUpMetres(m0), bin = new Uint8Array(pos.byteLength + nor.byteLength); bin.set(new Uint8Array(pos.buffer), 0); bin.set(new Uint8Array(nor.buffer), pos.byteLength);
-  const json = { asset: { version: '2.0', generator: 'Forge' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name: safeName(name) }], meshes: [{ name: safeName(name), primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0, mode: 4 }] }],
-    materials: [{ name: 'Print', pbrMetallicRoughness: { baseColorFactor: [.78, .78, .76, 1], metallicFactor: 0, roughnessFactor: .7 } }],
-    buffers: [{ byteLength: bin.length }], bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: pos.byteLength, target: 34962 }, { buffer: 0, byteOffset: pos.byteLength, byteLength: nor.byteLength, target: 34962 }],
-    accessors: [{ bufferView: 0, componentType: 5126, count: n, type: 'VEC3', min: lo, max: hi }, { bufferView: 1, componentType: 5126, count: n, type: 'VEC3' }] };
+  const ranges = m0.parts && m0.parts.length ? m0.parts : [{ t0: 0, t1: n / 3, color: null }], accessors = [], prims = [], mats = [];
+  ranges.forEach((r, k) => {   // corners are written triangle by triangle, so a colour's triangles are one run of corners
+    const a0 = r.t0 * 3, cnt = (r.t1 - r.t0) * 3, mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity]; for (let i = a0; i < a0 + cnt; i++) for (let c = 0; c < 3; c++) { const v = pos[i * 3 + c]; if (v < mn[c]) mn[c] = v; if (v > mx[c]) mx[c] = v; }
+    accessors.push({ bufferView: 0, byteOffset: a0 * 12, componentType: 5126, count: cnt, type: 'VEC3', min: mn, max: mx }, { bufferView: 1, byteOffset: a0 * 12, componentType: 5126, count: cnt, type: 'VEC3' });
+    prims.push({ attributes: { POSITION: k * 2, NORMAL: k * 2 + 1 }, material: k, mode: 4 }); mats.push({ name: r.color ? 'Colour ' + (k + 1) : 'Print', pbrMetallicRoughness: { baseColorFactor: r.color ? [...rgb01(r.color).map(v => Math.pow(v, 2.2)), 1] : [.78, .78, .76, 1], metallicFactor: 0, roughnessFactor: .6 } });
+  });
+  const json = { asset: { version: '2.0', generator: 'Forge' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name: safeName(name) }], meshes: [{ name: safeName(name), primitives: prims }], materials: mats,
+    buffers: [{ byteLength: bin.length }], bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: pos.byteLength, target: 34962, byteStride: 12 }, { buffer: 0, byteOffset: pos.byteLength, byteLength: nor.byteLength, target: 34962, byteStride: 12 }], accessors };
   let jb = enc.encode(JSON.stringify(json)); const jp = (4 - jb.length % 4) % 4, bp = (4 - bin.length % 4) % 4, total = 12 + 8 + jb.length + jp + 8 + bin.length + bp, out = new Uint8Array(total), dv = new DataView(out.buffer);
   dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, total, true); dv.setUint32(12, jb.length + jp, true); dv.setUint32(16, 0x4E4F534A, true); out.set(jb, 20); out.fill(0x20, 20 + jb.length, 20 + jb.length + jp);
   const o = 20 + jb.length + jp; dv.setUint32(o, bin.length + bp, true); dv.setUint32(o + 4, 0x004E4942, true); out.set(bin, o + 8); return out;
@@ -526,6 +545,7 @@ SOLIDS
            .fit({ z: 80 }) scales the whole solid evenly, about the origin, so that side measures that much (follow with .onBed())
            .bounds() gives { min, max, size, center }
   combine: union(a, b, ..., { fillet: r })   cut(body, tool, ..., { fillet: r })   intersect(a, b, ...)   fillet blends the joint with a radius
+  colour:  color(solid, '#rrggbb' or a plain name such as 'black' or 'orange') gives a solid a colour; it keeps it when moved, hollowed or cut. A model with colours is made as one body per colour, which is how a multi-colour printer (several filaments) prints it. Bodies of different colours must not overlap: cut the inner one out of the outer one, so they meet face to face. Return them joined: return union(color(a, 'black'), color(b, 'orange')).
   repeat:  array(solid, n, [dx, dy, dz])   polar(solid, n, { radius, start, angle }) (each copy moved out radius along +x, then turned about the Z axis, the first by start degrees from +x)   grid(solid, nx, ny, dx, dy) (centred on the origin)
   union, cut and intersect take any number of solids or arrays of them. A fillet never makes the model bigger than its parts.
 
@@ -780,6 +800,7 @@ function initView() {
   const fill = new THREE.DirectionalLight(0xffffff, .7); fill.position.set(-1, .8, .6); V.scene.add(fill);
   V.bed = new THREE.Group(); V.dim = new THREE.Group(); V.scene.add(V.bed, V.dim);
   V.mat = new THREE.MeshStandardMaterial({ color: 0xF26A1B, roughness: .6, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  V.matCol = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   V.edgeMat = new THREE.LineBasicMaterial({ color: 0x12202B, transparent: true, opacity: .5 });
   V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
   new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
@@ -799,7 +820,8 @@ function setMesh(r) {
   if (V.mesh) { V.scene.remove(V.mesh, V.lines); V.mesh.geometry.dispose(); V.lines.geometry.dispose(); V.mesh = V.lines = null; }
   if (r) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(r.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(r.nrm, 3));
-    V.mesh = new THREE.Mesh(g, V.mat); const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(r.edges, 3)); V.lines = new THREE.LineSegments(eg, V.edgeMat); V.lines.visible = ST.edges;
+    if (r.col) g.setAttribute('color', new THREE.BufferAttribute(r.col, 3));   // a model in colours shows each body in its own
+    V.mesh = new THREE.Mesh(g, r.col ? V.matCol : V.mat); const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(r.edges, 3)); V.lines = new THREE.LineSegments(eg, V.edgeMat); V.lines.visible = ST.edges;
     V.scene.add(V.mesh, V.lines);
   }
   drawDims();
@@ -855,6 +877,65 @@ function endDemo() {
 }
 // on the first screen the part sits in the right half of the sheet, beside the request box
 function offsetView(on) { const c = $('view'), w = c.clientWidth, h = c.clientHeight; if (on && w > 900) V.cam.setViewOffset(w, h, -w * .24, 0, w, h); else V.cam.clearViewOffset(); V.cam.updateProjectionMatrix(); draw(); }
+/* ---------------- while Forge works: a living form on the sheet, then the part prints in ---------------- */
+// Making a new part: a soft orange form breathes and morphs on the bed, its construction wire in blueprint blue.
+// Changing a part: a blue scan plane sweeps up and down through it. When the result arrives it is revealed layer by layer,
+// rising from the bed the way a printer builds it. (Skipped when the viewer asks for reduced motion.)
+const GN = { on: false, mode: null, t: 0, blob: null, wire: null, base: null, scan: null, reveal: null, raf: 0, last: 0, manual: false };
+const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function genStart(mode) {
+  if (GN.on || still()) return; GN.on = true; GN.mode = mode; GN.t = 0; GN.reveal = null;
+  if (mode === 'make') {
+    if (!GN.blob) {
+      // a smooth form (shared corners, so it shades softly) and a coarser construction wire that morphs with it
+      const geo = new THREE.SphereGeometry(1, 128, 96), wgeo = new THREE.SphereGeometry(1, 28, 18);
+      GN.base = Float32Array.from(geo.attributes.position.array); GN.wbase = Float32Array.from(wgeo.attributes.position.array);
+      GN.blob = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xF26A1B, roughness: .28, metalness: 0, clearcoat: .6, clearcoatRoughness: .25 }));
+      GN.wire = new THREE.LineSegments(new THREE.WireframeGeometry(wgeo), new THREE.LineBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .28 })); GN.wgeo = wgeo;
+    }
+    GN.blob.scale.setScalar(30); GN.wire.scale.setScalar(31.5); GN.blob.position.set(0, 0, 36); GN.wire.position.copy(GN.blob.position);
+    V.scene.add(GN.blob, GN.wire); if (!ST.mesh) frameBox([-38, -38, 0], [38, 38, 70]);
+  } else if (ST.mesh) {
+    const s = ST.mesh.stats, w = s.size[0] * 1.25 + 6, d = s.size[1] * 1.25 + 6;
+    if (!GN.scan) GN.scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false }));
+    GN.scan.scale.set(w, d, 1); GN.scan.position.set((s.min[0] + s.max[0]) / 2, (s.min[1] + s.max[1]) / 2, s.min[2]); V.scene.add(GN.scan);
+  }
+  GN.last = performance.now(); if (!GN.manual) GN.raf = requestAnimationFrame(genLoop);
+}
+function genLoop(now) { if (!GN.on) return; const dt = Math.min(.1, (now - GN.last) / 1000); GN.last = now; genFrame(dt); GN.raf = requestAnimationFrame(genLoop); }
+function genFrame(dt) {
+  GN.t += dt; const t = GN.t;
+  if (GN.blob && GN.blob.parent) {
+    const f = (x, y, z) => 1 + .17 * Math.sin(3.1 * x + 1.6 * t) * Math.sin(2.3 * y + 1.1 * t) + .11 * Math.sin(4.2 * z + 2.0 * t + 2 * x) + .07 * Math.sin(5.3 * (x + y) - 2.4 * t);
+    const morph = (geo, b) => { const pa = geo.attributes.position, a = pa.array; for (let i = 0; i < a.length; i += 3) { const x = b[i], y = b[i + 1], z = b[i + 2], k = f(x, y, z); a[i] = x * k; a[i + 1] = y * k; a[i + 2] = z * k * .92; } pa.needsUpdate = true; };
+    morph(GN.blob.geometry, GN.base); GN.blob.geometry.computeVertexNormals();
+    morph(GN.wgeo, GN.wbase); GN.wire.geometry.dispose(); GN.wire.geometry = new THREE.WireframeGeometry(GN.wgeo);
+    GN.blob.rotation.z = t * .35; GN.wire.rotation.z = GN.blob.rotation.z;
+  }
+  if (GN.scan && GN.scan.parent && ST.mesh) { const s = ST.mesh.stats, u = .5 - .5 * Math.cos(t * 1.4); GN.scan.position.z = s.min[2] + u * s.size[2]; }
+  if (GN.reveal) {
+    const r = GN.reveal; r.t += dt; const u = Math.min(1, r.t / r.dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    CLIP.constant = r.z0 + (r.z1 - r.z0 + .5) * e;
+    if (GN.blob?.parent) { const k = Math.max(0, 1 - r.t / .55); GN.blob.scale.setScalar(26 * k + .01); GN.wire.scale.setScalar(26.6 * k + .01); if (!k) V.scene.remove(GN.blob, GN.wire); }
+    if (u >= 1) { genStop(); drawDims(); return; }
+  }
+  draw();
+}
+const CLIP = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+// called when a built part is shown: rise it in from the bed, then stop
+function genReveal() {
+  if (!GN.on || !ST.mesh) return genStop();
+  if (GN.scan) V.scene.remove(GN.scan);
+  const s = ST.mesh.stats; GN.reveal = { t: 0, dur: Math.min(1.8, .9 + s.size[2] / 120), z0: s.min[2] - .5, z1: s.max[2] };
+  V.r.localClippingEnabled = true; for (const m of [V.mat, V.matCol, V.edgeMat]) m.clippingPlanes = [CLIP]; CLIP.constant = GN.reveal.z0;
+  for (const c of [...V.dim.children]) c.visible = false; $('dims').style.visibility = 'hidden';
+}
+function genStop() {
+  GN.on = false; GN.reveal = null; cancelAnimationFrame(GN.raf);
+  if (GN.blob) V.scene.remove(GN.blob, GN.wire); if (GN.scan) V.scene.remove(GN.scan);
+  for (const m of [V.mat, V.matCol, V.edgeMat]) m.clippingPlanes = []; $('dims').style.visibility = ''; for (const c of V.dim.children) c.visible = true; draw();
+}
+function frameBox(min, max) { const keep = ST.mesh; ST.mesh = { stats: { min, max, size: [0, 1, 2].map(i => max[i] - min[i]) } }; frame('iso'); ST.mesh = keep; }
 function thumb() {
   try { draw(); const c = document.createElement('canvas'), src = $('view'); c.width = 192; c.height = 144; const k = Math.max(192 / src.width, 144 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (192 - w) / 2, (144 - h) / 2, w, h); return c.toDataURL('image/jpeg', .72); } catch { return null; }
 }
@@ -1011,7 +1092,7 @@ async function send(text, pic) {
   setBusy(true);
   const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
   addMsg('you', text, pic ? { img: pic.small } : {}); setScreen();
-  const wait = waiting(first ? 'Working out the geometry' : 'Working out the change');
+  const wait = waiting(first ? 'Working out the geometry' : 'Working out the change'); genStart(first ? 'make' : 'edit');
   try {
     // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
     const views = !first && m.source && ST.mesh ? viewShots() : [];
@@ -1037,11 +1118,11 @@ async function send(text, pic) {
     if (m && before?.code) { restore(m, before); refreshBuild(); } else if (m && !ST.models.includes(m)) { ST.draft = m.chat; ST.cur = had || null; }
     if (!e?.code) console.error('[forge]', e);
     addMsg('note', friendly(e));
-  } finally { wait.done(); setBusy(false); }
+  } finally { wait.done(); setBusy(false); if (GN.on && !GN.reveal) genStop(); }
 }
 
 /* ---------------- the sheet (right side) ---------------- */
-function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); }
+function showBuilt(r) { endDemo(); ST.mesh = r; setMesh(r); $('tools').hidden = false; fillFacts(); setScreen(); if (GN.on && !GN.reveal) genReveal(); }
 function fillFacts() {
   const s = ST.mesh?.stats, m = ST.cur; if (!s || !m) return;
   const cell = (id, v) => { $(id).textContent = nice(v); $(id).append(el('small', { text: unitName() })); }; cell('sx', s.size[0]); cell('sy', s.size[1]); cell('sz', s.size[2]);
@@ -1057,6 +1138,8 @@ function fillFacts() {
   row('Weight in PLA', `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g if solid`);
   row('Surface', s.watertight && !s.oddEdges ? 'Closed, ready to slice' : `${s.openEdges + s.oddEdges} open edges`, s.watertight && !s.oddEdges ? 'ok' : 'bad');
   const fits = s.size[0] <= ST.bed[0] && s.size[1] <= ST.bed[1] && s.size[2] <= ST.bed[2]; row('Printer bed', fits ? 'Fits' : 'Too big for this bed', fits ? 'ok' : 'bad');
+  if (s.pieces > 1) row('Separate pieces', String(s.pieces) + (ST.mesh.parts?.length > 1 ? ' (counting each colour)' : ''));
+  if (ST.mesh.parts?.length > 1) { const dd = el('dd'); for (const pt of ST.mesh.parts) dd.append(el('span', { title: pt.color, style: `display:inline-block;width:14px;height:14px;border-radius:3px;margin-left:5px;vertical-align:-2px;border:1px solid rgba(0,0,0,.25);background:${pt.color}` })); f.append(el('dt', { text: `${ST.mesh.parts.length} colours` }), dd); }
   row('Triangles', s.triangles.toLocaleString('en-IN') + (s.quality === 'draft' ? ' (preview)' : ''));
 }
 let building = false, queued = null;
@@ -1101,7 +1184,7 @@ async function download(id) {
       status(null);
       if (mesh.stats.triangles > f.max) { $('fmtHint').textContent = `This model has too much fine detail for ${f.label} (it holds ${f.max.toLocaleString('en-IN')} flat faces at most). Use 3MF or STL instead.`; return; }
     }
-    const bytes = await f.write({ positions: mesh.positions, indices: mesh.indices }, m.name), name = `${safeName(m.name).replace(/\s+/g, '-').toLowerCase()}.${f.ext}`;
+    const bytes = await f.write({ positions: mesh.positions, indices: mesh.indices, parts: mesh.parts || null }, m.name), name = `${safeName(m.name).replace(/\s+/g, '-').toLowerCase()}.${f.ext}`;
     HOOK.saved = { name, bytes, triangles: mesh.stats.triangles };
     const url = URL.createObjectURL(new Blob([bytes], { type: f.mime })), a = el('a', { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
     $('fmtHint').textContent = `Saved ${name} (${bytes.length > 1e6 ? (bytes.length / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes.length / 1000)) + ' KB'}). ${f.note}`;
@@ -1195,7 +1278,7 @@ async function boot() {
   startWorker().catch(() => { });
   const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last); else setScreen();
 }
-globalThis.__forge = { ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
+globalThis.__forge = { GN, genFrame, genStart, genReveal, genStop, DM, ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
 boot();
 
 </script>

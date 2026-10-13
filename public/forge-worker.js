@@ -222,6 +222,41 @@ class Diff3 extends Solid {
   d(x, y, z) { const r = this.a.d(x, y, z), k = this.k, b = this.b, bd = bb3dist(b.bb, x, y, z); if (bd > k && -bd <= r - k) return r; if (k === 0 && b.dMin && b.k === 0) { const u = b.dMin(x, y, z, -r); return u < -r ? -u : r; } const v = -b.d(x, y, z); return k > 0 ? smax(r, v, k) : (r > v ? r : v); }
 }
 
+// A solid with a colour. Moving, turning, sizing, hollowing or cutting it keeps the colour; joined with other solids, each keeps its own,
+// and the model is made as one body per colour (what a multi-colour printer needs: a filament per body).
+class Colored extends Solid { constructor(k, col) { super(); this.k = k; this.col = col; this.bb = k.bb; this.L = k.L; } d(x, y, z) { return this.k.d(x, y, z); } }
+for (const m of ['move', 'moveX', 'moveY', 'moveZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotateAbout', 'scale', 'mirror', 'grow', 'shrink', 'round', 'shell', 'clip', 'center', 'onBed', 'fit']) Colored.prototype[m] = function (...a) { return new Colored(this.k[m](...a), this.col); };
+// A group of coloured bodies moved, sized, clipped or hollowed as one: the same change is made to each body, so each keeps its colour.
+const hasColor = q => q instanceof Colored || (q instanceof Union3 && !q.k && q.ks.some(hasColor));
+const eachBody = (c, f) => c instanceof Colored ? new Colored(f(c.k), c.col) : (c instanceof Union3 && !c.k && hasColor(c)) ? new Union3(c.ks.map(x => eachBody(x, f)), 0) : f(c);
+for (const m of ['move', 'moveX', 'moveY', 'moveZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotateAbout', 'scale', 'mirror', 'grow', 'shrink', 'round', 'shell', 'clip', 'center', 'onBed', 'fit']) {
+  const orig = Solid.prototype[m];
+  Solid.prototype[m] = function (...a) {
+    if (!(this instanceof Union3) || this.k || !hasColor(this)) return orig.apply(this, a);
+    const r = orig.apply(this, a);   // the change as worked out for the whole group (center, onBed and fit depend on the group's size)
+    if (r instanceof Xf3 && r.k === this) return eachBody(this, q => new Xf3(q, r.m, r.t, r.s));
+    if (r instanceof Scale3 && r.k === this) return eachBody(this, q => new Scale3(q, r.sx, r.sy, r.sz));
+    if (r === this) return this;
+    return eachBody(this, q => q[m](...a));
+  };
+}
+const HEX = /^#[0-9a-f]{6}$/i;
+const NAMED = { black: '#1b1b1b', white: '#f2f2f0', orange: '#f26a1b', red: '#c8312b', blue: '#1f5fbf', green: '#2f7d4a', yellow: '#f2c230', grey: '#8a8f94', gray: '#8a8f94', gold: '#c9a227', silver: '#c4c8cc', brown: '#7a4b2a', pink: '#e98aa8', purple: '#6c3fa0', teal: '#1f8a8a' };
+function color(solid, c) {
+  if (!(solid instanceof Solid)) throw new Error('color needs a solid: color(solid, "#rrggbb")');
+  const hex = HEX.test(String(c)) ? String(c).toLowerCase() : NAMED[String(c).toLowerCase()];
+  if (!hex) throw new Error(`color(…, "${c}"): give a colour as "#rrggbb" or a plain name (black, white, orange, red, blue, green, yellow, grey, gold, silver, brown, pink, purple, teal)`);
+  return new Colored(solid instanceof Colored ? solid.k : solid, hex);
+}
+// the bodies a model is made of: [{ col, solid }], one per colour (col null when the model has no colours)
+function colorParts(s) {
+  const out = [], walk = q => { if (q instanceof Colored) out.push({ col: q.col, solid: q.k }); else if (q instanceof Union3 && !q.k) q.ks.forEach(walk); else out.push({ col: null, solid: q }); };
+  walk(s);
+  if (!out.some(p => p.col)) return [{ col: null, solid: s }];
+  const by = new Map(); for (const p of out) { const k = p.col || '#d8d4cc'; if (!by.has(k)) by.set(k, []); by.get(k).push(p.solid); }
+  return [...by].map(([col, list]) => ({ col, solid: list.length === 1 ? list[0] : new Union3(groupFar(list), 0) }));
+}
+
 /* ---------------- the modelling vocabulary (what a model's code may call) ---------------- */
 const flat = a => a.flat(Infinity).filter(Boolean);
 function takeOpts(args) { const o = args.length && isOpts(args[args.length - 1]) ? args.pop() : {}; return o; }
@@ -229,8 +264,8 @@ const kOf = o => Math.max(0, num(o.fillet ?? o.blend ?? o.smooth, 0));
 const dimOf = list => { const d = list[0] instanceof Shape ? 2 : 3; for (const q of list) { if (!(q instanceof Shape) && !(q instanceof Solid)) throw new Error('union/cut/intersect take shapes or solids, got ' + (q === undefined ? 'undefined' : typeof q)); if ((q instanceof Shape ? 2 : 3) !== d) throw new Error('Cannot combine a flat shape with a solid: extrude the shape first'); } return d; };
 function union(...args) { const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('union needs at least one solid'); if (ks.length === 1) return ks[0]; const k = kOf(o); if (dimOf(ks) === 2) return new Union2(ks, k); if (!k) return new Union3(groupFar(ks), 0);
   const b = bbUnion(ks.map(q => q.bb)); return new Inter3([new Union3(ks, k), new Slab3(b)], 0); }   // a blended join would bulge where two faces are flush (both resting on the bed): the box that holds the parts trims that off
-function cut(a, ...rest) { const o = takeOpts(rest), tools = flat(rest); if (!(a instanceof Solid) && !(a instanceof Shape)) throw new Error('cut needs a solid to cut from'); if (!tools.length) return a; const k = kOf(o), d = dimOf([a, ...tools]), tool = tools.length === 1 ? tools[0] : (d === 2 ? new Union2(tools, 0) : new Union3(groupFar(tools), 0)); return d === 2 ? new Diff2(a, tool, k) : new Diff3(a, tool, k); }
-function intersect(...args) { const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('intersect needs at least one solid'); if (ks.length === 1) return ks[0]; return dimOf(ks) === 2 ? new Inter2(ks, kOf(o)) : new Inter3(ks, kOf(o)); }
+function cut(a, ...rest) { if (a instanceof Colored) return new Colored(cut(a.k, ...rest), a.col); if (a instanceof Union3 && !a.k && hasColor(a)) return eachBody(a, q => cut(q, ...rest)); const o = takeOpts(rest), tools = flat(rest); if (!(a instanceof Solid) && !(a instanceof Shape)) throw new Error('cut needs a solid to cut from'); if (!tools.length) return a; const k = kOf(o), d = dimOf([a, ...tools]), tool = tools.length === 1 ? tools[0] : (d === 2 ? new Union2(tools, 0) : new Union3(groupFar(tools), 0)); return d === 2 ? new Diff2(a, tool, k) : new Diff3(a, tool, k); }
+function intersect(...args) { if (args[0] instanceof Colored) return new Colored(intersect(args[0].k, ...args.slice(1)), args[0].col); const o = takeOpts(args), ks = flat(args); if (!ks.length) throw new Error('intersect needs at least one solid'); if (ks.length === 1) return ks[0]; return dimOf(ks) === 2 ? new Inter2(ks, kOf(o)) : new Inter3(ks, kOf(o)); }
 // Many parts in one union (a field of holes, a row of fins) are bundled by neighbourhood, so a point only asks the nearby ones.
 function groupFar(ks) {
   if (ks.length <= 10) return ks;
@@ -589,12 +624,16 @@ function finishMesh(positions, indices, info = {}) {
   // every edge should be used by exactly two triangles, once in each direction
   const em = new Map(), nV = positions.length / 3; for (let i = 0; i < idx.length; i += 3) for (let k = 0; k < 3; k++) { const a = idx[i + k], b = idx[i + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a; em.set(key, (em.get(key) || 0) + (a < b ? 1 : 1024)); }
   let open = 0, odd = 0; for (const v of em.values()) { if (v === 1 || v === 1024) open++; else if (v !== 1025) odd++; }
+  // separate pieces: triangles joined through shared corners
+  const par = new Int32Array(nV).map((_, i) => i), root = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  for (let i = 0; i < idx.length; i += 3) { const a = root(idx[i]), b = root(idx[i + 1]), c = root(idx[i + 2]); par[b] = a; par[root(c)] = a; }
+  const roots = new Set(); for (let i = 0; i < idx.length; i++) roots.add(root(idx[i]));
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], used = new Uint8Array(nV); for (let i = 0; i < idx.length; i++) used[idx[i]] = 1;
   for (let i = 0; i < nV; i++) if (used[i]) for (let a = 0; a < 3; a++) { const v = positions[i * 3 + a]; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
-  return { positions, indices: idx, stats: { triangles: idx.length / 3, volume: vol, area, min: lo, max: hi, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], openEdges: open, oddEdges: odd, watertight: open === 0, ...info } };
+  return { positions, indices: idx, stats: { triangles: idx.length / 3, volume: vol, area, min: lo, max: hi, size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], openEdges: open, oddEdges: odd, watertight: open === 0, pieces: roots.size, ...info } };
 }
 
-const API = { box, cylinder, cone, sphere, torus, tube, capsule, rod, halfspace, extrude, revolve, thread, union, cut, difference: cut, subtract: cut, intersect, rect, circle, ellipse, polygon, ngon, star, slot, ring, sector, text, array, polar, grid };
+const API = { color, colour: color, box, cylinder, cone, sphere, torus, tube, capsule, rod, halfspace, extrude, revolve, thread, union, cut, difference: cut, subtract: cut, intersect, rect, circle, ellipse, polygon, ngon, star, slot, ring, sector, text, array, polar, grid };
 /* ================= Forge worker =================
    Runs beside the page so the screen never freezes: it keeps the fonts and any imported shape, runs a model's code,
    turns the result into triangles and measures it. The page sends messages; this answers each one.
@@ -643,7 +682,7 @@ function runCode(code, params, source) {
 }
 
 // For the screen: every triangle gets its own corners, smooth across gentle bends and crisp at real edges, plus the list of crisp edges to draw as lines.
-function forScreen(positions, indices, creaseDeg = 32) {
+function forScreen(positions, indices, creaseDeg = 32, parts = null) {
   const nT = indices.length / 3, nV = positions.length / 3, fn = new Float32Array(nT * 3), fa = new Float32Array(nT), cosC = Math.cos(creaseDeg * Math.PI / 180);
   for (let t = 0; t < nT; t++) {
     const a = indices[t * 3] * 3, b = indices[t * 3 + 1] * 3, c = indices[t * 3 + 2] * 3, ux = positions[b] - positions[a], uy = positions[b + 1] - positions[a + 1], uz = positions[b + 2] - positions[a + 2], vx = positions[c] - positions[a], vy = positions[c + 1] - positions[a + 1], vz = positions[c + 2] - positions[a + 2];
@@ -658,16 +697,23 @@ function forScreen(positions, indices, creaseDeg = 32) {
     for (let q = start[v]; q < start[v + 1]; q++) { const f = of[q], bx = fn[f * 3], by = fn[f * 3 + 1], bz = fn[f * 3 + 2]; if (ax * bx + ay * by + az * bz >= cosC) { sx += bx * fa[f]; sy += by * fa[f]; sz += bz * fa[f]; } }
     const l = Math.hypot(sx, sy, sz) || 1; nrm[o] = sx / l; nrm[o + 1] = sy / l; nrm[o + 2] = sz / l;
   }
-  const seen = new Map(), edges = [];
+  const seen = new Map(), edges = [], cand = [];
   for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
     const a = indices[t * 3 + k], b = indices[t * 3 + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a, o = seen.get(key);
     if (o === undefined) { seen.set(key, t); continue; }
     if (fn[t * 3] * fn[o * 3] + fn[t * 3 + 1] * fn[o * 3 + 1] + fn[t * 3 + 2] * fn[o * 3 + 2] >= cosC) continue;
     const l2 = (positions[a * 3] - positions[b * 3]) ** 2 + (positions[a * 3 + 1] - positions[b * 3 + 1]) ** 2 + (positions[a * 3 + 2] - positions[b * 3 + 2]) ** 2;
-    if (Math.min(fa[t], fa[o]) < .04 * l2) continue;       // a needle-thin triangle has no trustworthy direction: no line for it
-    edges.push(positions[a * 3], positions[a * 3 + 1], positions[a * 3 + 2], positions[b * 3], positions[b * 3 + 1], positions[b * 3 + 2]);
+    if (Math.min(fa[t], fa[o]) < .08 * l2) continue;       // a needle-thin triangle has no trustworthy direction: no line for it
+    cand.push(a, b);
   }
-  return { pos, nrm, edges: new Float32Array(edges) };
+  // a real crease runs on through several edges; a lone crease edge on a smooth curve is a facet artefact, so it is not drawn
+  const up = new Map(), find = v => { let r = v; while (up.has(r) && up.get(r) !== r) r = up.get(r); return r; };
+  for (let i = 0; i < cand.length; i += 2) { const a = find(cand[i]), b = find(cand[i + 1]); up.set(a, a); up.set(b, a); }
+  const size = new Map(); for (let i = 0; i < cand.length; i += 2) { const r = find(cand[i]); size.set(r, (size.get(r) || 0) + 1); }
+  for (let i = 0; i < cand.length; i += 2) { const a = cand[i], b = cand[i + 1]; if (size.get(find(a)) < 6) continue; edges.push(positions[a * 3], positions[a * 3 + 1], positions[a * 3 + 2], positions[b * 3], positions[b * 3 + 1], positions[b * 3 + 2]); }
+  let col = null;
+  if (parts && parts.length) { col = new Float32Array(nT * 9); for (const pt of parts) { const c = parseInt(pt.color.slice(1), 16), r = (c >> 16 & 255) / 255, g = (c >> 8 & 255) / 255, b = (c & 255) / 255; for (let t = pt.t0; t < pt.t1; t++) for (let k = 0; k < 3; k++) { col[t * 9 + k * 3] = r; col[t * 9 + k * 3 + 1] = g; col[t * 9 + k * 3 + 2] = b; } } }
+  return { pos, nrm, edges: new Float32Array(edges), col };
 }
 
 // a file shown as it came: its own triangles, resized, centred and standing on the bed
@@ -677,15 +723,25 @@ function asOpened(msg) {
   for (let i = 0; i < P.length; i += 3) { P[i] = (raw.positions[i] - cx) * s; P[i + 1] = (raw.positions[i + 1] - cy) * s; P[i + 2] = (raw.positions[i + 2] - b[2]) * s; }
   return finishMesh(P, raw.indices.slice(), { keep: true, asOpened: true });
 }
+// one closed body per colour, joined into one list of triangles with the range each colour covers
+function meshColored(bodies, q) {
+  const meshes = bodies.map(b => ({ col: b.col, m: meshSolid(b.solid, { ...q, budget: Math.max(30000, Math.round(q.budget / Math.sqrt(bodies.length))) }) })).filter(x => x.m.stats.triangles);
+  let nv = 0, nt = 0; for (const x of meshes) { nv += x.m.positions.length; nt += x.m.indices.length; }
+  const P = new Float32Array(nv), I = new Uint32Array(nt), parts = []; let vo = 0, io = 0;
+  for (const x of meshes) { P.set(x.m.positions, vo); for (let i = 0; i < x.m.indices.length; i++) I[io + i] = x.m.indices[i] + vo / 3; parts.push({ color: x.col, t0: io / 3, t1: (io + x.m.indices.length) / 3 }); vo += x.m.positions.length; io += x.m.indices.length; }
+  const st = meshes.map(x => x.m.stats), lo = [0, 1, 2].map(a => Math.min(...st.map(s => s.min[a]))), hi = [0, 1, 2].map(a => Math.max(...st.map(s => s.max[a])));
+  return { positions: P, indices: I, parts, stats: { triangles: nt / 3, volume: st.reduce((a, s) => a + s.volume, 0), area: st.reduce((a, s) => a + s.area, 0), min: lo, max: hi, size: [0, 1, 2].map(a => hi[a] - lo[a]), openEdges: st.reduce((a, s) => a + s.openEdges, 0), oddEdges: st.reduce((a, s) => a + s.oddEdges, 0), watertight: st.every(s => s.watertight), pieces: st.reduce((a, s) => a + (s.pieces || 1), 0), cell: Math.min(...st.map(s => s.cell)), bodies: parts.length } };
+}
 function build(msg) {
   if (msg.passthrough) { const t0 = Date.now(), mesh = asOpened(msg), view = forScreen(mesh.positions, mesh.indices); return { positions: mesh.positions, indices: mesh.indices, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view }; }
   const t0 = Date.now(), src = msg.sourceId ? SOURCES.get(msg.sourceId) : null;
   const solid = runCode(msg.code, msg.params || {}, src);
   const q = { ...(QUALITY[msg.quality] || QUALITY.normal), ...(msg.budget > 0 ? { budget: msg.budget } : {}), ...(msg.tol > 0 ? { tol: msg.tol } : {}) };
-  const mesh = meshSolid(solid, q);
+  const bodies = colorParts(solid);
+  const mesh = bodies.length === 1 && !bodies[0].col ? meshSolid(solid, q) : meshColored(bodies, q);
   if (!mesh.stats.triangles) throw new Error('The model came out empty: everything was cut away, or it is thinner than the mesher can see.');
-  const view = forScreen(mesh.positions, mesh.indices);
-  return { positions: mesh.positions, indices: mesh.indices, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view };
+  const view = forScreen(mesh.positions, mesh.indices, 32, mesh.parts);
+  return { positions: mesh.positions, indices: mesh.indices, parts: mesh.parts || null, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view };
 }
 
 // An imported or sculpted mesh (millimetres or not, Z up) becomes a solid: 100 mm along its longest side, centred, on the bed.
@@ -721,7 +777,7 @@ function handle(msg, say) {
     else if (msg.type === 'lock') { lockDown(); say({ type: 'ready', what: 'lock' }); }
     else if (msg.type === 'source') { const r = addSource(msg, say); say({ type: 'sourced', id: msg.id, job: msg.job, ...r }); }
     else if (msg.type === 'forget') { SOURCES.delete(msg.id); }
-    else if (msg.type === 'build') { const r = build(msg); say({ type: 'built', job: msg.job, ...r }, [r.positions.buffer, r.indices.buffer, r.pos.buffer, r.nrm.buffer, r.edges.buffer]); }
+    else if (msg.type === 'build') { const r = build(msg); say({ type: 'built', job: msg.job, ...r }, [r.positions.buffer, r.indices.buffer, r.pos.buffer, r.nrm.buffer, r.edges.buffer, ...(r.col ? [r.col.buffer] : [])]); }
   } catch (e) { say({ type: 'error', job: msg.job, id: msg.id, message: e?.message || String(e), line: e?.line ?? null, stage: e?.stage || msg.type }); }
 }
 if (IN_WORKER) self.onmessage = ev => handle(ev.data, (m, tr) => self.postMessage(m, tr || []));

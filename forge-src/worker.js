@@ -46,7 +46,7 @@ function runCode(code, params, source) {
 }
 
 // For the screen: every triangle gets its own corners, smooth across gentle bends and crisp at real edges, plus the list of crisp edges to draw as lines.
-function forScreen(positions, indices, creaseDeg = 32) {
+function forScreen(positions, indices, creaseDeg = 32, parts = null) {
   const nT = indices.length / 3, nV = positions.length / 3, fn = new Float32Array(nT * 3), fa = new Float32Array(nT), cosC = Math.cos(creaseDeg * Math.PI / 180);
   for (let t = 0; t < nT; t++) {
     const a = indices[t * 3] * 3, b = indices[t * 3 + 1] * 3, c = indices[t * 3 + 2] * 3, ux = positions[b] - positions[a], uy = positions[b + 1] - positions[a + 1], uz = positions[b + 2] - positions[a + 2], vx = positions[c] - positions[a], vy = positions[c + 1] - positions[a + 1], vz = positions[c + 2] - positions[a + 2];
@@ -61,16 +61,23 @@ function forScreen(positions, indices, creaseDeg = 32) {
     for (let q = start[v]; q < start[v + 1]; q++) { const f = of[q], bx = fn[f * 3], by = fn[f * 3 + 1], bz = fn[f * 3 + 2]; if (ax * bx + ay * by + az * bz >= cosC) { sx += bx * fa[f]; sy += by * fa[f]; sz += bz * fa[f]; } }
     const l = Math.hypot(sx, sy, sz) || 1; nrm[o] = sx / l; nrm[o + 1] = sy / l; nrm[o + 2] = sz / l;
   }
-  const seen = new Map(), edges = [];
+  const seen = new Map(), edges = [], cand = [];
   for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
     const a = indices[t * 3 + k], b = indices[t * 3 + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a, o = seen.get(key);
     if (o === undefined) { seen.set(key, t); continue; }
     if (fn[t * 3] * fn[o * 3] + fn[t * 3 + 1] * fn[o * 3 + 1] + fn[t * 3 + 2] * fn[o * 3 + 2] >= cosC) continue;
     const l2 = (positions[a * 3] - positions[b * 3]) ** 2 + (positions[a * 3 + 1] - positions[b * 3 + 1]) ** 2 + (positions[a * 3 + 2] - positions[b * 3 + 2]) ** 2;
-    if (Math.min(fa[t], fa[o]) < .04 * l2) continue;       // a needle-thin triangle has no trustworthy direction: no line for it
-    edges.push(positions[a * 3], positions[a * 3 + 1], positions[a * 3 + 2], positions[b * 3], positions[b * 3 + 1], positions[b * 3 + 2]);
+    if (Math.min(fa[t], fa[o]) < .08 * l2) continue;       // a needle-thin triangle has no trustworthy direction: no line for it
+    cand.push(a, b);
   }
-  return { pos, nrm, edges: new Float32Array(edges) };
+  // a real crease runs on through several edges; a lone crease edge on a smooth curve is a facet artefact, so it is not drawn
+  const up = new Map(), find = v => { let r = v; while (up.has(r) && up.get(r) !== r) r = up.get(r); return r; };
+  for (let i = 0; i < cand.length; i += 2) { const a = find(cand[i]), b = find(cand[i + 1]); up.set(a, a); up.set(b, a); }
+  const size = new Map(); for (let i = 0; i < cand.length; i += 2) { const r = find(cand[i]); size.set(r, (size.get(r) || 0) + 1); }
+  for (let i = 0; i < cand.length; i += 2) { const a = cand[i], b = cand[i + 1]; if (size.get(find(a)) < 6) continue; edges.push(positions[a * 3], positions[a * 3 + 1], positions[a * 3 + 2], positions[b * 3], positions[b * 3 + 1], positions[b * 3 + 2]); }
+  let col = null;
+  if (parts && parts.length) { col = new Float32Array(nT * 9); for (const pt of parts) { const c = parseInt(pt.color.slice(1), 16), r = (c >> 16 & 255) / 255, g = (c >> 8 & 255) / 255, b = (c & 255) / 255; for (let t = pt.t0; t < pt.t1; t++) for (let k = 0; k < 3; k++) { col[t * 9 + k * 3] = r; col[t * 9 + k * 3 + 1] = g; col[t * 9 + k * 3 + 2] = b; } } }
+  return { pos, nrm, edges: new Float32Array(edges), col };
 }
 
 // a file shown as it came: its own triangles, resized, centred and standing on the bed
@@ -80,15 +87,25 @@ function asOpened(msg) {
   for (let i = 0; i < P.length; i += 3) { P[i] = (raw.positions[i] - cx) * s; P[i + 1] = (raw.positions[i + 1] - cy) * s; P[i + 2] = (raw.positions[i + 2] - b[2]) * s; }
   return finishMesh(P, raw.indices.slice(), { keep: true, asOpened: true });
 }
+// one closed body per colour, joined into one list of triangles with the range each colour covers
+function meshColored(bodies, q) {
+  const meshes = bodies.map(b => ({ col: b.col, m: meshSolid(b.solid, { ...q, budget: Math.max(30000, Math.round(q.budget / Math.sqrt(bodies.length))) }) })).filter(x => x.m.stats.triangles);
+  let nv = 0, nt = 0; for (const x of meshes) { nv += x.m.positions.length; nt += x.m.indices.length; }
+  const P = new Float32Array(nv), I = new Uint32Array(nt), parts = []; let vo = 0, io = 0;
+  for (const x of meshes) { P.set(x.m.positions, vo); for (let i = 0; i < x.m.indices.length; i++) I[io + i] = x.m.indices[i] + vo / 3; parts.push({ color: x.col, t0: io / 3, t1: (io + x.m.indices.length) / 3 }); vo += x.m.positions.length; io += x.m.indices.length; }
+  const st = meshes.map(x => x.m.stats), lo = [0, 1, 2].map(a => Math.min(...st.map(s => s.min[a]))), hi = [0, 1, 2].map(a => Math.max(...st.map(s => s.max[a])));
+  return { positions: P, indices: I, parts, stats: { triangles: nt / 3, volume: st.reduce((a, s) => a + s.volume, 0), area: st.reduce((a, s) => a + s.area, 0), min: lo, max: hi, size: [0, 1, 2].map(a => hi[a] - lo[a]), openEdges: st.reduce((a, s) => a + s.openEdges, 0), oddEdges: st.reduce((a, s) => a + s.oddEdges, 0), watertight: st.every(s => s.watertight), pieces: st.reduce((a, s) => a + (s.pieces || 1), 0), cell: Math.min(...st.map(s => s.cell)), bodies: parts.length } };
+}
 function build(msg) {
   if (msg.passthrough) { const t0 = Date.now(), mesh = asOpened(msg), view = forScreen(mesh.positions, mesh.indices); return { positions: mesh.positions, indices: mesh.indices, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view }; }
   const t0 = Date.now(), src = msg.sourceId ? SOURCES.get(msg.sourceId) : null;
   const solid = runCode(msg.code, msg.params || {}, src);
   const q = { ...(QUALITY[msg.quality] || QUALITY.normal), ...(msg.budget > 0 ? { budget: msg.budget } : {}), ...(msg.tol > 0 ? { tol: msg.tol } : {}) };
-  const mesh = meshSolid(solid, q);
+  const bodies = colorParts(solid);
+  const mesh = bodies.length === 1 && !bodies[0].col ? meshSolid(solid, q) : meshColored(bodies, q);
   if (!mesh.stats.triangles) throw new Error('The model came out empty: everything was cut away, or it is thinner than the mesher can see.');
-  const view = forScreen(mesh.positions, mesh.indices);
-  return { positions: mesh.positions, indices: mesh.indices, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view };
+  const view = forScreen(mesh.positions, mesh.indices, 32, mesh.parts);
+  return { positions: mesh.positions, indices: mesh.indices, parts: mesh.parts || null, stats: { ...mesh.stats, ms: Date.now() - t0, quality: msg.quality || 'normal' }, ...view };
 }
 
 // An imported or sculpted mesh (millimetres or not, Z up) becomes a solid: 100 mm along its longest side, centred, on the bed.
@@ -124,7 +141,7 @@ function handle(msg, say) {
     else if (msg.type === 'lock') { lockDown(); say({ type: 'ready', what: 'lock' }); }
     else if (msg.type === 'source') { const r = addSource(msg, say); say({ type: 'sourced', id: msg.id, job: msg.job, ...r }); }
     else if (msg.type === 'forget') { SOURCES.delete(msg.id); }
-    else if (msg.type === 'build') { const r = build(msg); say({ type: 'built', job: msg.job, ...r }, [r.positions.buffer, r.indices.buffer, r.pos.buffer, r.nrm.buffer, r.edges.buffer]); }
+    else if (msg.type === 'build') { const r = build(msg); say({ type: 'built', job: msg.job, ...r }, [r.positions.buffer, r.indices.buffer, r.pos.buffer, r.nrm.buffer, r.edges.buffer, ...(r.col ? [r.col.buffer] : [])]); }
   } catch (e) { say({ type: 'error', job: msg.job, id: msg.id, message: e?.message || String(e), line: e?.line ?? null, stage: e?.stage || msg.type }); }
 }
 if (IN_WORKER) self.onmessage = ev => handle(ev.data, (m, tr) => self.postMessage(m, tr || []));
