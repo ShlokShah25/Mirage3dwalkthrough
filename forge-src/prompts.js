@@ -77,8 +77,23 @@ const SCULPT_ON = `PART OR SCULPT
 "sculpt": natural, organic forms the vocabulary cannot build: animals, people, characters, faces, plants, creatures, rich ornament. A sculptor makes the shape and your code makes it a printable model.
 For a sculpt add "mesh": { "prompt": "the object alone, described for a sculptor in one clear sentence: what it is, its pose, its style", "from": "words" } (use "from": "picture" only when the customer attached a picture of the very thing to reproduce).
 In the code the sculpted shape is the solid "source": 100 mm along its longest side, centred on x = 0 and y = 0, sitting on z = 0. Size it with source.fit({ z: p.height }) (or x or y), then make it printable: a flat underside (source.fit({ z: p.height }).clip({ zmin: 1.5 }).onBed()), a base under it, a keyring loop, a hollow inside, lettering on the base. For a sculpt, "size" holds the sides your own code fixes (usually only the one you fitted); the others are null. To make it exactly H tall with a flat underside: source.fit({ z: H + 1.5 }).clip({ zmin: 1.5 }).onBed(); with a base of thickness B under it, fit the figure to H - B + overlap and move it up so its top lands on H.`;
-const SCULPT_OFF = `Sculpted shapes are switched off on this site. Always answer with "kind": "part": build the closest clean, stylised version you can from the vocabulary (blend rounded forms with union(..., { fillet })), and say in "say" that it is a simplified shape.`;
+const SCULPT_OFF = `Sculpted shapes are not available right now. Always answer with "kind": "part" and never refuse: anything can be built as a clean stylised model from the vocabulary, the way a toy designer would. Say in "say" that it is a stylised version.
+ORGANIC FORMS (people, characters, animals, plants, food, faces)
+  Build them like a vinyl toy: big simple masses blended together with union(..., { fillet: 2 to 6 }), never thin details.
+  Masses: an egg or bean is sphere(r).scale(sx, sy, sz); a limb is tube([[x, y, z], [x, y, z], ...], r) through the shoulder, elbow and hand; a tapered form is cylinder(r, h, { r2, round: true }) or revolve(profile); a flat round pad is cylinder with round.
+  A character: chibi proportions (head about 40% of the height, slightly wider than the body), torso a scaled sphere, legs two short thick tubes standing on a round base disc 3 mm thick so it prints, arms as tubes (T-pose arms out to the sides are fine, at least 5 mm thick), hands small spheres, feet slightly forward ellipsoids.
+  Face and character details from the picture, made bold enough to print: hair or a beard as scaled spheres fused to the head and clipped, glasses as two torus rings plus a bridge rod standing 1 mm proud of the face, eyes as shallow cut spheres or small raised dots, a nose as a small sphere, ears as flattened spheres, clothing edges as a 0.8 mm raised band or a colour change.
+  Copy what the customer's picture shows: its proportions, pose, hairstyle, clothes and colours. When the picture has clear colours (skin, hair, shirt, trousers, shoes), give each region its colour with color(), keeping regions from overlapping by cutting the inner one out of the outer one.
+  Front faces -y. Default height 100 mm unless asked. Everything must fuse into one solid standing on its base.`;
 
+// what the customer's own pictures are: one, or several views of the same object labelled front, left, right, back or top
+function picLine(o, edit) {
+  const n = o.picture ? (o.pictureViews?.length || 1) : 0; if (!n) return '';
+  const where = edit && o.views ? `the last ${n} attached image${n > 1 ? 's' : ''}` : `the attached image${n > 1 ? 's' : ''}`;
+  const lab = (o.pictureViews || []).map((v, i) => `picture ${i + 1}: ${v || 'view not named'}`).join('; ');
+  if (n === 1) return `The customer attached a picture (${where}). If it is a sketch or drawing with sizes written on it, read every size and use it exactly. If it is a photo of an object, copy its shape, proportions and colours as closely as the vocabulary allows.\n\n`;
+  return `The customer attached ${n} pictures of the same object from different sides (${where}, in this order: ${lab}). Combine them: the front view gives width and height, a side view gives depth and the profile, the top view gives the footprint. Read any sizes written on them and use them exactly; copy the shape, proportions and colours as closely as the vocabulary allows.\n\n`;
+}
 const cleanIn = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 function modelBlock(m, stats) {
   const o = { kind: m.kind, name: m.name, params: m.params, code: m.code, size: m.size };
@@ -102,7 +117,7 @@ ${REPLY}
 
 ${EXAMPLE}
 
-${o.picture ? 'The customer attached a picture. If it is a sketch or drawing with sizes written on it, read every size and use it exactly. If it is a photo of an object, use it to understand the shape.\n\n' : ''}THE CUSTOMER ASKS
+${picLine(o, false)}THE CUSTOMER ASKS
 ${cleanIn(text, 4000)}`;
 }
 
@@ -122,7 +137,7 @@ ${REPLY}
 
 ${modelBlock(m, o.stats)}
 ${o.views ? `\nPICTURES OF THE MODEL NOW: the first ${o.views} attached images show it from a front corner, from the front (looking toward +y), from the right side (looking toward -x) and from above, on a 10 mm grid with its width, depth and height drawn in blue. Use them to find where things are on the shape (an ear, a handle, a flat face) and work out their coordinates.\n` : ''}
-${talkBlock(m)}${o.picture ? 'The customer attached a picture with this request. Read any sizes written on it and use them exactly.\n\n' : ''}THE CUSTOMER NOW ASKS
+${talkBlock(m)}${picLine(o, true)}THE CUSTOMER NOW ASKS
 ${cleanIn(text, 4000)}`;
 }
 

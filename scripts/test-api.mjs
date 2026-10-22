@@ -271,7 +271,7 @@ process.env.LAUNCH_OFFER = 'off'; cfg = await (await fetch(B + '/api/config')).j
 process.env.FAL_QUEUE_URL = 'http://localhost:4003/queue';
 const Z = '66666666-eeee-4eee-8eee-000000000001', Z2 = '66666666-eeee-4eee-8eee-000000000002', FORGE_ASK = 'You are Forge, a mechanical designer.\n\nTHE CUSTOMER ASKS\n';
 for (const p of ['/forge', '/forge-worker.js', '/fonts/forge-sans.ttf']) assert.equal((await fetch(B + p)).status, 200, p); ok('the Forge page, its builder and its lettering fonts are served');
-cfg = await (await fetch(B + '/api/config', { cache: 'no-store' })).json(); assert.equal(cfg.forge.meshOn, true); assert.equal(cfg.forge.makesPerDay, 25);
+cfg = await (await fetch(B + '/api/config', { cache: 'no-store' })).json(); assert.equal(cfg.forge.meshOn, false); assert.equal(cfg.forge.makesPerDay, 25);
 r = await ai(Z, { kind: 'model_make', prompt: FORGE_ASK + 'a plate 60 x 40 x 5 with a hole' }); assert.ok(r.done); assert.match(r.json.code, /return cut\(plate/); assert.deepEqual(r.json.size, { x: 60, y: 40, z: 5 }); assert.equal(calls.filter(c => c.model).at(-1).model, 'claude-opus-5-5');
 r = await ai(Z, { kind: 'model_edit', prompt: 'You are Forge.\nTHE MODEL NOW\n{}\nTHE CUSTOMER NOW ASKS\nmake it 8 thick' }); assert.equal(r.json.size.z, 8); assert.equal(calls.filter(c => c.model).at(-1).model, 'claude-sonnet-5');
 r = await ai(Z, { kind: 'model_fix', prompt: 'You are Forge. A model you wrote has a problem.' }); assert.match(r.json.say, /corrected/); ok('Forge writes, changes and repairs a model (the strongest model writes, the everyday one edits)');

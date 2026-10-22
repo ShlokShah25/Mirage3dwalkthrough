@@ -59,7 +59,7 @@ export const DEEP = { rounds: () => Math.max(0, Math.min(8, Number(env('PLAN_DEE
 
 export function publicConfig(launch) {
   return {
-    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(), voiceOn: !!env('FAL_KEY'), forge: { meshOn: !!env('FAL_KEY'), makesPerDay: FORGE.makesPerDay, meshesPerDay: FORGE.meshesPerDay },
+    launch, free: freeMode(), guest: guestMode(), deepRounds: DEEP.rounds(), voiceOn: !!env('FAL_KEY'), forge: { meshOn: env('FORGE_SCULPT', 'off') === 'on' && !!env('FAL_KEY'), makesPerDay: FORGE.makesPerDay, meshesPerDay: FORGE.meshesPerDay },
     supabaseUrl: env('SUPABASE_URL', ''),
     supabaseAnonKey: env('SUPABASE_ANON_KEY', ''),
     razorpayKeyId: env('RAZORPAY_KEY_ID', ''),

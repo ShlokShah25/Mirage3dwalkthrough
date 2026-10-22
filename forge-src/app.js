@@ -10,7 +10,7 @@ const fail = (code, message, extra) => Object.assign(new Error(message || code),
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const HOOK = {};            // tests may replace the calls that leave the page
 
-const ST = { cfg: {}, models: store.get('forge-models', []), cur: null, mesh: null, busy: false, unit: store.get('forge-unit', 'mm'), bed: store.get('forge-bed', [220, 220, 250]), dims: true, edges: true, pic: null, quality: 'normal', draft: [] };
+const ST = { cfg: {}, models: store.get('forge-models', []), cur: null, mesh: null, busy: false, unit: store.get('forge-unit', 'mm'), bed: store.get('forge-bed', [220, 220, 250]), dims: true, edges: true, pics: [], last: null, quality: 'normal', draft: [] };
 
 /* ---------------- numbers on screen ---------------- */
 // The mesh follows curves to about a hundredth of a millimetre, so sizes are shown to that and no finer.
@@ -130,18 +130,18 @@ async function buildNow(m, quality = 'normal', extra = {}) {
 const V = { labels: [] };
 function initView() {
   const canvas = $('view');
-  V.r = new THREE.WebGLRenderer({ canvas, antialias: true }); V.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); V.r.setClearColor(0xEEF1F3, 1);
+  V.r = new THREE.WebGLRenderer({ canvas, antialias: true }); V.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); V.r.setClearColor(0x2A313A, 1);
   V.scene = new THREE.Scene();
   V.cam = new THREE.PerspectiveCamera(30, 1, 1, 30000); V.cam.up.set(0, 0, 1); V.cam.position.set(260, -330, 230);
   V.ctl = new OrbitControls(V.cam, canvas); V.ctl.enableDamping = false; V.ctl.addEventListener('change', draw);
-  V.scene.add(new THREE.HemisphereLight(0xffffff, 0xAEB9C2, 1.5));
+  V.scene.add(new THREE.HemisphereLight(0xffffff, 0x5A6672, 1.55));
   const key = new THREE.DirectionalLight(0xffffff, 2.1); key.position.set(.6, -1, 1.5); V.scene.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, .7); fill.position.set(-1, .8, .6); V.scene.add(fill);
   V.bed = new THREE.Group(); V.dim = new THREE.Group(); V.scene.add(V.bed, V.dim);
   V.mat = new THREE.MeshStandardMaterial({ color: 0xF26A1B, roughness: .6, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   V.matCol = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-  V.edgeMat = new THREE.LineBasicMaterial({ color: 0x12202B, transparent: true, opacity: .5 });
-  V.dimMat = new THREE.LineBasicMaterial({ color: 0x1F5FBF });
+  V.edgeMat = new THREE.LineBasicMaterial({ color: 0x10151B, transparent: true, opacity: .55 });
+  V.dimMat = new THREE.LineBasicMaterial({ color: 0x5B9BFF });
   new ResizeObserver(resize).observe($('stage')); drawBed(); resize(); frame('iso');
 }
 function resize() { const s = $('stage'), w = Math.max(50, s.clientWidth), h = Math.max(50, s.clientHeight); V.r.setSize(w, h, false); V.cam.aspect = w / h; V.cam.updateProjectionMatrix(); if (DM.on && ST.mesh === DM.r) offsetView(true); draw(); }
@@ -151,8 +151,8 @@ function drawBed() {
   const [bx, by] = ST.bed, hx = bx / 2, hy = by / 2, minor = [], major = [];
   for (let x = -Math.floor(hx / 10) * 10; x <= hx; x += 10) (x % 50 === 0 ? major : minor).push(x, -hy, 0, x, hy, 0);
   for (let y = -Math.floor(hy / 10) * 10; y <= hy; y += 10) (y % 50 === 0 ? major : minor).push(-hx, y, 0, hx, y, 0);
-  V.bed.add(lines(minor, new THREE.LineBasicMaterial({ color: 0xD3DADF })), lines(major, new THREE.LineBasicMaterial({ color: 0xB3BEC7 })),
-    lines([-hx, -hy, 0, hx, -hy, 0, hx, -hy, 0, hx, hy, 0, hx, hy, 0, -hx, hy, 0, -hx, hy, 0, -hx, -hy, 0], new THREE.LineBasicMaterial({ color: 0x6B7A86 })));
+  V.bed.add(lines(minor, new THREE.LineBasicMaterial({ color: 0x343D47 })), lines(major, new THREE.LineBasicMaterial({ color: 0x45505C })),
+    lines([-hx, -hy, 0, hx, -hy, 0, hx, -hy, 0, hx, hy, 0, hx, hy, 0, -hx, hy, 0, -hx, hy, 0, -hx, -hy, 0], new THREE.LineBasicMaterial({ color: 0x7A8794 })));
   draw();
 }
 function setMesh(r) {
@@ -230,13 +230,13 @@ function genStart(mode) {
       const geo = new THREE.SphereGeometry(1, 128, 96), wgeo = new THREE.SphereGeometry(1, 28, 18);
       GN.base = Float32Array.from(geo.attributes.position.array); GN.wbase = Float32Array.from(wgeo.attributes.position.array);
       GN.blob = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xF26A1B, roughness: .28, metalness: 0, clearcoat: .6, clearcoatRoughness: .25 }));
-      GN.wire = new THREE.LineSegments(new THREE.WireframeGeometry(wgeo), new THREE.LineBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .28 })); GN.wgeo = wgeo;
+      GN.wire = new THREE.LineSegments(new THREE.WireframeGeometry(wgeo), new THREE.LineBasicMaterial({ color: 0x8DBBFF, transparent: true, opacity: .3 })); GN.wgeo = wgeo;
     }
     GN.blob.scale.setScalar(30); GN.wire.scale.setScalar(31.5); GN.blob.position.set(0, 0, 36); GN.wire.position.copy(GN.blob.position);
     V.scene.add(GN.blob, GN.wire); if (!ST.mesh) frameBox([-38, -38, 0], [38, 38, 70]);
   } else if (ST.mesh) {
     const s = ST.mesh.stats, w = s.size[0] * 1.25 + 6, d = s.size[1] * 1.25 + 6;
-    if (!GN.scan) GN.scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x1F5FBF, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false }));
+    if (!GN.scan) GN.scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x5B9BFF, transparent: true, opacity: .18, side: THREE.DoubleSide, depthWrite: false }));
     GN.scan.scale.set(w, d, 1); GN.scan.position.set((s.min[0] + s.max[0]) / 2, (s.min[1] + s.max[1]) / 2, s.min[2]); V.scene.add(GN.scan);
   }
   GN.last = performance.now(); if (!GN.manual) GN.raf = requestAnimationFrame(genLoop);
@@ -360,11 +360,38 @@ function remember(m, snap) { if (!snap?.code) return; (m.history ||= []).push(sn
 /* ---------------- the conversation ---------------- */
 function showMsg(c) {
   const d = el('div', { class: 'msg ' + c.who }, c.text);
-  if (c.tip) d.append(el('span', { class: 'tip', text: c.tip })); if (c.img) d.append(el('img', { src: c.img, alt: 'Picture you added' }));
+  if (c.tip) d.append(el('span', { class: 'tip', text: c.tip }));
+  const imgs = c.imgs || (c.img ? [c.img] : []);
+  if (imgs.length) d.append(el('div', { class: 'imgs' }, ...imgs.map((src, i) => el('img', { src, alt: c.views?.[i] ? c.views[i] + ' view' : 'Picture you added', title: c.views?.[i] || '' }))));
   $('log').append(d); $('log').scrollTop = 1e9; return d;
 }
-function addMsg(who, text, extra = {}) { const c = { who, text, ...extra }; (ST.cur ? (ST.cur.chat ||= []) : ST.draft).push(c); if (ST.cur?.chat.length > 60) ST.cur.chat.splice(0, ST.cur.chat.length - 60); return showMsg(c); }
-function renderChat() { $('log').textContent = ''; for (const c of ST.cur?.chat || ST.draft) showMsg(c); }
+// The latest message carries the next step: Retry after something failed, or another version / undo after a result.
+function lastAsk() { const chat = ST.cur ? ST.cur.chat || [] : ST.draft, i = chat.map(c => c.who).lastIndexOf('you'); return i < 0 ? null : { text: chat[i].text, pics: [], first: !ST.cur?.history?.length }; }
+function markActions() {
+  for (const a of document.querySelectorAll('#log .macts')) a.remove();
+  const can = !ST.busy && !!(ST.last || (ST.cur && lastAsk())); $('btnRetry').disabled = !can;
+  const d = $('log').lastElementChild; if (!can || !d || !/\b(note|forge)\b/.test(d.className) || ST.lastOutcome === 'none') return;
+  const ic = '<svg class="i" viewBox="0 0 16 16"><path d="M13.5 8A5.5 5.5 0 1 1 11.6 3.8"/><path d="M13.5 2v3.5H10"/></svg>';
+  const b = (label, cls, fn) => { const x = el('button', { type: 'button', class: 'chip ' + cls, onclick: fn }); x.innerHTML = ic; x.append(label); return x; };
+  const row = el('div', { class: 'macts' });
+  if (ST.lastOutcome === 'fail') row.append(b('Retry', 'primary', retry));
+  else if (ST.lastOutcome === 'ok') row.append(b('Try another version', '', retry));
+  else return;
+  d.append(row); $('log').scrollTop = 1e9;
+}
+// Run the last request again. After a result, that first takes the result back, so the retry replaces it.
+async function retry() {
+  if (ST.busy) return; const L = ST.last || lastAsk(); if (!L) return;
+  if (ST.lastOutcome !== 'fail' && ST.cur?.code) {
+    const m = ST.cur;
+    if (m.history?.length && !L.first) { restore(m, m.history.pop()); openSheet(); }
+    else { ST.models = ST.models.filter(x => x !== m); idb.del(m.id); ST.draft = (m.chat || []).slice(); ST.cur = null; ST.mesh = null; setMesh(null); $('sheet').hidden = true; $('tools').hidden = true; $('titleblock').hidden = true; save(); }
+  }
+  const chat = ST.cur ? ST.cur.chat : ST.draft, i = chat.map(c => c.who).lastIndexOf('you'); if (i >= 0) chat.splice(i);
+  renderChat(); send(L.text, L.pics);
+}
+function addMsg(who, text, extra = {}) { const c = { who, text, ...extra }; (ST.cur ? (ST.cur.chat ||= []) : ST.draft).push(c); if (ST.cur?.chat.length > 60) ST.cur.chat.splice(0, ST.cur.chat.length - 60); const d = showMsg(c); markActions(); return d; }
+function renderChat() { $('log').textContent = ''; for (const c of ST.cur?.chat || ST.draft) showMsg(c); markActions(); }
 function waiting(text) { const span = el('span', { text }), d = el('div', { class: 'msg wait' }, el('i'), span); $('log').append(d); $('log').scrollTop = 1e9; return { say(t) { span.textContent = t; status(t); }, done() { d.remove(); statusDone(); } }; }
 let statusT = null, statusT0 = 0;
 function status(text) {
@@ -377,7 +404,7 @@ function statusDone() { status(null); statusT0 = 0; }
 function setScreen() {
   const empty = !ST.cur && !ST.draft.length && !ST.busy; document.body.classList.toggle('empty', empty); $('start').hidden = !empty;
   if (!empty) endDemo(); else startDemo();
-  $('crumb').hidden = !ST.cur; if (ST.cur) $('crumb').textContent = ST.cur.name;
+  $('crumb').hidden = !ST.cur?.code; if (ST.cur) $('mName').value = ST.cur.name;
   $('titleblock').hidden = !ST.cur || !ST.mesh; resize();
 }
 const friendly = e => e?.code === 'cancelled' ? 'Stopped.' : (e?.message && e.code ? e.message : 'Something went wrong. Try again.');
@@ -407,7 +434,7 @@ async function buildChecked(m, wait, request) {
 // An organic shape: the server has it sculpted (about a minute), then it is stored here and handed to the builder.
 async function sculpt(m, spec, pic, wait) {
   wait.say('Sculpting the shape. This takes about a minute');
-  const usePic = spec.from === 'picture' && pic, started = HOOK.mesh ? await HOOK.mesh(spec, pic) : await (await api('/api/mesh', usePic ? { image: pic.data } : { prompt: String(spec.prompt || m.name) })).json();
+  pic = Array.isArray(pic) ? pic[0] : pic; const usePic = spec.from === 'picture' && pic, started = HOOK.mesh ? await HOOK.mesh(spec, pic) : await (await api('/api/mesh', usePic ? { image: pic.data } : { prompt: String(spec.prompt || m.name) })).json();
   let buf = started.bytes || null;
   for (let t0 = Date.now(); !buf;) {
     if (Date.now() - t0 > 9 * 60e3) throw fail('mesh_failed', 'Sculpting took too long. Try again in a moment.');
@@ -426,29 +453,32 @@ async function setSource(m, tri, info) {
 }
 function blankModel() { return { id: newId(), name: 'Model', kind: 'part', code: '', params: [], size: { x: null, y: null, z: null }, chat: [], history: [], source: null, thumb: null, created: Date.now(), updated: Date.now() }; }
 
-async function send(text, pic) {
-  text = String(text || '').trim(); if (ST.busy || (!text && !pic)) return; if (!text) text = 'Make this.';
-  setBusy(true);
+async function send(text, pics) {
+  pics = (Array.isArray(pics) ? pics : pics ? [pics] : []).filter(Boolean); const pic = pics.length ? pics : null;
+  text = String(text || '').trim(); if (ST.busy || (!text && !pic)) return; if (!text) text = pics.length > 1 ? 'Make this, from these views.' : 'Make this.';
   const first = !ST.cur?.code, had = ST.cur; let m = ST.cur, before = m ? snapshot(m) : null;
-  addMsg('you', text, pic ? { img: pic.small } : {}); setScreen();
+  ST.last = { text, pics, first }; ST.lastOutcome = 'none'; setBusy(true);
+  addMsg('you', text, pic ? { imgs: pics.map(p => p.small), views: pics.map(p => p.view || '') } : {}); setScreen();
   const wait = waiting(first ? 'Working out the geometry' : 'Working out the change'); genStart(first ? 'make' : 'edit');
   try {
     // a model made from a file or a sculpture is only a shape to Claude, so it sees the model itself, from four sides, with its sizes drawn
     const views = !first && m.source && ST.mesh ? viewShots() : [];
-    const opts = { meshOn: !!ST.cfg.forge?.meshOn || !!HOOK.mesh, picture: !!pic, stats: ST.mesh?.stats, views: views.length };
-    const ans = await askAIOnce(first ? 'model_make' : 'model_edit', first ? makePrompt(text, opts) : editPrompt(m, text, opts), [...views, ...(pic ? [pic.data] : [])]);
-    if (!ans?.code) { addMsg('forge', String(ans?.say || 'I could not work that out. Say it another way, with the sizes you need.').slice(0, 900)); return; }
+    const opts = { meshOn: !!ST.cfg.forge?.meshOn || !!HOOK.mesh, picture: !!pic, pictureViews: pics.map(p => p.view || ''), stats: ST.mesh?.stats, views: views.length };
+    const ans = await askAIOnce(first ? 'model_make' : 'model_edit', first ? makePrompt(text, opts) : editPrompt(m, text, opts), [...views, ...pics.map(p => p.data)]);
+    if (!ans?.code) { ST.lastOutcome = ans?.say ? 'none' : 'fail'; addMsg('forge', String(ans?.say || 'I could not work that out. Say it another way, with the sizes you need.').slice(0, 900)); return; }
     if (!m) { m = blankModel(); m.chat = ST.draft; ST.draft = []; ST.cur = m; }
     applyAnswer(m, ans);
-    if (ans.kind === 'sculpt' && ans.mesh && (first || ans.mesh.prompt)) await sculpt(m, ans.mesh, pic, wait);
+    if (opts.meshOn && ans.kind === 'sculpt' && ans.mesh && (first || ans.mesh.prompt)) await sculpt(m, ans.mesh, pic, wait);
+    else if (m.kind === 'sculpt' && !m.source) m.kind = 'part';
     const res = await buildChecked(m, wait, text);
     if (!res.built) {
+      ST.lastOutcome = 'fail';
       if (before?.code) { restore(m, before); addMsg('note', `That change could not be built (${res.problem?.message || 'the geometry failed'}), so your model is as it was. Try asking in a different way.`); }
       else { ST.draft = m.chat; ST.cur = had || null; addMsg('note', `That could not be built (${res.problem?.message || 'the geometry failed'}). Try again with a simpler description.`); }
       return;
     }
     if (!first) remember(m, before);
-    addMsg('forge', m.say || 'Done.', m.print ? { tip: m.print } : {});
+    ST.lastOutcome = 'ok'; addMsg('forge', m.say || 'Done.', m.print ? { tip: m.print } : {});
     if (!res.ok && res.problem?.type === 'size') addMsg('note', `Check the size: ${res.problem.off.map(a => `${a.toUpperCase()} measures ${nice(res.problem.got['xyz'.indexOf(a)])} ${unitName()} where ${nice(m.size[a])} was expected`).join(', ')}. Tell me which sizes matter most and I will correct it.`);
     if (!res.ok && res.problem?.type === 'open') addMsg('note', 'Part of the surface is too thin to close properly. Ask me to thicken it before you print.');
     if (!ST.models.includes(m)) ST.models.unshift(m);
@@ -456,7 +486,7 @@ async function send(text, pic) {
   } catch (e) {
     if (m && before?.code) { restore(m, before); refreshBuild(); } else if (m && !ST.models.includes(m)) { ST.draft = m.chat; ST.cur = had || null; }
     if (!e?.code) console.error('[forge]', e);
-    addMsg('note', friendly(e));
+    ST.lastOutcome = e?.code === 'cancelled' ? 'none' : 'fail'; addMsg('note', friendly(e));
   } finally { wait.done(); setBusy(false); if (GN.on && !GN.reveal) genStop(); }
 }
 
@@ -468,7 +498,7 @@ function fillFacts() {
   const offAxes = sizeOff(m.size, s.size);
   for (const [i, a] of ['x', 'y', 'z'].entries()) { const e = $('a' + a), w = m.size?.[a]; e.textContent = w != null ? `asked ${nice(w)}${offAxes.includes(a) ? ', differs' : ', matches'}` : ''; e.className = 'asked' + (offAxes.includes(a) ? ' bad' : ''); }
   $('tbName').textContent = m.name; $('tbSize').textContent = `${nice(s.size[0])} × ${nice(s.size[1])} × ${nice(s.size[2])}`; $('tbMass').textContent = `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g`;
-  $('tbDate').textContent = new Date(m.updated || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); $('crumb').textContent = m.name; $('titleblock').hidden = false;
+  $('tbDate').textContent = new Date(m.updated || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); $('mName').value = m.name; $('titleblock').hidden = false;
   const f = $('facts'); f.textContent = '';
   const row = (k, v, cls) => f.append(el('dt', { text: k }), el('dd', { class: cls || '', text: v }));
   const want = m.size, asked = ['x', 'y', 'z'].filter(a => want?.[a] != null);
@@ -477,7 +507,7 @@ function fillFacts() {
   row('Weight in PLA', `about ${Math.max(1, Math.round(s.volume / 1000 * 1.24))} g if solid`);
   row('Surface', s.watertight && !s.oddEdges ? 'Closed, ready to slice' : `${s.openEdges + s.oddEdges} open edges`, s.watertight && !s.oddEdges ? 'ok' : 'bad');
   const fits = s.size[0] <= ST.bed[0] && s.size[1] <= ST.bed[1] && s.size[2] <= ST.bed[2]; row('Printer bed', fits ? 'Fits' : 'Too big for this bed', fits ? 'ok' : 'bad');
-  if (s.pieces > 1) row('Separate pieces', String(s.pieces) + (ST.mesh.parts?.length > 1 ? ' (counting each colour)' : ''));
+  if (s.pieces > 1 && !(ST.mesh.parts?.length > 1)) row('Separate pieces', String(s.pieces));
   if (ST.mesh.parts?.length > 1) { const dd = el('dd'); for (const pt of ST.mesh.parts) dd.append(el('span', { title: pt.color, style: `display:inline-block;width:14px;height:14px;border-radius:3px;margin-left:5px;vertical-align:-2px;border:1px solid rgba(0,0,0,.25);background:${pt.color}` })); f.append(el('dt', { text: `${ST.mesh.parts.length} colours` }), dd); }
   row('Triangles', s.triangles.toLocaleString('en-IN') + (s.quality === 'draft' ? ' (preview)' : ''));
 }
@@ -509,7 +539,7 @@ function openSheet() {
   $('mName').value = m.name; $('code').value = m.code; $('codeErr').hidden = true; $('btnUndo').disabled = !m.history?.length; fillParams(); fillFacts(); $('btnGo').textContent = 'Change it';
   $('say').placeholder = 'Say what to change. For example: make it 10 mm taller, add a second hole, round the corners.';
 }
-function setBusy(b) { ST.busy = b; $('btnGo').disabled = b; for (const e of document.querySelectorAll('#params input, #codeRun, #btnUndo, #mName, #dlMain, #formats button')) e.disabled = b; if (!b && ST.cur) $('btnUndo').disabled = !ST.cur.history?.length; }
+function setBusy(b) { ST.busy = b; $('btnGo').disabled = b; $('btnRetry').disabled = true; if (!b) setTimeout(markActions); for (const e of document.querySelectorAll('#params input, #codeRun, #btnUndo, #mName, #dlMain, #formats button')) e.disabled = b; if (!b) $('btnUndo').disabled = !ST.cur?.history?.length; if (b) for (const a of document.querySelectorAll('#log .macts')) a.remove(); }
 
 /* ---------------- downloads ---------------- */
 async function download(id) {
@@ -532,7 +562,7 @@ async function download(id) {
 
 /* ---------------- opening, switching, listing ---------------- */
 async function openModel(m) {
-  ST.cur = m; ST.mesh = null; setMesh(null); renderChat(); $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false');
+  ST.last = null; ST.lastOutcome = 'none'; ST.cur = m; ST.mesh = null; setMesh(null); renderChat(); $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false');
   if (!m) { $('sheet').hidden = true; $('tools').hidden = true; setScreen(); $('btnGo').textContent = 'Make it'; $('say').placeholder = 'Describe the object and give any sizes you know. For example: a bracket 60 mm wide with two 5 mm holes.'; store.set('forge-last', null); return; }
   openSheet(); setScreen(); status('Building');
   try { showBuilt(await buildNow(m, ST.quality)); frame('iso'); if (!m.thumb) { m.thumb = thumb(); } save(); }
@@ -549,7 +579,7 @@ function listModels() {
   }
 }
 async function importFile(file) {
-  if (ST.busy) return; setBusy(true); const had = ST.cur; ST.cur = null; ST.draft = []; renderChat();
+  if (ST.busy) return; ST.last = null; ST.lastOutcome = 'none'; setBusy(true); const had = ST.cur; ST.cur = null; ST.draft = []; renderChat();
   const wait = waiting('Reading the file');
   try {
     const tri = await readMeshFile(file), m = blankModel(); m.name = file.name.replace(/\.[^.]+$/, '').slice(0, 60) || 'Opened mesh'; m.kind = 'part';
@@ -565,15 +595,34 @@ async function importFile(file) {
   } catch (e) { ST.cur = had || null; renderChat(); addMsg('note', e.code ? e.message : 'That file could not be read.'); if (had) openSheet(); }
   finally { wait.done(); setBusy(false); }
 }
-async function takePicture(file) {
-  if (!file) return; if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { addMsg('note', 'Add a JPG, PNG or WebP picture.'); return; }
-  const img = await createImageBitmap(file).catch(() => null); if (!img) { addMsg('note', 'That picture could not be read.'); return; }
-  const draw2 = side => { const k = Math.min(1, side / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c; };
-  ST.pic = { data: draw2(1568).toDataURL('image/jpeg', .88), small: draw2(220).toDataURL('image/jpeg', .7) };
-  $('picThumb').src = ST.pic.small; $('picThumb').hidden = false; $('picClear').hidden = false; $('btnPic').textContent = 'Change picture';
-  $('heroThumb').src = ST.pic.small; $('heroThumb').hidden = false; $('heroPic').textContent = 'Change picture';
+const MAXPICS = 4, VIEWS = ['', 'Front', 'Back', 'Left', 'Right', 'Top', 'Detail'];
+async function takePicture(files) {
+  files = [...(files?.length !== undefined ? files : [files])].filter(Boolean);
+  for (const file of files) {
+    if (ST.pics.length >= MAXPICS) { addMsg('note', `Up to ${MAXPICS} pictures per request.`); break; }
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { addMsg('note', 'Add a JPG, PNG or WebP picture.'); continue; }
+    const img = await createImageBitmap(file).catch(() => null); if (!img) { addMsg('note', 'That picture could not be read.'); continue; }
+    const draw2 = side => { const k = Math.min(1, side / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); return c; };
+    const guess = ['front', 'back', 'left', 'right', 'top'].find(v => new RegExp('\\b' + v + '\\b', 'i').test(file.name.replace(/[_-]/g, ' ')));
+    ST.pics.push({ data: draw2(1280).toDataURL('image/jpeg', .86), small: draw2(220).toDataURL('image/jpeg', .7), view: guess ? guess[0].toUpperCase() + guess.slice(1) : (ST.pics.length ? '' : '') });
+  }
+  showPics();
 }
-function clearPicture() { ST.pic = null; $('picThumb').hidden = true; $('picClear').hidden = true; $('btnPic').textContent = 'Add a picture'; $('picFile').value = ''; $('heroThumb').hidden = true; $('heroPic').textContent = 'Add a picture or sketch'; }
+// the pictures waiting to be sent, in both request boxes: a thumbnail, which side it shows (optional), and remove
+function showPics() {
+  for (const [list, btn, word] of [['picList', 'btnPic', 'Add a picture'], ['heroList', 'heroPic', 'Add a picture or sketch']]) {
+    const box = $(list); box.textContent = ''; box.hidden = !ST.pics.length;
+    ST.pics.forEach((p, i) => {
+      const sel = el('select', { 'aria-label': 'Which side picture ' + (i + 1) + ' shows', title: 'Which side this shows (optional)' }, ...VIEWS.map(v => el('option', { value: v, text: v || 'Side?' })));
+      sel.value = p.view || ''; sel.addEventListener('change', () => { p.view = sel.value; });
+      const x = el('button', { type: 'button', class: 'x', 'aria-label': 'Remove picture ' + (i + 1), text: '×', onclick: () => { ST.pics.splice(i, 1); showPics(); } });
+      box.append(el('div', { class: 'pic' }, el('img', { src: p.small, alt: '' }), sel, x));
+    });
+    const lbl = $(btn).lastChild; lbl.textContent = ST.pics.length ? (ST.pics.length < MAXPICS ? 'Add another view' : 'Four views added') : word; $(btn).disabled = ST.pics.length >= MAXPICS;
+  }
+  $('picClear').hidden = ST.pics.length < 2; $('picFile').value = '';
+}
+function clearPicture() { ST.pics = []; showPics(); }
 
 /* ---------------- start ---------------- */
 const STARTERS = [
@@ -581,7 +630,7 @@ const STARTERS = [
   ['A wall hook for a bag. The back plate is 30 mm wide, 70 mm tall and 4 mm thick, with two holes for M4 screws. The hook sticks out 35 mm.', 'Wall hook with two screw holes', '30 × 70, M4'],
   ['A stand for a phone that is 78 mm wide and 9 mm thick, leaning back 20 degrees, with a gap at the bottom for the charging cable.', 'Phone stand, leaning back 20°', '78 mm phone'],
   ['An M10 bolt 30 mm long with a hex head, and a matching nut beside it.', 'Bolt and nut with real threads', 'M10 × 30'],
-  ['A small sitting cat, 80 mm tall, with a flat base so it stands.', 'Sitting cat figurine', '80 tall', 'sculpt'],
+  ['A small sitting cat, 80 mm tall, with a flat base so it stands.', 'Sitting cat figurine', '80 tall'],
 ];
 async function boot() {
   try { ST.cfg = await (await fetch('/api/config')).json(); } catch { ST.cfg = {}; }
@@ -589,17 +638,18 @@ async function boot() {
   for (const [full, short, dims, need] of STARTERS) { if (need === 'sculpt' && !ST.cfg.forge?.meshOn) continue; $('starters').append(el('li', {}, el('button', { type: 'button', onclick: () => { $('heroSay').value = full; $('heroSay').focus(); } }, short, el('span', { text: dims })))); }
   for (const f of FORMATS.filter(x => x.id !== 'stl')) $('formats').append(el('button', { type: 'button', text: f.label, title: f.note, onclick: () => download(f.id), onmouseenter: () => { $('fmtHint').textContent = f.note; }, onfocus: () => { $('fmtHint').textContent = f.note; } }));
   $('dlMain').addEventListener('click', () => download('stl'));
-  $('heroAsk').addEventListener('submit', e => { e.preventDefault(); const t = $('heroSay').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) { $('heroSay').focus(); return; } $('heroSay').value = ''; clearPicture(); send(t, p); });
+  $('heroAsk').addEventListener('submit', e => { e.preventDefault(); const t = $('heroSay').value, p = ST.pics.slice(); if (ST.busy || (!t.trim() && !p.length)) { $('heroSay').focus(); return; } $('heroSay').value = ''; clearPicture(); send(t, p); });
   $('heroSay').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('heroAsk').requestSubmit(); } });
   $('heroPic').addEventListener('click', () => $('picFile').click());
   const closeGallery = () => { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); };
   $('galClose').addEventListener('click', closeGallery);
-  $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pic; if (ST.busy || (!t.trim() && !p)) return; $('say').value = ''; clearPicture(); send(t, p); });
+  $('ask').addEventListener('submit', e => { e.preventDefault(); const t = $('say').value, p = ST.pics.slice(); if (ST.busy || (!t.trim() && !p.length)) return; $('say').value = ''; clearPicture(); send(t, p); });
+  $('btnRetry').addEventListener('click', retry);
   $('say').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('ask').requestSubmit(); });
-  $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files[0])); $('picClear').addEventListener('click', clearPicture);
+  $('btnPic').addEventListener('click', () => $('picFile').click()); $('picFile').addEventListener('change', e => takePicture(e.target.files)); $('picClear').addEventListener('click', clearPicture);
   $('btnImport').addEventListener('click', () => $('meshFile').click()); $('btnOpen').addEventListener('click', () => { if (!ST.busy) $('meshFile').click(); }); $('meshFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); });
   const stage = $('stage'); stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('drop'); }); stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
-  stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('drop'); const f = e.dataTransfer?.files?.[0]; if (!f) return; if (/\.(stl|obj|glb)$/i.test(f.name)) importFile(f); else takePicture(f); });
+  stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('drop'); const fs = [...(e.dataTransfer?.files || [])], f = fs[0]; if (!f) return; if (/\.(stl|obj|glb)$/i.test(f.name)) importFile(f); else takePicture(fs); });
   for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => frame(b.dataset.view));
   $('tgDims').addEventListener('click', () => { ST.dims = !ST.dims; $('tgDims').setAttribute('aria-pressed', ST.dims); drawDims(); });
   $('tgEdges').addEventListener('click', () => { ST.edges = !ST.edges; $('tgEdges').setAttribute('aria-pressed', ST.edges); if (V.lines) V.lines.visible = ST.edges; draw(); });
@@ -610,12 +660,12 @@ async function boot() {
   $('bed').addEventListener('change', e => { ST.bed = e.target.value.split(',').map(Number); store.set('forge-bed', ST.bed); drawBed(); fillFacts(); });
   $('mName').addEventListener('change', e => { if (!ST.cur) return; ST.cur.name = e.target.value.trim().slice(0, 60) || 'Model'; e.target.value = ST.cur.name; save(); });
   $('codeRun').addEventListener('click', () => { const m = ST.cur; if (!m || ST.busy) return; const t = $('code').value; if (t === m.code) return refreshBuild(); remember(m, snapshot(m)); m.code = t; m.size = { x: null, y: null, z: null }; m.updated = Date.now(); $('btnUndo').disabled = false; refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
-  $('btnUndo').addEventListener('click', () => { const m = ST.cur, s = m?.history?.pop(); if (!s || ST.busy) return; restore(m, s); m.updated = Date.now(); openSheet(); addMsg('note', 'Went back to the version before the last change.'); refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
+  $('btnUndo').addEventListener('click', () => { const m = ST.cur, s = m?.history?.pop(); if (!s || ST.busy) return; restore(m, s); m.updated = Date.now(); openSheet(); ST.last = null; ST.lastOutcome = 'none'; addMsg('note', 'Went back to the version before the last change.'); refreshBuild().then(() => { m.thumb = thumb(); save(); }); });
   $('btnNew').addEventListener('click', () => { if (ST.busy) return; ST.draft = []; openModel(null); $('heroSay').focus(); });
   $('btnModels').addEventListener('click', () => { const d = $('drawer'); d.hidden = !d.hidden; $('btnModels').setAttribute('aria-expanded', !d.hidden); if (!d.hidden) listModels(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) { $('drawer').hidden = true; $('btnModels').setAttribute('aria-expanded', 'false'); $('btnModels').focus(); } });
   startWorker().catch(() => { });
   const last = ST.models.find(m => m.id === store.get('forge-last', null)); if (last) openModel(last); else setScreen();
 }
-globalThis.__forge = { GN, genFrame, genStart, genReveal, genStop, DM, ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
+globalThis.__forge = { retry, markActions, takePicture, GN, genFrame, genStart, genReveal, genStop, DM, ST, V, W, HOOK, send, buildNow, refreshBuild, download, frame, openModel, importFile, makePrompt, editPrompt, fixPrompt, FORMATS, nice, sizeOff, readSTL, readOBJ, readGLB, draw };
 boot();
