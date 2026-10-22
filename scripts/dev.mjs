@@ -37,7 +37,8 @@ http.createServer(async (req, res) => {
     if (!p.startsWith(join(root, 'public'))) { res.writeHead(403).end(); return; }
     try { if ((await stat(p)).isDirectory()) p = join(p, 'index.html'); } catch { if (existsSync(p + '.html')) p += '.html'; }
     const data = await readFile(p), ext = extname(p), type = TYPES[ext] || 'application/octet-stream';
-    const cache = ['.glb', '.mp4', '.mp3'].includes(ext) ? { 'cache-control': 'public, max-age=604800' } : {};
+    // pages and app code always revalidate, so a new deploy shows on the next load; media can be kept a week
+    const cache = ['.glb', '.mp4', '.mp3'].includes(ext) ? { 'cache-control': 'public, max-age=604800' } : { 'cache-control': 'no-cache' };
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (range && ['.mp4', '.mp3'].includes(ext)) {   // video needs byte ranges (Safari won't play without them)
       let a = range[1] ? +range[1] : data.length - +range[2], b = range[1] && range[2] ? +range[2] : data.length - 1;
